@@ -7,6 +7,9 @@ Input: [VC-02](02-test-delivery-and-recording.md) · Output: [VC-04](04-prototyp
 
 Convert real sessions into evidence-backed findings, review them through Devin, and create or update GitHub issues without duplicates. Respect `issues_only` as a complete, useful stopping point.
 
+> **Inputs available from VC-02 (implemented 2026-09-19):** `session.upload_verified` events and `SessionManifest` documents via `GET /api/owner/sessions/:id/manifest` (manifest, clock map, envelope), verified MP4 assets by id through signed URLs, event streams (`events:<session>`), transcript segments in session milliseconds (`transcript:<session>`), and the clock map. `tested_commit_sha` is a placeholder until VC-01 supplies a baseline, and `outcome.instrumented` is `unknown` until a success-rule evaluator exists; treat both as not established.
+
+
 ## Processing workflow
 
 1. Validate the manifest, ownership, task revision, tested build and completeness.

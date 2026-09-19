@@ -126,6 +126,8 @@ These are example counts and proposed defaults, not powered sample sizes or veri
 
 ## Implementation coordination
 
+Repository layout: `apps/web` (Next.js app, API routes, worker), `packages/contracts` (Zod schemas that every producer and consumer imports), `packages/sdk` (embedded script). Local stack: Supabase CLI for Postgres and Storage, Better Auth for sign-in, Biome for lint/format, Vitest and Playwright for tests. VC-02 is implemented and verified against real Vonage and SLNG with a simulated session (`LIVE_PROVIDERS=1`); VC-01 output is stand-in sample data seeded with provenance `sample`. The participant flow is a dialog the SDK overlays on the product page; see VC-02 for the host↔dialog contract in `packages/contracts/src/embed-messages.ts`.
+
 First agree on schemas and sample payloads. Person A owns VC-02 and dashboard UI; Person B owns VC-01/03/04/05 and orchestration. Person A also prepares the demo app and independent browser checks so repair work does not become a bottleneck. Both own shared contracts. This split does not authorize spawning agents automatically.
 
 Suggested milestones: (1) supplied finding → checked preview; (2) genuine recording → finding; (3) published task → assignment; (4) preview → retest → PR evidence; (5) discovery and demo polish.
@@ -140,9 +142,9 @@ Add unresolved proposals under Open decisions until resolved. JSON schema versio
 
 ## Open decisions
 
-- [ ] Choose durable worker/runtime and preview provider after a successful integration spike.
+- [x] Durable worker: a separate process leasing rows from a Postgres `jobs` table (`apps/web/src/worker`). Preview provider still open.
 - [ ] Verify Devin account/API capabilities, budgets and artifact retrieval with a real call.
-- [ ] Verify Vonage screen recording and SLNG timestamp/alignment behavior in the chosen browsers.
-- [ ] Select notification provider; local demo uses a test inbox.
+- [ ] Measure timestamp alignment tolerance between video, transcript and events, and verify Safari/Firefox screen share end to end. Vonage recording, signed callbacks and SLNG transcription are verified with real calls (2026-09-19); see VC-02's verification record.
+- [ ] Select notification provider; local development writes magic links and invitations to a database test inbox (`/dev/inbox`).
 - [ ] Confirm the selected open-source demo and hackathon eligibility; see VC-07.
 

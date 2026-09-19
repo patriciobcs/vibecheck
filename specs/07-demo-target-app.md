@@ -98,11 +98,12 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 
 | Item | Current value |
 | --- | --- |
-| Preferred candidate | Easy!Appointments; awaiting local spike |
-| Selected repository/fork | TBD |
-| Upstream commit/license reviewed | TBD |
+| Preferred candidate | Easy!Appointments for the rescheduling story; awaiting local spike |
+| Embedded-dialog demo target | [Excalidraw](https://github.com/excalidraw/excalidraw) cloned locally to `../excalidraw`, branch `vibecheck-demo` adds the SDK script tag to `excalidraw-app/index.html`; MIT licensed. Used to prove VC-02's in-app dialog and safe event capture, not the code-repair loop. Study "task_share_drawing" is stand-in data (VC-01 not implemented). |
+| Selected repository/fork | Local clone only; no GitHub fork created yet |
+| Upstream commit/license reviewed | Excalidraw: clone of 2026-09-19 (`git rev-parse HEAD` in `../excalidraw`), MIT. Easy!Appointments: TBD |
 | Baseline commit | TBD |
-| Setup and reset commands verified | TBD |
+| Setup and reset commands verified | Excalidraw: `yarn install`, `yarn --cwd ./excalidraw-app vite --port 3200` with `.env.development.local` holding `VITE_APP_PORT` and `VITE_APP_VIBECHECK_KEY`; no fixture reset needed for a blank canvas |
 | Deposit support | Unverified; optional and excluded unless demonstrated |
 | Preview runtime | TBD |
 | Organizer confirmation for third-party target | Pending |

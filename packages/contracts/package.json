@@ -1,0 +1,25 @@
+{
+  "name": "@vibecheck/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./safe": "./src/safe.ts",
+    "./embed": "./src/embed-messages.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "echo 'contracts is consumed from source'"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^5.0.1"
+  }
+}
