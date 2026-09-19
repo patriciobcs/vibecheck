@@ -1,0 +1,1 @@
+ALTER TABLE "IssuePublishRequest" ADD COLUMN "skipReason" text;

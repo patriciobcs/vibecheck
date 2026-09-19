@@ -15,6 +15,13 @@
       "when": 1789848766365,
       "tag": "0001_gray_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789849174413,
+      "tag": "0002_free_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

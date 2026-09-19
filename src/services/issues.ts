@@ -22,6 +22,11 @@ export function sanitizeForPublic(text: string, dashboardUrl: string) {
     .replace(/https?:\/\/[^\s)]+/gi, (url) =>
       url.startsWith(dashboardUrl) ? url : "[redacted url]",
     )
+    .replace(/\bsession[_-][A-Za-z0-9_-]+\b/gi, "[redacted session]")
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+      "[redacted id]",
+    )
     .replace(/\b(?:sk-|ghp_|Bearer\s+)[A-Za-z0-9._-]+/gi, "[redacted secret]");
 }
 
@@ -136,30 +141,25 @@ export async function publishFinding(
     )
     .limit(1);
   if (existing) return existing;
+  const recordSkipped = async (skipReason: "github_disconnected" | "no_token") => {
+    const [skipped] = await db
+      .insert(issuePublishRequest)
+      .values({
+        tenantId: row.tenantId,
+        findingId: row.id,
+        idempotencyKey: key,
+        action: "skipped",
+        skipReason,
+      })
+      .returning();
+    return skipped;
+  };
   const binding = repoBindingSchema.safeParse(productRow.repoBinding);
   if (!binding.success || !binding.data.issues_enabled) {
-    const [skipped] = await db
-      .insert(issuePublishRequest)
-      .values({
-        tenantId: row.tenantId,
-        findingId: row.id,
-        idempotencyKey: key,
-        action: "skipped",
-      })
-      .returning();
-    return skipped;
+    return recordSkipped("github_disconnected");
   }
-  if (!process.env.GITHUB_ISSUES_TOKEN && process.env.ISSUE_PUBLISHER !== "memory") {
-    const [skipped] = await db
-      .insert(issuePublishRequest)
-      .values({
-        tenantId: row.tenantId,
-        findingId: row.id,
-        idempotencyKey: key,
-        action: "skipped",
-      })
-      .returning();
-    return skipped;
+  if (!publisher && !process.env.GITHUB_ISSUES_TOKEN && process.env.ISSUE_PUBLISHER !== "memory") {
+    return recordSkipped("no_token");
   }
   const issuePublisher = publisherFor(publisher);
   const repo = { owner: binding.data.owner, repo: binding.data.repo };

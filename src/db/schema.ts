@@ -318,6 +318,7 @@ export const issuePublishRequest = pgTable(
       .references(() => finding.id, { onDelete: "cascade" }),
     idempotencyKey: text("idempotencyKey").notNull(),
     action: issueAction("action").notNull(),
+    skipReason: text("skipReason").$type<"github_disconnected" | "no_token">(),
     issueNumber: integer("issueNumber"),
     issueUrl: text("issueUrl"),
     createdAt: createdAt(),

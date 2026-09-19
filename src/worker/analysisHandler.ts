@@ -56,7 +56,7 @@ function selectBounded<T>(items: T[], max: number): { values: T[]; truncated: bo
   };
 }
 
-function validateOutput(raw: unknown, evidence: EvidencePackage) {
+export function validateAnalysisOutput(raw: unknown, evidence: EvidencePackage) {
   const parsed = analysisOutputSchema.safeParse(raw);
   if (!parsed.success) return { success: false as const, problems: parsed.error.message };
   if (
@@ -180,12 +180,16 @@ export async function handleAnalysisRun(runId: string, deps: AnalysisDeps = {}, 
     .where(and(eq(product.id, plan.plan.product_id), eq(product.tenantId, run.tenantId)))
     .limit(1);
   if (!productRow) throw new Error("product_not_found");
-  const packageData = await buildEvidencePackage(
-    deps.source ?? evidenceSource(),
-    run,
-    studyRow,
-    plan,
-  );
+  let packageData: EvidencePackage;
+  try {
+    packageData = await buildEvidencePackage(deps.source ?? evidenceSource(), run, studyRow, plan);
+  } catch (error) {
+    await db
+      .update(analysisRun)
+      .set({ status: "failed", error: error instanceof Error ? error.message : "analysis_failed" })
+      .where(eq(analysisRun.id, run.id));
+    throw error;
+  }
   await db
     .update(analysisRun)
     .set({ status: "analysing", evidencePackage: packageData })
@@ -202,11 +206,11 @@ export async function handleAnalysisRun(runId: string, deps: AnalysisDeps = {}, 
   };
   let result = await provider.analyse(packageData, { id: run.id }, onSession);
   rawResponses.push(result.raw);
-  let validated = validateOutput(result.raw, packageData);
+  let validated = validateAnalysisOutput(result.raw, packageData);
   if (!validated.success) {
     result = await provider.requestCorrection(result.handle, validated.problems);
     rawResponses.push(result.raw);
-    validated = validateOutput(result.raw, packageData);
+    validated = validateAnalysisOutput(result.raw, packageData);
     await db.update(analysisRun).set({ rawResponses }).where(eq(analysisRun.id, run.id));
   } else {
     await db.update(analysisRun).set({ rawResponses }).where(eq(analysisRun.id, run.id));
