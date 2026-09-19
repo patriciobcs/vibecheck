@@ -1,0 +1,1453 @@
+{
+  "id": "7eaa4c1a-3d27-4d29-bbc2-c539dcdd96e8",
+  "prevId": "4d38a270-7ac5-430f-b606-263538ef5600",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.AnalysisRun": {
+      "name": "AnalysisRun",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "studyId": {
+          "name": "studyId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sessionId": {
+          "name": "sessionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "AnalysisStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "DiscoveryProvider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidencePackage": {
+          "name": "evidencePackage",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rawResponses": {
+          "name": "rawResponses",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "providerSessionId": {
+          "name": "providerSessionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerSessionUrl": {
+          "name": "providerSessionUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "AnalysisRun_tenantId_idx": {
+          "name": "AnalysisRun_tenantId_idx",
+          "columns": [
+            {
+              "expression": "tenantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "AnalysisRun_tenantId_Tenant_id_fk": {
+          "name": "AnalysisRun_tenantId_Tenant_id_fk",
+          "tableFrom": "AnalysisRun",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "AnalysisRun_studyId_Study_id_fk": {
+          "name": "AnalysisRun_studyId_Study_id_fk",
+          "tableFrom": "AnalysisRun",
+          "tableTo": "Study",
+          "columnsFrom": ["studyId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "AnalysisRun_studyId_sessionId_key": {
+          "name": "AnalysisRun_studyId_sessionId_key",
+          "nullsNotDistinct": false,
+          "columns": ["studyId", "sessionId"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ApiKey": {
+      "name": "ApiKey",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "keyHash": {
+          "name": "keyHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ApiKey_tenantId_Tenant_id_fk": {
+          "name": "ApiKey_tenantId_Tenant_id_fk",
+          "tableFrom": "ApiKey",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "ApiKey_keyHash_unique": {
+          "name": "ApiKey_keyHash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["keyHash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.DiscoveryRun": {
+      "name": "DiscoveryRun",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "DiscoveryStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "DiscoveryProvider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "providerSessionId": {
+          "name": "providerSessionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerSessionUrl": {
+          "name": "providerSessionUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sourceRevision": {
+          "name": "sourceRevision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "DiscoveryOutcome",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outcomeReason": {
+          "name": "outcomeReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rawResponses": {
+          "name": "rawResponses",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "correctionAttempts": {
+          "name": "correctionAttempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "DiscoveryRun_tenantId_idx": {
+          "name": "DiscoveryRun_tenantId_idx",
+          "columns": [
+            {
+              "expression": "tenantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "DiscoveryRun_productId_Product_id_fk": {
+          "name": "DiscoveryRun_productId_Product_id_fk",
+          "tableFrom": "DiscoveryRun",
+          "tableTo": "Product",
+          "columnsFrom": ["productId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "DiscoveryRun_tenantId_Tenant_id_fk": {
+          "name": "DiscoveryRun_tenantId_Tenant_id_fk",
+          "tableFrom": "DiscoveryRun",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.Finding": {
+      "name": "Finding",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "studyId": {
+          "name": "studyId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "studyRevision": {
+          "name": "studyRevision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "baselineCommitSha": {
+          "name": "baselineCommitSha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "semanticTarget": {
+          "name": "semanticTarget",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observation": {
+          "name": "observation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hypothesis": {
+          "name": "hypothesis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "impact": {
+          "name": "impact",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "certainty": {
+          "name": "certainty",
+          "type": "FindingCertainty",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "limitations": {
+          "name": "limitations",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suggestedExperiment": {
+          "name": "suggestedExperiment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidence": {
+          "name": "evidence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observedSessionCount": {
+          "name": "observedSessionCount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eligibleSessionCount": {
+          "name": "eligibleSessionCount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issueRepo": {
+          "name": "issueRepo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "issueNumber": {
+          "name": "issueNumber",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "issueUrl": {
+          "name": "issueUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "Finding_tenantId_idx": {
+          "name": "Finding_tenantId_idx",
+          "columns": [
+            {
+              "expression": "tenantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Finding_tenantId_Tenant_id_fk": {
+          "name": "Finding_tenantId_Tenant_id_fk",
+          "tableFrom": "Finding",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "Finding_studyId_Study_id_fk": {
+          "name": "Finding_studyId_Study_id_fk",
+          "tableFrom": "Finding",
+          "tableTo": "Study",
+          "columnsFrom": ["studyId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "Finding_studyId_fingerprint_key": {
+          "name": "Finding_studyId_fingerprint_key",
+          "nullsNotDistinct": false,
+          "columns": ["studyId", "fingerprint"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.IssuePublishRequest": {
+      "name": "IssuePublishRequest",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "findingId": {
+          "name": "findingId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotencyKey": {
+          "name": "idempotencyKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "IssueAction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issueNumber": {
+          "name": "issueNumber",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "issueUrl": {
+          "name": "issueUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "IssuePublishRequest_tenantId_Tenant_id_fk": {
+          "name": "IssuePublishRequest_tenantId_Tenant_id_fk",
+          "tableFrom": "IssuePublishRequest",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "IssuePublishRequest_findingId_Finding_id_fk": {
+          "name": "IssuePublishRequest_findingId_Finding_id_fk",
+          "tableFrom": "IssuePublishRequest",
+          "tableTo": "Finding",
+          "columnsFrom": ["findingId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "IssuePublishRequest_tenantId_idempotencyKey_key": {
+          "name": "IssuePublishRequest_tenantId_idempotencyKey_key",
+          "nullsNotDistinct": false,
+          "columns": ["tenantId", "idempotencyKey"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.Job": {
+      "name": "Job",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "JobStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "maxAttempts": {
+          "name": "maxAttempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 3
+        },
+        "leaseUntil": {
+          "name": "leaseUntil",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lockedBy": {
+          "name": "lockedBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nextRunAt": {
+          "name": "nextRunAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "lastError": {
+          "name": "lastError",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "Job_status_nextRunAt_idx": {
+          "name": "Job_status_nextRunAt_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "nextRunAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Job_tenantId_Tenant_id_fk": {
+          "name": "Job_tenantId_Tenant_id_fk",
+          "tableFrom": "Job",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.OutboxEvent": {
+      "name": "OutboxEvent",
+      "schema": "",
+      "columns": {
+        "idempotencyKey": {
+          "name": "idempotencyKey",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "eventId": {
+          "name": "eventId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eventType": {
+          "name": "eventType",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "correlationId": {
+          "name": "correlationId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurredAt": {
+          "name": "occurredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publishedAt": {
+          "name": "publishedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "OutboxEvent_eventId_unique": {
+          "name": "OutboxEvent_eventId_unique",
+          "nullsNotDistinct": false,
+          "columns": ["eventId"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.Product": {
+      "name": "Product",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "permittedOrigins": {
+          "name": "permittedOrigins",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "audience": {
+          "name": "audience",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repoBinding": {
+          "name": "repoBinding",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "releaseNotes": {
+          "name": "releaseNotes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "supportComplaints": {
+          "name": "supportComplaints",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "knownJourneys": {
+          "name": "knownJourneys",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "productEvents": {
+          "name": "productEvents",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "ProductStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "setupError": {
+          "name": "setupError",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "Product_tenantId_Tenant_id_fk": {
+          "name": "Product_tenantId_Tenant_id_fk",
+          "tableFrom": "Product",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.Proposal": {
+      "name": "Proposal",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "discoveryRunId": {
+          "name": "discoveryRunId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "taskId": {
+          "name": "taskId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "researchQuestion": {
+          "name": "researchQuestion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "participantPrompt": {
+          "name": "participantPrompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rationale": {
+          "name": "rationale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidenceRefs": {
+          "name": "evidenceRefs",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidenceType": {
+          "name": "evidenceType",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eligibilityRuleRef": {
+          "name": "eligibilityRuleRef",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "successRuleRef": {
+          "name": "successRuleRef",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uncertainties": {
+          "name": "uncertainties",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimatedDurationSeconds": {
+          "name": "estimatedDurationSeconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "Proposal_discoveryRunId_DiscoveryRun_id_fk": {
+          "name": "Proposal_discoveryRunId_DiscoveryRun_id_fk",
+          "tableFrom": "Proposal",
+          "tableTo": "DiscoveryRun",
+          "columnsFrom": ["discoveryRunId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "Proposal_tenantId_Tenant_id_fk": {
+          "name": "Proposal_tenantId_Tenant_id_fk",
+          "tableFrom": "Proposal",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "Proposal_discoveryRunId_taskId_key": {
+          "name": "Proposal_discoveryRunId_taskId_key",
+          "nullsNotDistinct": false,
+          "columns": ["discoveryRunId", "taskId"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.PublishRequest": {
+      "name": "PublishRequest",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotencyKey": {
+          "name": "idempotencyKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "studyId": {
+          "name": "studyId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "responseHash": {
+          "name": "responseHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "PublishRequest_tenantId_Tenant_id_fk": {
+          "name": "PublishRequest_tenantId_Tenant_id_fk",
+          "tableFrom": "PublishRequest",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "PublishRequest_studyId_Study_id_fk": {
+          "name": "PublishRequest_studyId_Study_id_fk",
+          "tableFrom": "PublishRequest",
+          "tableTo": "Study",
+          "columnsFrom": ["studyId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "PublishRequest_tenantId_idempotencyKey_key": {
+          "name": "PublishRequest_tenantId_idempotencyKey_key",
+          "nullsNotDistinct": false,
+          "columns": ["tenantId", "idempotencyKey"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.Study": {
+      "name": "Study",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenantId": {
+          "name": "tenantId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "StudyStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currentRevision": {
+          "name": "currentRevision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "Study_productId_Product_id_fk": {
+          "name": "Study_productId_Product_id_fk",
+          "tableFrom": "Study",
+          "tableTo": "Product",
+          "columnsFrom": ["productId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "Study_tenantId_Tenant_id_fk": {
+          "name": "Study_tenantId_Tenant_id_fk",
+          "tableFrom": "Study",
+          "tableTo": "Tenant",
+          "columnsFrom": ["tenantId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.StudyPlanRevision": {
+      "name": "StudyPlanRevision",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "studyId": {
+          "name": "studyId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plan": {
+          "name": "plan",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publishedAt": {
+          "name": "publishedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "StudyPlanRevision_studyId_Study_id_fk": {
+          "name": "StudyPlanRevision_studyId_Study_id_fk",
+          "tableFrom": "StudyPlanRevision",
+          "tableTo": "Study",
+          "columnsFrom": ["studyId"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "StudyPlanRevision_studyId_revision_key": {
+          "name": "StudyPlanRevision_studyId_revision_key",
+          "nullsNotDistinct": false,
+          "columns": ["studyId", "revision"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.Tenant": {
+      "name": "Tenant",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.AnalysisStatus": {
+      "name": "AnalysisStatus",
+      "schema": "public",
+      "values": ["queued", "analysing", "completed", "failed"]
+    },
+    "public.DiscoveryOutcome": {
+      "name": "DiscoveryOutcome",
+      "schema": "public",
+      "values": ["proposed", "cannot_assess", "needs_setup"]
+    },
+    "public.DiscoveryProvider": {
+      "name": "DiscoveryProvider",
+      "schema": "public",
+      "values": ["fixture", "devin"]
+    },
+    "public.DiscoveryStatus": {
+      "name": "DiscoveryStatus",
+      "schema": "public",
+      "values": ["queued", "inspecting", "proposed", "failed", "cancelled"]
+    },
+    "public.FindingCertainty": {
+      "name": "FindingCertainty",
+      "schema": "public",
+      "values": ["insufficient_evidence", "preliminary", "repeated_observation", "contradictory"]
+    },
+    "public.IssueAction": {
+      "name": "IssueAction",
+      "schema": "public",
+      "values": ["created", "updated", "skipped"]
+    },
+    "public.JobStatus": {
+      "name": "JobStatus",
+      "schema": "public",
+      "values": ["pending", "running", "done", "failed"]
+    },
+    "public.ProductStatus": {
+      "name": "ProductStatus",
+      "schema": "public",
+      "values": ["draft", "connecting", "ready", "needs_setup"]
+    },
+    "public.StudyStatus": {
+      "name": "StudyStatus",
+      "schema": "public",
+      "values": ["draft", "published", "recruiting"]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -1,6 +1,6 @@
 # VC-03 · Evidence analysis and GitHub issues
 
-Status: Draft
+Status: In progress — implemented against fixture sessions
 Input: [VC-02](02-test-delivery-and-recording.md) · Output: [VC-04](04-prototypes-and-verification.md)
 
 ## Goal
@@ -80,3 +80,16 @@ The orchestrator, not an unconstrained analysis prompt, performs issue publicati
 - [ ] Choose aggregation timing: per session initially, with an explicit study-close pass later.
 - [ ] Support export to other issue trackers through an adapter.
 
+Implementation notes: the fixture evidence source validates session IDs and
+keeps bounded semantic events and transcript segments. Analysis validates
+manifest revision, baseline, citation IDs, time overlap and quote substrings
+before persistence. Finding fingerprints use product, task, category and a
+normalized semantic target; certainty is preliminary for one observation and
+repeated_observation after two sessions. Issue publication uses a tenant-scoped
+observed-session idempotency key and sanitizes public free text. Finding records
+also store semantic target and provenance.
+
+- [ ] Contradictory certainty aggregation.
+- [ ] VC-02 owner API for events and transcript.
+- [ ] Real-sha baseline from PR #3.
+- [ ] Monorepo merge.

@@ -50,3 +50,14 @@ Set `DISCOVERY_PROVIDER=devin` and `DEVIN_API_KEY` to use the Devin provider.
 
 The fixture discovery provider returns clearly labelled sample output from the
 VC-07 demo target. It is not agent inference or human research evidence.
+
+## VC-03 evidence analysis
+
+The fixture evidence source is selected with `EVIDENCE_SOURCE=fixture` and uses
+the simulated session `sample_session_capture_ideas`. Analysis reads semantic
+events and transcript text only; media references are passed as references and
+the Devin provider is not told that it watched recordings. GitHub issue
+publication uses `GITHUB_ISSUES_TOKEN` and `APP_BASE_URL`. Set
+`ISSUE_PUBLISHER=memory` for local in-process publication tests. Live GitHub
+publication was not run without a token. The VC-02 evidence source will replace
+the fixture source when its owner API is available.

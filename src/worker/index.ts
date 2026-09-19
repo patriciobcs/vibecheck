@@ -2,12 +2,35 @@ import os from "node:os";
 import { z } from "zod";
 import { and, asc, eq, isNull, lte, lt, or } from "drizzle-orm";
 import { db } from "@/db";
-import { job as jobTable } from "@/db/schema";
+import { analysisRun as analysisRunTable, job as jobTable } from "@/db/schema";
 import { handleDiscoveryRun, markDiscoveryRunFailed, markDiscoveryRunQueued } from "./handler";
+import { handleAnalysisRun } from "./analysisHandler";
+import { publishFinding } from "@/services/issues";
 
 const workerId = `${os.hostname()}:${process.pid}`;
 const leaseMs = 5 * 60 * 1000;
-const jobPayloadSchema = z.object({ runId: z.string().min(1) });
+const discoveryPayloadSchema = z.object({ runId: z.string().min(1) });
+const analysisPayloadSchema = z.object({ analysisRunId: z.string().min(1) });
+const issuePayloadSchema = z.object({ findingId: z.string().min(1) });
+type JobPayload =
+  | z.infer<typeof discoveryPayloadSchema>
+  | z.infer<typeof analysisPayloadSchema>
+  | z.infer<typeof issuePayloadSchema>;
+type JobHandler = (payload: JobPayload, tenantId: string) => Promise<void>;
+const handlers: Record<string, JobHandler> = {
+  "discovery.run": async (payload, tenantId) => {
+    const parsed = discoveryPayloadSchema.parse(payload);
+    await handleDiscoveryRun(parsed.runId, undefined, tenantId);
+  },
+  "analysis.run": async (payload, tenantId) => {
+    const parsed = analysisPayloadSchema.parse(payload);
+    await handleAnalysisRun(parsed.analysisRunId, undefined, tenantId);
+  },
+  "issue.publish": async (payload, tenantId) => {
+    const parsed = issuePayloadSchema.parse(payload);
+    await publishFinding(parsed.findingId, undefined, tenantId);
+  },
+};
 let shuttingDown = false;
 
 async function claim() {
@@ -45,16 +68,26 @@ async function processJob(job: Awaited<ReturnType<typeof claim>>) {
       .where(eq(jobTable.id, job.id));
   }, 60_000);
   try {
-    if (job.type !== "discovery.run") throw new Error("unknown_job_type");
-    const payload = jobPayloadSchema.parse(job.payload);
-    await handleDiscoveryRun(payload.runId, undefined, job.tenantId);
+    const handler = handlers[job.type];
+    if (!handler) throw new Error("unknown_job_type");
+    const payload: JobPayload =
+      job.type === "discovery.run"
+        ? discoveryPayloadSchema.parse(job.payload)
+        : job.type === "analysis.run"
+          ? analysisPayloadSchema.parse(job.payload)
+          : job.type === "issue.publish"
+            ? issuePayloadSchema.parse(job.payload)
+            : (() => {
+                throw new Error("unknown_job_type");
+              })();
+    await handler(payload, job.tenantId);
     await db
       .update(jobTable)
       .set({ status: "done", leaseUntil: null })
       .where(eq(jobTable.id, job.id));
   } catch (error) {
     const attempts = job.attempts + 1;
-    const payload = jobPayloadSchema.safeParse(job.payload);
+    const payload = discoveryPayloadSchema.safeParse(job.payload);
     const terminal =
       (error instanceof Error && error.message === "unknown_job_type") ||
       attempts >= job.maxAttempts;
@@ -63,6 +96,26 @@ async function processJob(job: Awaited<ReturnType<typeof claim>>) {
         await markDiscoveryRunFailed(payload.data.runId, error, job.tenantId);
       } else {
         await markDiscoveryRunQueued(payload.data.runId, job.tenantId);
+      }
+    } else if (job.type === "analysis.run") {
+      const analysisPayload = analysisPayloadSchema.safeParse(job.payload);
+      if (analysisPayload.success) {
+        const [run] = await db
+          .select({ id: analysisRunTable.id })
+          .from(analysisRunTable)
+          .where(eq(analysisRunTable.id, analysisPayload.data.analysisRunId))
+          .limit(1);
+        if (run && terminal) {
+          await db
+            .update(analysisRunTable)
+            .set({ status: "failed", error: error instanceof Error ? error.message : "job_failed" })
+            .where(eq(analysisRunTable.id, run.id));
+        } else if (run) {
+          await db
+            .update(analysisRunTable)
+            .set({ status: "queued" })
+            .where(eq(analysisRunTable.id, run.id));
+        }
       }
     }
     await db

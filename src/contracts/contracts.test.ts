@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { agentOutputJsonSchema, agentOutputSchema } from "./agentOutput";
 import { studyPlanSchema } from "./studyPlan";
+import { analysisOutputSchema } from "./analysisOutput";
+import { sessionManifestSchema } from "./session";
 
 describe("contracts", () => {
   it("accepts the study plan handoff", () => {
@@ -79,5 +81,33 @@ describe("contracts", () => {
   it("exports a root object JSON schema without refs", () => {
     expect("type" in agentOutputJsonSchema ? agentOutputJsonSchema.type : undefined).toBe("object");
     expect("$ref" in agentOutputJsonSchema).toBe(false);
+  });
+  it("accepts the fixture session manifest and analysis output", async () => {
+    const manifest =
+      await import("../../fixtures/sessions/sample_session_capture_ideas/manifest.json");
+    const output = await import("../../fixtures/analysis/sample_session_capture_ideas.json");
+    expect(sessionManifestSchema.parse(manifest.default).provenance).toBe("fixture");
+    expect(analysisOutputSchema.parse(output.default).findings).toHaveLength(1);
+  });
+  it("rejects findings for a no-finding outcome", () => {
+    expect(
+      analysisOutputSchema.safeParse({
+        schema_version: "1.0",
+        evidence_package_id: "package",
+        session_id: "session",
+        outcome: "no_finding",
+        findings: [
+          {
+            category: "other",
+            semantic_target: "target",
+            observation: "observation",
+            hypothesis: "hypothesis",
+            evidence: [{ segment_ids: ["segment"], event_ids: [], start_ms: 0, end_ms: 1 }],
+            impact: "no_impact",
+            limitations: [],
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });

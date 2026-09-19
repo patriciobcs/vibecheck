@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "evidence_package_id": "fixture-package",
+  "session_id": "sample_session_capture_ideas",
+  "outcome": "findings",
+  "findings": [
+    {
+      "category": "discoverability",
+      "semantic_target": "toolbar.sticky_note",
+      "observation": "The participant searched the toolbar and drew a rectangle before typing the idea inside it.",
+      "hypothesis": "The intended note tool may be difficult to discover in the toolbar.",
+      "evidence": [
+        {
+          "segment_ids": ["segment_01", "segment_02"],
+          "event_ids": ["event_03", "event_04", "event_05"],
+          "start_ms": 7000,
+          "end_ms": 24000,
+          "quote": "I need to add a few ideas to this board, but I do not immediately see how to add a note."
+        }
+      ],
+      "impact": "task_slowed",
+      "limitations": ["One simulated fixture session; alternative explanations remain."],
+      "suggested_experiment": "Surface the note tool in the main toolbar with a clear label."
+    }
+  ]
+}

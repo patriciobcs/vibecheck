@@ -11,6 +11,8 @@ import {
 } from "drizzle-orm/pg-core";
 import type { ProductConfig } from "@/contracts/productConfig";
 import type { StudyPlan } from "@/contracts/studyPlan";
+import type { EvidencePackage } from "@/contracts/evidencePackage";
+import type { Finding as FindingContract } from "@/contracts/finding";
 
 const id = () =>
   text()
@@ -44,6 +46,19 @@ export const discoveryOutcome = pgEnum("DiscoveryOutcome", [
 ]);
 export const studyStatus = pgEnum("StudyStatus", ["draft", "published", "recruiting"]);
 export const jobStatus = pgEnum("JobStatus", ["pending", "running", "done", "failed"]);
+export const analysisStatus = pgEnum("AnalysisStatus", [
+  "queued",
+  "analysing",
+  "completed",
+  "failed",
+]);
+export const findingCertainty = pgEnum("FindingCertainty", [
+  "insufficient_evidence",
+  "preliminary",
+  "repeated_observation",
+  "contradictory",
+]);
+export const issueAction = pgEnum("IssueAction", ["created", "updated", "skipped"]);
 
 export const tenant = pgTable("Tenant", {
   id: id(),
@@ -226,6 +241,95 @@ export const job = pgTable(
   (table) => [index("Job_status_nextRunAt_idx").on(table.status, table.nextRunAt)],
 );
 
+export const analysisRun = pgTable(
+  "AnalysisRun",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    studyId: text("studyId")
+      .notNull()
+      .references(() => study.id, { onDelete: "cascade" }),
+    sessionId: text("sessionId").notNull(),
+    status: analysisStatus("status").notNull(),
+    provider: discoveryProvider("provider").notNull(),
+    outcome: text("outcome"),
+    evidencePackage: jsonb("evidencePackage").$type<EvidencePackage | null>(),
+    rawResponses: jsonb("rawResponses").$type<unknown[]>().notNull(),
+    providerSessionId: text("providerSessionId"),
+    providerSessionUrl: text("providerSessionUrl"),
+    error: text("error"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("AnalysisRun_studyId_sessionId_key").on(table.studyId, table.sessionId),
+    index("AnalysisRun_tenantId_idx").on(table.tenantId),
+  ],
+);
+
+export const finding = pgTable(
+  "Finding",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    studyId: text("studyId")
+      .notNull()
+      .references(() => study.id, { onDelete: "cascade" }),
+    studyRevision: integer("studyRevision").notNull(),
+    baselineCommitSha: text("baselineCommitSha").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    category: text("category").notNull(),
+    semanticTarget: text("semanticTarget").notNull(),
+    observation: text("observation").notNull(),
+    hypothesis: text("hypothesis").notNull(),
+    impact: text("impact").notNull(),
+    certainty: findingCertainty("certainty").notNull(),
+    limitations: text("limitations").array().notNull(),
+    suggestedExperiment: text("suggestedExperiment"),
+    evidence: jsonb("evidence").$type<FindingContract["evidence"]>().notNull(),
+    observedSessionCount: integer("observedSessionCount").notNull(),
+    eligibleSessionCount: integer("eligibleSessionCount").notNull(),
+    provenance: text("provenance").notNull(),
+    issueRepo: text("issueRepo"),
+    issueNumber: integer("issueNumber"),
+    issueUrl: text("issueUrl"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("Finding_studyId_fingerprint_key").on(table.studyId, table.fingerprint),
+    index("Finding_tenantId_idx").on(table.tenantId),
+  ],
+);
+
+export const issuePublishRequest = pgTable(
+  "IssuePublishRequest",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    findingId: text("findingId")
+      .notNull()
+      .references(() => finding.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotencyKey").notNull(),
+    action: issueAction("action").notNull(),
+    issueNumber: integer("issueNumber"),
+    issueUrl: text("issueUrl"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    unique("IssuePublishRequest_tenantId_idempotencyKey_key").on(
+      table.tenantId,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
 export type Tenant = typeof tenant.$inferSelect;
 export type ApiKey = typeof apiKey.$inferSelect;
 export type Product = typeof product.$inferSelect;
@@ -236,3 +340,6 @@ export type StudyPlanRevision = typeof studyPlanRevision.$inferSelect;
 export type OutboxEvent = typeof outboxEvent.$inferSelect;
 export type PublishRequest = typeof publishRequest.$inferSelect;
 export type Job = typeof job.$inferSelect;
+export type AnalysisRun = typeof analysisRun.$inferSelect;
+export type Finding = typeof finding.$inferSelect;
+export type IssuePublishRequest = typeof issuePublishRequest.$inferSelect;

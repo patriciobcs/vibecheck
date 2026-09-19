@@ -62,10 +62,12 @@ export async function handleDiscoveryRun(
   const provider = providerFor(run.provider, providerOverride);
   const context = { ...toProductConfig(runProduct), sourceRevision: run.sourceRevision };
   let result = await provider.propose(context, { id: run.id }, async (handle) => {
-    await db
-      .update(discoveryRun)
-      .set({ providerSessionId: handle.sessionId, providerSessionUrl: handle.url })
-      .where(eq(discoveryRun.id, run.id));
+    const session = {
+      ...(handle.sessionId ? { providerSessionId: handle.sessionId } : {}),
+      ...(handle.url ? { providerSessionUrl: handle.url } : {}),
+    };
+    if (Object.keys(session).length === 0) return;
+    await db.update(discoveryRun).set(session).where(eq(discoveryRun.id, run.id));
   });
   const initialRaw = result.raw;
   let parsed = agentOutputSchema.safeParse(result.raw);

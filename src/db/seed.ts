@@ -58,6 +58,12 @@ async function main() {
       permittedOrigins: ["http://localhost:3001"],
       language: "en",
       audience: "whiteboard users",
+      repoBinding: {
+        provider: "github",
+        owner: "minasrc",
+        repo: "excalidraw",
+        issues_enabled: true,
+      },
       releaseNotes,
       supportComplaints,
       knownJourneys: ["capture ideas", "match colors", "navigate board"],
@@ -66,7 +72,17 @@ async function main() {
     })
     .onConflictDoUpdate({
       target: product.id,
-      set: { releaseNotes, supportComplaints, updatedAt: new Date() },
+      set: {
+        releaseNotes,
+        supportComplaints,
+        repoBinding: {
+          provider: "github",
+          owner: "minasrc",
+          repo: "excalidraw",
+          issues_enabled: true,
+        },
+        updatedAt: new Date(),
+      },
     });
   console.log("seeded tenant dev-tenant");
 }
