@@ -7,8 +7,9 @@ Dependencies: [VC-02](02-test-delivery-and-recording.md), [VC-04](04-prototypes-
 
 Select a real open-source application that can be cloned, run and seeded
 predictably, then demonstrate one complete human-research-to-code-to-retest
-workflow. The VC-03 demo currently uses an authorized local clone; this spec
-does not claim that the suspected UX problem exists upstream.
+workflow. The VC-03 demo publishes to a plain-copy repository owned by the
+team; the local source clone remains the input for future VC-04 work. This
+spec does not claim that the suspected UX problem exists upstream.
 
 ## Selected target and measured evidence
 
@@ -84,13 +85,14 @@ submission. The VibeCheck platform must be built during the event. If
 organizers disallow the clone, use a newly built fixture app and record that
 choice.
 
-VC-03 uses the authorized local clone for read-only repository context and
-retains findings in VibeCheck instead of opening issues. A team-owned fork or
-other write-authorized repository is required before VC-04 creates
-modifications, issues or PRs. MIT permits this; preserve upstream copyright
-and license notices. Record the pinned upstream SHA and every demo-specific
-modification. Do not submit deliberately introduced demo defects to upstream
-or portray them as flaws independently discovered in the original project.
+VC-03 uses the local source clone for read-only repository context and publishes
+findings only to the plain-copy repository `minasrc/excalidraw-demo`, never to
+upstream Excalidraw. The plain copy is not a fork. A write-authorized
+repository is still required before VC-04 creates modifications, issues or
+PRs. MIT permits this; preserve upstream copyright and license notices. Record
+the pinned upstream SHA and every demo-specific modification. Do not submit
+deliberately introduced demo defects to upstream or portray them as flaws
+independently discovered in the original project.
 
 ## Three-minute capture plan
 
@@ -110,8 +112,9 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 ## Acceptance criteria
 
 - Chosen app has documented source/license, pinned revision, successful clean setup and reset.
-- All future changes, issues and PRs target an authorized demo repo, not upstream;
-  the current VC-03 local binding does not open issues.
+- All future changes, issues and PRs target an authorized demo repo, not
+  upstream; VC-03 findings stay in VibeCheck and sanitized issues target
+  `minasrc/excalidraw-demo`.
 - A human baseline session generates real evidence that reaches the agent workflow.
 - A code candidate is verified and deployed at the same SHA that the retester sees.
 - The PR displays functional checks and bounded human evidence separately.
@@ -124,7 +127,7 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 | --- | --- |
 | Selected upstream | `excalidraw/excalidraw`, MIT |
 | Spike commit reviewed | `97c68dd371e13c017a8dcca49f8b3995ba7890a8` (2026-09-19) |
-| Team-owned fork | Not created; VC-03 uses the authorized local clone and VC-04 writes are gated |
+| Demo repository | `minasrc/excalidraw-demo` plain copy; upstream issue tracker is not used |
 | Baseline commit | `97c68dd371e13c017a8dcca49f8b3995ba7890a8` |
 | Setup verified | `yarn install` 4m24s, `yarn start` on port 3001, HTTP 200 |
 | Reset command | Not implemented; local storage reset plus scene re-seed is the intended mechanism |

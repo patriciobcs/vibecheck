@@ -86,8 +86,8 @@ Simulated `ProductConfig` inputs, all labeled as sample material with their prov
 
 | Input | Value |
 | --- | --- |
-| URL / origins | Locally served build of the demo clone |
-| Repository | Authorized local clone, pinned to the VC-07 baseline commit |
+| URL / origins | Locally served build of the Excalidraw source clone |
+| Repository | Plain-copy GitHub demo repository `minasrc/excalidraw-demo`, pinned to the VC-07 baseline commit |
 | Release notes | The scoped feature list in VC-07, taken verbatim from upstream commit subjects |
 | Support complaints | Sample, clearly labeled; no real user reports exist |
 | Product events | None; exploratory proposals must be labeled accordingly |

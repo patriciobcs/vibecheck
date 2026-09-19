@@ -57,11 +57,12 @@ For an existing open issue, append new sanitized evidence or update a managed ev
 Issue content: problem and observed effect, task context, safe reproduction steps, tested version, evidence counts and limits, proposed experiment, functional constraints, private dashboard link, automation mode and provenance. Never publish participant names, email addresses, private recordings, raw transcripts, test credentials, or secret URLs to a public repository.
 
 The orchestrator, not an unconstrained analysis prompt, performs publication
-with an idempotency record. A `local` binding records a disconnected-GitHub
-skip while retaining the finding in the dashboard; its bounded publication job
-does not contact a tracker. A `github` binding uses the GitHub adapter after
-reconciling uncertain API responses before retries. The VC-03 demo uses the
-authorized local Excalidraw clone, never the upstream issue tracker.
+with an idempotency record. A `local` binding is the no-GitHub path: it records
+a disconnected-GitHub skip while retaining the finding in the dashboard, and
+its bounded publication job does not contact a tracker. A `github` binding uses
+the GitHub adapter after reconciling uncertain API responses before retries.
+The VC-03 demo publishes sanitized issues to the plain-copy repository
+`minasrc/excalidraw-demo`; it never writes to upstream Excalidraw.
 
 ## Policy and failures
 

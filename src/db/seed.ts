@@ -2,7 +2,8 @@ import { db } from "./index";
 import { apiKey, product, tenant } from "./schema";
 import { hashApiKey } from "@/lib/auth";
 
-const demoTargetRepoPath = process.env.DEMO_TARGET_REPO_PATH ?? "/Users/devin/repos/excalidraw";
+const demoTargetRepoOwner = process.env.DEMO_TARGET_REPO_OWNER ?? "minasrc";
+const demoTargetRepoName = process.env.DEMO_TARGET_REPO_NAME ?? "excalidraw-demo";
 const features = [
   ["release_sticky_notes", "Sticky notes", 12064],
   ["release_bucket_fill", "Bucket fill", 11849],
@@ -60,8 +61,10 @@ async function main() {
       language: "en",
       audience: "whiteboard users",
       repoBinding: {
-        provider: "local",
-        path: demoTargetRepoPath,
+        provider: "github",
+        owner: demoTargetRepoOwner,
+        repo: demoTargetRepoName,
+        issues_enabled: true,
       },
       releaseNotes,
       supportComplaints,
@@ -75,8 +78,10 @@ async function main() {
         releaseNotes,
         supportComplaints,
         repoBinding: {
-          provider: "local",
-          path: demoTargetRepoPath,
+          provider: "github",
+          owner: demoTargetRepoOwner,
+          repo: demoTargetRepoName,
+          issues_enabled: true,
         },
         updatedAt: new Date(),
       },

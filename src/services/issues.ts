@@ -81,7 +81,7 @@ ${sanitizeForPublic(row.suggestedExperiment ?? "No experiment proposed.", dashbo
 
 ### Automation
 - Mode: ${plan.automation.mode}
-- Dashboard: ${dashboardUrl}/studies/${row.studyId}
+- Dashboard: ${dashboardUrl}
 `;
 }
 

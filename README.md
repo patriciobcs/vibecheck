@@ -59,11 +59,14 @@ events and transcript text only; media references are passed as references and
 the Devin provider is not told that it watched recordings. GitHub issue
 publication uses `GITHUB_ISSUES_TOKEN` and `APP_BASE_URL`. Set
 `ISSUE_PUBLISHER=memory` for local in-process publication tests. Live GitHub
-publication was not run without a token. The VC-02 evidence source will replace
-the fixture source when its owner API is available.
+publication targets the configured GitHub binding. The VC-02 evidence source
+will replace the fixture source when its owner API is available.
 
-The VC-03 demo binds the seeded product to the local Excalidraw clone at
-`DEMO_TARGET_REPO_PATH` (default `/Users/devin/repos/excalidraw`). Findings
-from a local binding remain in the VibeCheck dashboard and are not sent to an
-issue tracker. The GitHub publisher remains available for tenants that configure
-a `github` repository binding. Agent-driven issue opening is deferred to VC-04.
+The VC-03 demo binds the seeded product to the plain-copy GitHub repository
+`minasrc/excalidraw-demo`, configured by `DEMO_TARGET_REPO_OWNER` and
+`DEMO_TARGET_REPO_NAME`. It is not a fork, so the upstream Excalidraw issue
+tracker is never touched. Findings remain in the VibeCheck dashboard and
+sanitized issues are published only to that demo repository. A `local` binding
+is the no-GitHub path and records `github_disconnected` while retaining the
+finding. The local clone at `/Users/devin/repos/excalidraw` remains the source
+for future VC-04 work.
