@@ -37,7 +37,7 @@ A remote agent cannot reach an owner's laptop: a `localhost` target produces `ne
 | Field | Default / behavior |
 | --- | --- |
 | launch_policy | `owner_selects`; optional `auto_launch` under saved limits |
-| automation.mode | `issues_only`; `draft_pr` and `prototype_and_retest` require setup |
+| automation.mode | `prototype_and_retest` for the demo target so the full loop is exercised; production tenants should default to `issues_only`. `draft_pr` and `prototype_and_retest` require repository setup before repair jobs run |
 | audience | Owner-defined product-relevant criteria, not inferred sensitive traits |
 | recruitment.source | `direct_link`, `embedded`, or `marketplace` |
 | permitted_origins | Explicit web origins; editable by admins |

@@ -15,7 +15,7 @@ Use Devin to reproduce supported findings and create working design alternatives
 | draft_pr | Create/update | Devin change, independent checks, draft PR | Retest off; preview optional |
 | prototype_and_retest | Create/update | Devin change, independent checks, draft PR | Deploy checked candidate and assign retest |
 
-MVP default is `issues_only`; the owner can select another mode at product or study level. Study settings snapshot the choice. Raising automation for an existing issue requires a deliberate owner action; lowering it or pausing must gate queued side effects immediately. No mode authorizes automatic merging or production deployment.
+The demo build defaults to `prototype_and_retest` so the whole loop is exercised (see VC-01 configuration); `issues_only` remains the recommended default for real tenants. The owner can select another mode at product or study level. Study settings snapshot the choice. Raising automation for an existing issue requires a deliberate owner action; lowering it or pausing must gate queued side effects immediately. No mode authorizes automatic merging or production deployment.
 
 ## Repository adapter and prerequisites
 
