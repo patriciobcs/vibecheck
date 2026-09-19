@@ -9,10 +9,18 @@ type CachedToken = {
 const tokenCache = new Map<string, CachedToken>();
 const apiBase = "https://api.github.com";
 
+function normalizePrivateKey(value: string) {
+  const normalized = value.replace(/\\n/g, "\n").trim();
+  if (normalized.includes("-----BEGIN")) return normalized;
+  const body = normalized.replace(/\s+/g, "");
+  const lines = body.match(/.{1,64}/g)?.join("\n") ?? "";
+  return `-----BEGIN RSA PRIVATE KEY-----\n${lines}\n-----END RSA PRIVATE KEY-----\n`;
+}
+
 function appCredentials() {
   const appId = process.env.GITHUB_APP_ID?.trim();
   const privateKey = process.env.GITHUB_APP_PRIVATE_KEY?.trim();
-  return appId && privateKey ? { appId, privateKey: privateKey.replace(/\\n/g, "\n") } : null;
+  return appId && privateKey ? { appId, privateKey: normalizePrivateKey(privateKey) } : null;
 }
 
 function encode(value: object) {

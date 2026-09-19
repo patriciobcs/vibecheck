@@ -96,7 +96,7 @@ short-lived token is cached only in memory and never stored. The legacy
 - [ ] Choose aggregation timing: per session initially, with an explicit study-close pass later.
 - [ ] Support export to other issue trackers through an adapter.
 - [ ] Agent-driven issue opening for a local repository binding in VC-04.
-- [ ] Verify whether GitHub's search API accepts installation tokens for installed repositories; the adapter currently falls back to paginated repository issue reads on 403/422.
+- [x] Verified that GitHub's `/search/issues` accepts the installation token for the installed demo repository; the live marker lookup returned 200, so the repository-pagination fallback was not used. The 403/422 fallback remains for installations where search is unavailable.
 - [ ] Decide whether to store `installation_id` on the repository binding instead of resolving it per repository.
 
 Implementation notes: the fixture evidence source validates session IDs and

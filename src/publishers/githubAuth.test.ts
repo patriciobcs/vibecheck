@@ -13,11 +13,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function makeKeys() {
-  return generateKeyPairSync("rsa", {
-    modulusLength: 2048,
-    privateKeyEncoding: { format: "pem", type: "pkcs8" },
-    publicKeyEncoding: { format: "pem", type: "spki" },
-  });
+  return generateKeyPairSync("rsa", { modulusLength: 2048 });
 }
 
 function decodePart(value: string) {
@@ -34,7 +30,10 @@ describe("GitHub App authentication", () => {
   it("creates a signed JWT with the expected app claims", async () => {
     const { privateKey, publicKey } = makeKeys();
     vi.stubEnv("GITHUB_APP_ID", "12345");
-    vi.stubEnv("GITHUB_APP_PRIVATE_KEY", privateKey.replace(/\n/g, "\\n"));
+    vi.stubEnv(
+      "GITHUB_APP_PRIVATE_KEY",
+      privateKey.export({ type: "pkcs8", format: "pem" }).toString().replace(/\n/g, "\\n"),
+    );
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ id: 42 }))
@@ -69,7 +68,10 @@ describe("GitHub App authentication", () => {
   it("resolves an installation and uses its token for GitHub requests", async () => {
     const { privateKey } = makeKeys();
     vi.stubEnv("GITHUB_APP_ID", "app-id");
-    vi.stubEnv("GITHUB_APP_PRIVATE_KEY", privateKey);
+    vi.stubEnv(
+      "GITHUB_APP_PRIVATE_KEY",
+      privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    );
     const marker = "<!-- vibecheck:fingerprint=test -->";
     const fetchMock = vi
       .fn()
@@ -107,7 +109,10 @@ describe("GitHub App authentication", () => {
   it("falls back to paginated repository issue reads when search is unavailable", async () => {
     const { privateKey } = makeKeys();
     vi.stubEnv("GITHUB_APP_ID", "app-id");
-    vi.stubEnv("GITHUB_APP_PRIVATE_KEY", privateKey);
+    vi.stubEnv(
+      "GITHUB_APP_PRIVATE_KEY",
+      privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    );
     const fallbackRepo = { owner: "fallback-owner", repo: "fallback-repo" };
     const marker = "<!-- vibecheck:fingerprint=fallback -->";
     const fetchMock = vi
@@ -142,12 +147,35 @@ describe("GitHub App authentication", () => {
     );
   });
 
+  it("normalizes a bare base64 PKCS#1 private key body", async () => {
+    const { privateKey } = makeKeys();
+    const pem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+    const body = pem
+      .replace("-----BEGIN RSA PRIVATE KEY-----", "")
+      .replace("-----END RSA PRIVATE KEY-----", "")
+      .replace(/\s+/g, "");
+    vi.stubEnv("GITHUB_APP_ID", "bare-key-app");
+    vi.stubEnv("GITHUB_APP_PRIVATE_KEY", body);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ id: 102 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ token: "bare-key-token", expires_at: "2099-01-01T00:00:00Z" }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await getGithubToken({ owner: "bare-owner", repo: "bare-repo" })).toBe("bare-key-token");
+  });
+
   it("reuses cached tokens and refreshes them near expiration", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
     const { privateKey } = makeKeys();
     vi.stubEnv("GITHUB_APP_ID", "app-id");
-    vi.stubEnv("GITHUB_APP_PRIVATE_KEY", privateKey);
+    vi.stubEnv(
+      "GITHUB_APP_PRIVATE_KEY",
+      privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    );
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ id: 1 }))
@@ -170,6 +198,8 @@ describe("GitHub App authentication", () => {
   });
 
   it("uses the PAT fallback or returns null without credentials", async () => {
+    vi.stubEnv("GITHUB_APP_ID", "");
+    vi.stubEnv("GITHUB_APP_PRIVATE_KEY", "");
     vi.stubEnv("GITHUB_ISSUES_TOKEN", "development-pat");
     expect(hasGithubCredentials()).toBe(true);
     expect(await getGithubToken({ owner: "pat-owner", repo: "pat-repo" })).toBe("development-pat");
