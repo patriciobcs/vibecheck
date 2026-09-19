@@ -29,3 +29,18 @@ Changes run in isolated test environments. Human retesting evaluates usability; 
 ## Specifications
 
 See [specs/README.md](specs/README.md) for the workflow specifications, shared contracts, and change policy.
+
+## Running locally
+
+```bash
+docker compose up -d
+cp .env.example .env
+npm install
+npx prisma migrate dev
+npx prisma db seed
+npm run dev
+npm run worker
+```
+
+The fixture discovery provider returns clearly labelled sample output from the
+VC-07 demo target. It is not agent inference or human research evidence.

@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: vibecheck
+      POSTGRES_USER: vibecheck
+      POSTGRES_PASSWORD: vibecheck
+    ports:
+      - "5432:5432"
+    volumes:
+      - vibecheck_pgdata:/var/lib/postgresql/data
+
+volumes:
+  vibecheck_pgdata:

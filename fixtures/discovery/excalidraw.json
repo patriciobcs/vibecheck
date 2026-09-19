@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "discovery_run_id": "fixture",
+  "source_revision": "fixture",
+  "outcome": "proposed",
+  "proposals": [
+    {
+      "task_id": "task_capture_ideas",
+      "research_question": "Can a user capture several short ideas on an existing board?",
+      "participant_prompt": "Add the ideas listed in your task to the board so your teammates can read them.",
+      "rationale": "Release notes from upstream commit subjects report a newly shipped sticky-note capability; support complaints are sample data and no human evidence exists yet.",
+      "evidence_refs": ["release_note_sticky_notes"],
+      "evidence_type": "reported",
+      "eligibility_rule_ref": "whiteboard_users_v1",
+      "success_rule_ref": "stickynote_capture_v1",
+      "uncertainties": ["No baseline human test has been completed."]
+    },
+    {
+      "task_id": "task_match_colors",
+      "research_question": "Can a user make several shapes share an existing shape's fill?",
+      "participant_prompt": "Make the selected shapes use the same fill as the reference shape.",
+      "rationale": "Release notes from upstream commit subjects report bucket fill and color tools; support complaints are sample data and no human evidence exists yet.",
+      "evidence_refs": ["release_note_bucket_fill"],
+      "evidence_type": "reported",
+      "eligibility_rule_ref": "whiteboard_users_v1",
+      "success_rule_ref": "fill_match_v1",
+      "uncertainties": ["No baseline human test has been completed."]
+    },
+    {
+      "task_id": "task_navigate_board",
+      "research_question": "Can a user bring an off-screen region of the board into view?",
+      "participant_prompt": "Bring the region marked for the team offsite into view.",
+      "rationale": "Release notes from upstream commit subjects report navigation improvements; support complaints are sample data and no human evidence exists yet.",
+      "evidence_refs": ["release_note_navigation"],
+      "evidence_type": "reported",
+      "eligibility_rule_ref": "whiteboard_users_v1",
+      "success_rule_ref": "viewport_reached_v1",
+      "uncertainties": ["No baseline human test has been completed."]
+    }
+  ]
+}
