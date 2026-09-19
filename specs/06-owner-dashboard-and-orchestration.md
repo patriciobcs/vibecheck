@@ -46,11 +46,11 @@ Use backend authorization and row-level tenant boundaries; unguessable IDs alone
 
 ## Suggested architecture
 
-Next.js application/API, Postgres/Supabase for tenancy and workflow records, private object storage for media, and a durable worker for long-running jobs. Provider adapters: Devin, GitHub, media, STT, email, preview deployment. The browser must not hold an API request open for a Devin session or a human assignment.
+Next.js application/API, Postgres (Drizzle ORM, schema in `src/db/schema.ts`, migrations in `drizzle/`) for tenancy and workflow records, private object storage for media, and a durable worker for long-running jobs. Provider adapters: Devin, GitHub, media, STT, email, preview deployment. The browser must not hold an API request open for a Devin session or a human assignment.
 
-MVP durable worker can be a separate process backed by a database jobs table with leases, heartbeats, retry count and `next_run_at`. Do not build a complex workflow engine before the pipeline works. Every provider session/deployment ID is stored for reconciliation.
+MVP durable worker is a separate process (`npm run worker`) backed by the `Job` table: claims use `SELECT … FOR UPDATE SKIP LOCKED`, a five-minute lease renewed by heartbeat, `attempts`/`maxAttempts` with exponential backoff on `nextRunAt`, and graceful shutdown on SIGINT/SIGTERM. Job payloads are schema-validated; unknown job types fail terminally. Do not build a complex workflow engine before the pipeline works. Every provider session/deployment ID is stored for reconciliation (`DiscoveryRun.providerSessionId`, `providerSessionUrl`).
 
-Core tables: `tenants`, `memberships`, `products`, `integration_refs`, `product_config_revisions`, `discovery_runs`, `studies`, `study_revisions`, `participants`, `assignments`, `sessions`, `assets`, `events`, `transcript_segments`, `findings`, `issue_mappings`, `repair_runs`, `check_runs`, `previews`, `validation_summaries`, `notification_outbox`, `jobs`, `audit_events`, optional `credit_ledger`.
+Core tables (first slice implemented: `Tenant`, `ApiKey`, `Product`, `DiscoveryRun`, `Proposal`, `Study`, `StudyPlanRevision`, `OutboxEvent`, `PublishRequest`, `Job`; tenant authentication is currently a hashed API key per tenant, memberships/roles come later): `tenants`, `memberships`, `products`, `integration_refs`, `product_config_revisions`, `discovery_runs`, `studies`, `study_revisions`, `participants`, `assignments`, `sessions`, `assets`, `events`, `transcript_segments`, `findings`, `issue_mappings`, `repair_runs`, `check_runs`, `previews`, `validation_summaries`, `notification_outbox`, `jobs`, `audit_events`, optional `credit_ledger`.
 
 Store credentials in an appropriate secret store; database records hold references. Event/media payload size must be bounded. Background processing loads bounded evidence windows rather than entire sessions into every model call.
 
@@ -64,7 +64,7 @@ Use the shared envelope and schema validation. Initial events:
 - `repair.candidate_ready`, `checks.completed`, `preview.ready`
 - `retest.requested`, `validation.updated`, `workflow.blocked`
 
-Use transactions plus an outbox for jobs and notifications. Each transition checks current state/revision and permissions. Consumers deduplicate; scheduled reconciliation resolves lost webhooks. Progress subscriptions via SSE or polling read the persisted state, not simulated timers.
+`study.published` is written to `OutboxEvent` in the publish transaction with idempotency key `<study_id>:revision_<n>:publish`; `discovery.completed` is not yet emitted (run completion is read from `DiscoveryRun.status`). Use transactions plus an outbox for jobs and notifications. Each transition checks current state/revision and permissions. Consumers deduplicate; scheduled reconciliation resolves lost webhooks. Progress subscriptions via SSE or polling read the persisted state, not simulated timers.
 
 ## Policy precedence
 
@@ -94,7 +94,8 @@ Deletion jobs remove scoped media/transcripts and dependent content, invalidate 
 
 ## Open decisions / future changes
 
-- [ ] Final worker/hosting choice after account capability checks.
+- [ ] Final worker/hosting choice after account capability checks. Drizzle over Prisma was chosen for SQL-first locking queries and a lighter runtime.
+- [ ] Replace per-tenant API keys with memberships/roles once a dashboard login exists.
 - [ ] Marketplace ranking, paid credits and participant quality appeals after MVP.
 - [ ] Team invitation and SSO requirements from actual customers.
 - [ ] Additional observability, retention export and provider-deletion guarantees.

@@ -1,0 +1,42 @@
+{
+  "name": "vibecheck",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "lint": "next lint",
+    "worker": "tsx src/worker/index.ts",
+    "test": "vitest run",
+    "format": "prettier --write src drizzle.config.ts drizzle fixtures",
+    "format:check": "prettier --check src drizzle.config.ts drizzle fixtures",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "next": "^15.5.0",
+    "postgres": "3.4.9",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.0",
+    "zod-to-json-schema": "^3.24.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "0.31.10",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.5.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.8",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0"
+  }
+}

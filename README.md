@@ -29,3 +29,24 @@ Changes run in isolated test environments. Human retesting evaluates usability; 
 ## Specifications
 
 See [specs/README.md](specs/README.md) for the workflow specifications, shared contracts, and change policy.
+
+## Running locally
+
+```bash
+docker compose up -d
+cp .env.example .env
+npm install
+npm run db:migrate
+npm run db:seed
+npm run dev
+npm run worker
+```
+
+Set `ALLOW_LOCAL_TARGETS=true` for localhost demo targets. Set a non-empty
+`DEV_API_KEY` in `.env` before running the seed; the seed refuses to run when
+it is missing, and the same key authenticates the UI. Run the worker in a
+second terminal. Database-backed tests require `DATABASE_URL`.
+Set `DISCOVERY_PROVIDER=devin` and `DEVIN_API_KEY` to use the Devin provider.
+
+The fixture discovery provider returns clearly labelled sample output from the
+VC-07 demo target. It is not agent inference or human research evidence.
