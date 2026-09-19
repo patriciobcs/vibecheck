@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -18,8 +18,9 @@ const supportComplaints = [
 ];
 
 async function main() {
+  const key = process.env.DEV_API_KEY;
+  if (!key) throw new Error("DEV_API_KEY required");
   const tenant = await prisma.tenant.upsert({ where: { id: "dev-tenant" }, update: {}, create: { id: "dev-tenant", name: "dev" } });
-  const key = process.env.DEV_API_KEY || `dev_${randomUUID()}`;
   await prisma.apiKey.upsert({ where: { keyHash: createHash("sha256").update(key).digest("hex") }, update: {}, create: { tenantId: tenant.id, keyHash: createHash("sha256").update(key).digest("hex"), label: "development" } });
   await prisma.product.upsert({ where: { id: "demo-product" }, update: { releaseNotes, supportComplaints }, create: {
     id: "demo-product", tenantId: tenant.id, name: "Excalidraw (demo target, sample data)",
@@ -27,7 +28,6 @@ async function main() {
     permittedOrigins: ["http://localhost:3001"], language: "en", audience: "whiteboard users",
     releaseNotes, supportComplaints, knownJourneys: ["capture ideas", "match colors", "navigate board"], productEvents: [], status: "ready",
   } });
-  console.log(`Development API key: ${key}`);
 }
 
 main().finally(() => prisma.$disconnect());

@@ -14,6 +14,13 @@ export function providerFor(name: string, override?: DiscoveryProvider) {
 
 const jsonValue = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 
+export async function markDiscoveryRunFailed(runId: string, error: unknown) {
+  await prisma.discoveryRun.update({
+    where: { id: runId },
+    data: { status: "failed", error: error instanceof Error ? error.message : "job_failed" },
+  });
+}
+
 export async function handleDiscoveryRun(runId: string, providerOverride?: DiscoveryProvider) {
   const run = await prisma.discoveryRun.findUnique({ where: { id: runId }, include: { product: true } });
   if (!run) throw new Error("run_not_found");
@@ -25,7 +32,12 @@ export async function handleDiscoveryRun(runId: string, providerOverride?: Disco
     complaints: run.product.supportComplaints, journeys: run.product.knownJourneys,
     events: run.product.productEvents,
   };
-  let result = await provider.propose(context, { id: run.id });
+  let result = await provider.propose(context, { id: run.id }, async (handle) => {
+    await prisma.discoveryRun.update({
+      where: { id: run.id },
+      data: { providerSessionId: handle.sessionId, providerSessionUrl: handle.url },
+    });
+  });
   const initialRaw = result.raw;
   let parsed = agentOutputSchema.safeParse(result.raw);
   let contextMatches = parsed.success && parsed.data.discovery_run_id === run.id && parsed.data.source_revision === run.sourceRevision;

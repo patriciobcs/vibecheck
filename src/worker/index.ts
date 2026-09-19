@@ -1,6 +1,6 @@
 import os from "node:os";
 import { prisma } from "@/lib/prisma";
-import { handleDiscoveryRun } from "./handler";
+import { handleDiscoveryRun, markDiscoveryRunFailed } from "./handler";
 
 const workerId = `${os.hostname()}:${process.pid}`;
 const leaseMs = 5 * 60 * 1000;
@@ -29,6 +29,10 @@ async function processJob(job: Awaited<ReturnType<typeof claim>>) {
     await prisma.job.update({ where: { id: job.id }, data: { status: "done", leaseUntil: null } });
   } catch (error) {
     const attempts = job.attempts + 1;
+    const payload = job.payload as { runId?: string };
+    if (job.type === "discovery.run" && payload.runId) {
+      await markDiscoveryRunFailed(payload.runId, error);
+    }
     await prisma.job.update({ where: { id: job.id }, data: {
       attempts, status: attempts >= job.maxAttempts ? "failed" : "pending",
       nextRunAt: new Date(Date.now() + 2 ** attempts * 1000), lastError: error instanceof Error ? error.message : "job_failed",

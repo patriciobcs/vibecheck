@@ -5,6 +5,7 @@ export async function tenantFromRequest(request: Request) {
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
   const key = header.slice(7);
+  if (!key) return null;
   const keyHash = createHash("sha256").update(key).digest("hex");
   const found = await prisma.apiKey.findUnique({ where: { keyHash } });
   return found?.tenantId ?? null;

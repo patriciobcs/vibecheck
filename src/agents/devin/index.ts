@@ -24,14 +24,16 @@ async function poll(handle: ProviderHandle): Promise<ProviderResult> {
 
 export const devinProvider: DiscoveryProvider = {
   name: "devin",
-  async propose(context, run) {
+  async propose(context, run, onSession) {
     const response = await fetch(`${base}/sessions`, {
       method: "POST", headers: headers(),
       body: JSON.stringify({ prompt: buildPrompt(context, run.id), title: `VibeCheck discovery ${run.id}`, tags: ["vibecheck", "discovery"], unlisted: true, structured_output_schema: agentOutputJsonSchema, max_acu_limit: Number(process.env.DEVIN_MAX_ACU ?? 5), idempotent: true }),
     });
     if (!response.ok) throw new Error(`devin_api_${response.status}`);
     const body = await response.json() as { session_id?: string; url?: string };
-    return poll({ sessionId: body.session_id, url: body.url });
+    const handle = { sessionId: body.session_id, url: body.url };
+    await onSession?.(handle);
+    return poll(handle);
   },
   async requestCorrection(handle, problems) {
     if (!handle.sessionId) return { raw: null, handle };

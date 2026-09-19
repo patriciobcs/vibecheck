@@ -29,4 +29,4 @@ export const agentOutputSchema = z.object({
 });
 
 export type AgentOutput = z.infer<typeof agentOutputSchema>;
-export const agentOutputJsonSchema = zodToJsonSchema(agentOutputSchema, "AgentOutput");
+export const agentOutputJsonSchema = zodToJsonSchema(agentOutputSchema, { $refStrategy: "none" });

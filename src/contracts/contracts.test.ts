@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agentOutputSchema } from "./agentOutput";
+import { agentOutputJsonSchema, agentOutputSchema } from "./agentOutput";
 import { studyPlanSchema } from "./studyPlan";
 
 describe("contracts", () => {
@@ -18,5 +18,9 @@ describe("contracts", () => {
   });
   it("rejects a proposal without success_rule_ref", () => {
     expect(agentOutputSchema.safeParse({ schema_version: "1.0", discovery_run_id: "run", source_revision: "sha", proposals: [{ task_id: "x", research_question: "q", participant_prompt: "p", rationale: "r", evidence_refs: [], evidence_type: "reported", eligibility_rule_ref: "e", uncertainties: [] }] }).success).toBe(false);
+  });
+  it("exports a root object JSON schema without refs", () => {
+    expect("type" in agentOutputJsonSchema ? agentOutputJsonSchema.type : undefined).toBe("object");
+    expect("$ref" in agentOutputJsonSchema).toBe(false);
   });
 });
