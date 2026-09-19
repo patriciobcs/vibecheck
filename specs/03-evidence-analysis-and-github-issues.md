@@ -64,6 +64,12 @@ the GitHub adapter after reconciling uncertain API responses before retries.
 The VC-03 demo publishes sanitized issues to the plain-copy repository
 `minasrc/excalidraw-demo`; it never writes to upstream Excalidraw.
 
+GitHub publication authenticates as a GitHub App installation with Issues
+read/write permission when `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` are
+configured. The installation is resolved per repository, and the resulting
+short-lived token is cached only in memory and never stored. The legacy
+`GITHUB_ISSUES_TOKEN` remains available as a development/test fallback.
+
 ## Policy and failures
 
 - `issues_only`: issue publication ends the automated run; no branches, PRs or retest invitations.
@@ -90,6 +96,8 @@ The VC-03 demo publishes sanitized issues to the plain-copy repository
 - [ ] Choose aggregation timing: per session initially, with an explicit study-close pass later.
 - [ ] Support export to other issue trackers through an adapter.
 - [ ] Agent-driven issue opening for a local repository binding in VC-04.
+- [ ] Verify whether GitHub's search API accepts installation tokens for installed repositories; the adapter currently falls back to paginated repository issue reads on 403/422.
+- [ ] Decide whether to store `installation_id` on the repository binding instead of resolving it per repository.
 
 Implementation notes: the fixture evidence source validates session IDs and
 keeps bounded semantic events and transcript segments. Analysis validates

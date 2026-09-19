@@ -46,7 +46,7 @@ Use backend authorization and row-level tenant boundaries; unguessable IDs alone
 
 ## Suggested architecture
 
-Next.js application/API, Postgres (Drizzle ORM, schema in `src/db/schema.ts`, migrations in `drizzle/`) for tenancy and workflow records, private object storage for media, and a durable worker for long-running jobs. Provider adapters: Devin, GitHub, media, STT, email, preview deployment. The browser must not hold an API request open for a Devin session or a human assignment.
+Next.js application/API, Postgres (Drizzle ORM, schema in `src/db/schema.ts`, migrations in `drizzle/`) for tenancy and workflow records, private object storage for media, and a durable worker for long-running jobs. Provider adapters: Devin, GitHub, media, STT, email, preview deployment. GitHub publication uses an installed App identity with short-lived installation tokens when configured, with a development/test PAT fallback. The browser must not hold an API request open for a Devin session or a human assignment.
 
 MVP durable worker is a separate process (`npm run worker`) backed by the `Job` table: claims use `SELECT … FOR UPDATE SKIP LOCKED`, a five-minute lease renewed by heartbeat, `attempts`/`maxAttempts` with exponential backoff on `nextRunAt`, and graceful shutdown on SIGINT/SIGTERM. Job payloads are schema-validated; unknown job types fail terminally. Do not build a complex workflow engine before the pipeline works. Every provider session/deployment ID is stored for reconciliation (`DiscoveryRun.providerSessionId`, `providerSessionUrl`).
 
@@ -99,4 +99,3 @@ Deletion jobs remove scoped media/transcripts and dependent content, invalidate 
 - [ ] Marketplace ranking, paid credits and participant quality appeals after MVP.
 - [ ] Team invitation and SSO requirements from actual customers.
 - [ ] Additional observability, retention export and provider-deletion guarantees.
-

@@ -14,6 +14,7 @@ import type { Finding } from "@/db/schema";
 import type { StudyPlan } from "@/contracts/studyPlan";
 import type { IssuePublisher } from "@/publishers/types";
 import { githubIssuePublisher } from "@/publishers/github";
+import { hasGithubCredentials } from "@/publishers/githubAuth";
 import { memoryIssuePublisher } from "@/publishers/memory";
 
 export function sanitizeForPublic(text: string, dashboardUrl: string) {
@@ -159,7 +160,7 @@ export async function publishFinding(
     return recordSkipped("github_disconnected");
   }
   const githubBinding = binding.data;
-  if (!publisher && !process.env.GITHUB_ISSUES_TOKEN && process.env.ISSUE_PUBLISHER !== "memory") {
+  if (!publisher && !hasGithubCredentials() && process.env.ISSUE_PUBLISHER !== "memory") {
     return recordSkipped("no_token");
   }
   const issuePublisher = publisherFor(publisher);

@@ -276,6 +276,39 @@ describe.skipIf(!process.env.DATABASE_URL)("issue publication", () => {
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });
 
+  it("records no_token when GitHub credentials are unavailable", async () => {
+    const previousAppId = process.env.GITHUB_APP_ID;
+    const previousPrivateKey = process.env.GITHUB_APP_PRIVATE_KEY;
+    const previousToken = process.env.GITHUB_ISSUES_TOKEN;
+    const previousPublisher = process.env.ISSUE_PUBLISHER;
+    delete process.env.GITHUB_APP_ID;
+    delete process.env.GITHUB_APP_PRIVATE_KEY;
+    delete process.env.GITHUB_ISSUES_TOKEN;
+    process.env.ISSUE_PUBLISHER = "github";
+    const data = await fixture({});
+    try {
+      const result = await publishFinding(data.findingRow.id);
+      const [request] = await db
+        .select()
+        .from(issuePublishRequest)
+        .where(eq(issuePublishRequest.findingId, data.findingRow.id));
+      expect({ action: result.action, skipReason: request?.skipReason }).toEqual({
+        action: "skipped",
+        skipReason: "no_token",
+      });
+    } finally {
+      await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+      if (previousAppId === undefined) delete process.env.GITHUB_APP_ID;
+      else process.env.GITHUB_APP_ID = previousAppId;
+      if (previousPrivateKey === undefined) delete process.env.GITHUB_APP_PRIVATE_KEY;
+      else process.env.GITHUB_APP_PRIVATE_KEY = previousPrivateKey;
+      if (previousToken === undefined) delete process.env.GITHUB_ISSUES_TOKEN;
+      else process.env.GITHUB_ISSUES_TOKEN = previousToken;
+      if (previousPublisher === undefined) delete process.env.ISSUE_PUBLISHER;
+      else process.env.ISSUE_PUBLISHER = previousPublisher;
+    }
+  });
+
   it("retains findings for a local repository binding", async () => {
     const data = await fixture({
       repoBinding: { provider: "local", path: "/Users/devin/repos/excalidraw" },
