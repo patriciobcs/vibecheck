@@ -1,12 +1,12 @@
 import type { DiscoveryContext } from "../types";
-import { agentOutputJsonSchema } from "@/contracts/agentOutput";
+import { agentOutputJsonSchema, MAX_PROPOSALS } from "@/contracts/agentOutput";
 import { ELIGIBILITY_RULE_REFS, SUCCESS_RULE_REFS } from "@/contracts/rules";
 
 export function buildPrompt(context: DiscoveryContext, runId: string) {
   return `You are performing read-only UX discovery for VibeCheck run ${runId}.
 Echo this source_revision verbatim in your output: ${context.sourceRevision}.
 Propose tasks only for the recently shipped features listed in release notes, with at
-most 3 proposals. Items marked isSample:true are sample data and must be described
+most ${MAX_PROPOSALS} proposals. Items marked isSample:true are sample data and must be described
 as sample data in the rationale. When product_events is empty, proposals are
 exploratory and must say so in uncertainties.
 

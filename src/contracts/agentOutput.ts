@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-export const MAX_PROPOSALS = 5;
+export const MAX_PROPOSALS = 3;
 
 export const proposalSchema = z.object({
   task_id: z.string().min(1),
