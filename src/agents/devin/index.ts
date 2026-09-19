@@ -3,7 +3,10 @@ import type { DiscoveryContext, DiscoveryProvider, ProviderHandle, ProviderResul
 import { buildPrompt } from "./prompt";
 
 const base = process.env.DEVIN_API_BASE ?? "https://api.devin.ai/v1";
-const headers = () => ({ authorization: `Bearer ${process.env.DEVIN_API_KEY ?? ""}`, "content-type": "application/json" });
+const headers = () => ({
+  authorization: `Bearer ${process.env.DEVIN_API_KEY ?? ""}`,
+  "content-type": "application/json",
+});
 const pollMs = () => Number(process.env.DEVIN_POLL_MS ?? 10000);
 
 async function poll(handle: ProviderHandle): Promise<ProviderResult> {
@@ -13,10 +16,15 @@ async function poll(handle: ProviderHandle): Promise<ProviderResult> {
   while (Date.now() < deadline) {
     const response = await fetch(`${base}/sessions/${handle.sessionId}`, { headers: headers() });
     if (!response.ok) throw new Error(`devin_api_${response.status}`);
-    const body = await response.json() as { structured_output?: unknown; status_enum?: string; messages?: Array<{ message?: string }> };
+    const body = (await response.json()) as {
+      structured_output?: unknown;
+      status_enum?: string;
+      messages?: Array<{ message?: string }>;
+    };
     if (body.structured_output != null) return { raw: body.structured_output, handle };
     last = body.messages?.at(-1)?.message;
-    if (["finished", "blocked", "expired"].includes(body.status_enum ?? "")) return { raw: last, handle };
+    if (["finished", "blocked", "expired"].includes(body.status_enum ?? ""))
+      return { raw: last, handle };
     await new Promise((resolve) => setTimeout(resolve, pollMs()));
   }
   return { raw: last, handle };
@@ -26,18 +34,31 @@ export const devinProvider: DiscoveryProvider = {
   name: "devin",
   async propose(context, run, onSession) {
     const response = await fetch(`${base}/sessions`, {
-      method: "POST", headers: headers(),
-      body: JSON.stringify({ prompt: buildPrompt(context, run.id), title: `VibeCheck discovery ${run.id}`, tags: ["vibecheck", "discovery"], unlisted: true, structured_output_schema: agentOutputJsonSchema, max_acu_limit: Number(process.env.DEVIN_MAX_ACU ?? 5), idempotent: true }),
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        prompt: buildPrompt(context, run.id),
+        title: `VibeCheck discovery ${run.id}`,
+        tags: ["vibecheck", "discovery"],
+        unlisted: true,
+        structured_output_schema: agentOutputJsonSchema,
+        max_acu_limit: Number(process.env.DEVIN_MAX_ACU ?? 5),
+        idempotent: true,
+      }),
     });
     if (!response.ok) throw new Error(`devin_api_${response.status}`);
-    const body = await response.json() as { session_id?: string; url?: string };
+    const body = (await response.json()) as { session_id?: string; url?: string };
     const handle = { sessionId: body.session_id, url: body.url };
     await onSession?.(handle);
     return poll(handle);
   },
   async requestCorrection(handle, problems) {
     if (!handle.sessionId) return { raw: null, handle };
-    const response = await fetch(`${base}/sessions/${handle.sessionId}/message`, { method: "POST", headers: headers(), body: JSON.stringify({ message: `Correct the JSON output. Problems: ${problems}` }) });
+    const response = await fetch(`${base}/sessions/${handle.sessionId}/message`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ message: `Correct the JSON output. Problems: ${problems}` }),
+    });
     if (!response.ok) throw new Error(`devin_api_${response.status}`);
     return poll(handle);
   },

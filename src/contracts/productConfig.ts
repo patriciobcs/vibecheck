@@ -8,18 +8,26 @@ export const productConfigSchema = z.object({
   language: z.string().default("en"),
   audience: z.string().default(""),
   repo_binding: z.record(z.unknown()).optional(),
-  release_notes: z.array(z.object({
-    id: z.string(),
-    text: z.string(),
-    source: z.string(),
-    isSample: z.boolean(),
-  })).default([]),
-  support_complaints: z.array(z.object({
-    id: z.string(),
-    text: z.string(),
-    source: z.string(),
-    isSample: z.boolean(),
-  })).default([]),
+  release_notes: z
+    .array(
+      z.object({
+        id: z.string(),
+        text: z.string(),
+        source: z.string(),
+        isSample: z.boolean(),
+      }),
+    )
+    .default([]),
+  support_complaints: z
+    .array(
+      z.object({
+        id: z.string(),
+        text: z.string(),
+        source: z.string(),
+        isSample: z.boolean(),
+      }),
+    )
+    .default([]),
   known_journeys: z.array(z.string()).default([]),
   product_events: z.array(z.unknown()).default([]),
 });

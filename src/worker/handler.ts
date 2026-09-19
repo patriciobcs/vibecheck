@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import type { DiscoveryProvider } from "@/agents/types";
 import { fixtureProvider } from "@/agents/fixture";
 import { devinProvider } from "@/agents/devin";
+import { toProductConfig } from "@/services/products";
+import { ELIGIBILITY_RULE_REFS, SUCCESS_RULE_REFS } from "@/contracts/rules";
 
 export function providerFor(name: string, override?: DiscoveryProvider) {
   if (override) return override;
@@ -21,17 +23,22 @@ export async function markDiscoveryRunFailed(runId: string, error: unknown) {
   });
 }
 
+export async function markDiscoveryRunQueued(runId: string) {
+  await prisma.discoveryRun.update({
+    where: { id: runId },
+    data: { status: "queued" },
+  });
+}
+
 export async function handleDiscoveryRun(runId: string, providerOverride?: DiscoveryProvider) {
-  const run = await prisma.discoveryRun.findUnique({ where: { id: runId }, include: { product: true } });
+  const run = await prisma.discoveryRun.findUnique({
+    where: { id: runId },
+    include: { product: true },
+  });
   if (!run) throw new Error("run_not_found");
   await prisma.discoveryRun.update({ where: { id: runId }, data: { status: "inspecting" } });
   const provider = providerFor(run.provider, providerOverride);
-  const context = {
-    url: run.product.url, description: run.product.description, audience: run.product.audience,
-    language: run.product.language, sourceRevision: run.sourceRevision, releaseNotes: run.product.releaseNotes,
-    complaints: run.product.supportComplaints, journeys: run.product.knownJourneys,
-    events: run.product.productEvents,
-  };
+  const context = { ...toProductConfig(run.product), sourceRevision: run.sourceRevision };
   let result = await provider.propose(context, { id: run.id }, async (handle) => {
     await prisma.discoveryRun.update({
       where: { id: run.id },
@@ -40,32 +47,93 @@ export async function handleDiscoveryRun(runId: string, providerOverride?: Disco
   });
   const initialRaw = result.raw;
   let parsed = agentOutputSchema.safeParse(result.raw);
-  let contextMatches = parsed.success && parsed.data.discovery_run_id === run.id && parsed.data.source_revision === run.sourceRevision;
-  await prisma.discoveryRun.update({ where: { id: run.id }, data: { providerSessionId: result.handle.sessionId, providerSessionUrl: result.handle.url, rawResponses: [jsonValue(result.raw)] } });
-  if (!parsed.success || !contextMatches) {
-    const problems = parsed.success ? "discovery_run_id or source_revision mismatch" : parsed.error.message;
+  let contextMatches =
+    parsed.success &&
+    parsed.data.discovery_run_id === run.id &&
+    parsed.data.source_revision === run.sourceRevision;
+  let ruleRefsValid =
+    parsed.success &&
+    parsed.data.proposals.every(
+      (proposal) =>
+        SUCCESS_RULE_REFS.includes(
+          proposal.success_rule_ref as (typeof SUCCESS_RULE_REFS)[number],
+        ) &&
+        ELIGIBILITY_RULE_REFS.includes(
+          proposal.eligibility_rule_ref as (typeof ELIGIBILITY_RULE_REFS)[number],
+        ),
+    );
+  await prisma.discoveryRun.update({
+    where: { id: run.id },
+    data: {
+      providerSessionId: result.handle.sessionId,
+      providerSessionUrl: result.handle.url,
+      rawResponses: [jsonValue(result.raw)],
+    },
+  });
+  if (!parsed.success || !contextMatches || !ruleRefsValid) {
+    const problems = parsed.success
+      ? !contextMatches
+        ? "discovery_run_id or source_revision mismatch"
+        : `unknown rule ref; allowed success_rule_ref values: ${SUCCESS_RULE_REFS.join(", ")}; allowed eligibility_rule_ref values: ${ELIGIBILITY_RULE_REFS.join(", ")}`
+      : parsed.error.message;
     const correction = await provider.requestCorrection(result.handle, problems);
     result = correction;
     parsed = agentOutputSchema.safeParse(result.raw);
-    contextMatches = parsed.success && parsed.data.discovery_run_id === run.id && parsed.data.source_revision === run.sourceRevision;
-    await prisma.discoveryRun.update({ where: { id: run.id }, data: { correctionAttempts: 1, rawResponses: [jsonValue(initialRaw), jsonValue(result.raw)] } });
+    contextMatches =
+      parsed.success &&
+      parsed.data.discovery_run_id === run.id &&
+      parsed.data.source_revision === run.sourceRevision;
+    ruleRefsValid =
+      parsed.success &&
+      parsed.data.proposals.every(
+        (proposal) =>
+          SUCCESS_RULE_REFS.includes(
+            proposal.success_rule_ref as (typeof SUCCESS_RULE_REFS)[number],
+          ) &&
+          ELIGIBILITY_RULE_REFS.includes(
+            proposal.eligibility_rule_ref as (typeof ELIGIBILITY_RULE_REFS)[number],
+          ),
+      );
+    await prisma.discoveryRun.update({
+      where: { id: run.id },
+      data: { correctionAttempts: 1, rawResponses: [jsonValue(initialRaw), jsonValue(result.raw)] },
+    });
   }
-  if (!parsed.success || !contextMatches) {
-    await prisma.discoveryRun.update({ where: { id: run.id }, data: { status: "failed", error: "malformed_agent_output" } });
+  if (!parsed.success || !contextMatches || !ruleRefsValid) {
+    await prisma.discoveryRun.update({
+      where: { id: run.id },
+      data: { status: "failed", error: "malformed_agent_output" },
+    });
     return;
   }
   await prisma.$transaction(async (tx) => {
     await tx.proposal.deleteMany({ where: { discoveryRunId: run.id } });
     if (parsed.data.outcome === "proposed") {
-      await tx.proposal.createMany({ data: parsed.data.proposals.slice(0, 5).map((proposal) => ({
-        discoveryRunId: run.id, tenantId: run.tenantId, taskId: proposal.task_id,
-        researchQuestion: proposal.research_question, participantPrompt: proposal.participant_prompt,
-        rationale: proposal.rationale, evidenceRefs: proposal.evidence_refs, evidenceType: proposal.evidence_type,
-        eligibilityRuleRef: proposal.eligibility_rule_ref, successRuleRef: proposal.success_rule_ref,
-        uncertainties: proposal.uncertainties, estimatedDurationSeconds: proposal.estimated_duration_seconds,
-        confidence: proposal.confidence,
-      })) });
+      await tx.proposal.createMany({
+        data: parsed.data.proposals.map((proposal) => ({
+          discoveryRunId: run.id,
+          tenantId: run.tenantId,
+          taskId: proposal.task_id,
+          researchQuestion: proposal.research_question,
+          participantPrompt: proposal.participant_prompt,
+          rationale: proposal.rationale,
+          evidenceRefs: proposal.evidence_refs,
+          evidenceType: proposal.evidence_type,
+          eligibilityRuleRef: proposal.eligibility_rule_ref,
+          successRuleRef: proposal.success_rule_ref,
+          uncertainties: proposal.uncertainties,
+          estimatedDurationSeconds: proposal.estimated_duration_seconds,
+          confidence: proposal.confidence,
+        })),
+      });
     }
-    await tx.discoveryRun.update({ where: { id: run.id }, data: { status: "proposed", outcome: parsed.data.outcome, outcomeReason: parsed.data.outcome_reason } });
+    await tx.discoveryRun.update({
+      where: { id: run.id },
+      data: {
+        status: "proposed",
+        outcome: parsed.data.outcome,
+        outcomeReason: parsed.data.outcome_reason,
+      },
+    });
   });
 }

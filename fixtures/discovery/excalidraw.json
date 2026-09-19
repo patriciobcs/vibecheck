@@ -11,7 +11,7 @@
       "rationale": "Release notes from upstream commit subjects report a newly shipped sticky-note capability; support complaints are sample data and no human evidence exists yet.",
       "evidence_refs": ["release_sticky_notes"],
       "evidence_type": "reported",
-      "eligibility_rule_ref": "whiteboard_users_v1",
+      "eligibility_rule_ref": "eligible_whiteboard_users_v1",
       "success_rule_ref": "stickynote_capture_v1",
       "uncertainties": ["No baseline human test has been completed."]
     },
@@ -22,7 +22,7 @@
       "rationale": "Release notes from upstream commit subjects report bucket fill and color tools; support complaints are sample data and no human evidence exists yet.",
       "evidence_refs": ["release_bucket_fill", "release_eyedropper"],
       "evidence_type": "reported",
-      "eligibility_rule_ref": "whiteboard_users_v1",
+      "eligibility_rule_ref": "eligible_whiteboard_users_v1",
       "success_rule_ref": "fill_match_v1",
       "uncertainties": ["No baseline human test has been completed."]
     },
@@ -33,7 +33,7 @@
       "rationale": "Release notes from upstream commit subjects report navigation improvements; support complaints are sample data and no human evidence exists yet.",
       "evidence_refs": ["release_right_click_pan"],
       "evidence_type": "reported",
-      "eligibility_rule_ref": "whiteboard_users_v1",
+      "eligibility_rule_ref": "eligible_whiteboard_users_v1",
       "success_rule_ref": "viewport_reached_v1",
       "uncertainties": ["No baseline human test has been completed."]
     }

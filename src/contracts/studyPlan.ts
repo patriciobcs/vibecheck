@@ -38,4 +38,23 @@ export const studyPlanSchema = z.object({
   }),
 });
 
+export const publishInputSchema = z.object({
+  product_id: z.string().min(1),
+  discovery_run_id: z.string().min(1),
+  task_id: z.string().min(1),
+  task: studyPlanSchema.shape.task
+    .pick({
+      participant_prompt: true,
+      time_limit_seconds: true,
+    })
+    .partial()
+    .optional(),
+  baseline: studyPlanSchema.shape.baseline,
+  fixture_ref: z.string().min(1),
+  recruitment: studyPlanSchema.shape.recruitment.partial().optional(),
+  capture: studyPlanSchema.shape.capture.partial().optional(),
+  automation: studyPlanSchema.shape.automation.partial().optional(),
+});
+
 export type StudyPlan = z.infer<typeof studyPlanSchema>;
+export type PublishInput = z.infer<typeof publishInputSchema>;

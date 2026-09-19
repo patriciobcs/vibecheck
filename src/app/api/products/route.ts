@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { tenantFromRequest, apiError } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { createProduct } from "@/services/products";
 
 export async function POST(request: NextRequest) {
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const tenantId = await tenantFromRequest(request);
   if (!tenantId) return apiError("authentication required", "unauthorized", 401);
-  const { prisma } = await import("@/lib/prisma");
-  return Response.json(await prisma.product.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" } }));
+  return Response.json(
+    await prisma.product.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" } }),
+  );
 }

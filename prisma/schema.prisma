@@ -22,6 +22,17 @@ enum DiscoveryStatus {
   cancelled
 }
 
+enum DiscoveryProvider {
+  fixture
+  devin
+}
+
+enum DiscoveryOutcome {
+  proposed
+  cannot_assess
+  needs_setup
+}
+
 enum StudyStatus {
   draft
   published
@@ -86,11 +97,11 @@ model DiscoveryRun {
   productId          String
   tenantId           String
   status             DiscoveryStatus
-  provider           String
+  provider           DiscoveryProvider
   providerSessionId  String?
   providerSessionUrl String?
   sourceRevision     String
-  outcome            String?
+  outcome            DiscoveryOutcome?
   outcomeReason      String?
   rawResponses       Json
   correctionAttempts Int             @default(0)

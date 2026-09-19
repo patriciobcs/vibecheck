@@ -1,1 +1,7 @@
-{"schema_version":"1.0","discovery_run_id":"fixture","source_revision":"fixture","outcome":"proposed","proposals":[{"task_id":"malformed"}]}
+{
+  "schema_version": "1.0",
+  "discovery_run_id": "fixture",
+  "source_revision": "fixture",
+  "outcome": "proposed",
+  "proposals": [{ "task_id": "malformed" }]
+}

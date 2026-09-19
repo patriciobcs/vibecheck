@@ -4,9 +4,15 @@ import type { DiscoveryContext, DiscoveryProvider, ProviderHandle, ProviderResul
 export const fixtureProvider: DiscoveryProvider = {
   name: "fixture",
   async propose(ctx: DiscoveryContext, _run): Promise<ProviderResult> {
-    return { raw: { ...fixture, discovery_run_id: _run.id, source_revision: ctx.sourceRevision }, handle: { runId: _run.id, sourceRevision: ctx.sourceRevision } };
+    return {
+      raw: { ...fixture, discovery_run_id: _run.id, source_revision: ctx.sourceRevision },
+      handle: { runId: _run.id, sourceRevision: ctx.sourceRevision },
+    };
   },
   async requestCorrection(_handle: ProviderHandle, _problems: string): Promise<ProviderResult> {
-    return { raw: { ...fixture, discovery_run_id: _handle.runId, source_revision: _handle.sourceRevision }, handle: _handle };
+    return {
+      raw: { ...fixture, discovery_run_id: _handle.runId, source_revision: _handle.sourceRevision },
+      handle: _handle,
+    };
   },
 };

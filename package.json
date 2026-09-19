@@ -9,7 +9,9 @@
     "worker": "tsx src/worker/index.ts",
     "test": "vitest run",
     "prisma": "prisma",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "format": "prettier --write src prisma/seed.ts fixtures",
+    "format:check": "prettier --check src prisma/seed.ts fixtures"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -29,6 +31,8 @@
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.5.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.8",
     "prisma": "^6.16.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.19.0",

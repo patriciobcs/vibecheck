@@ -1,5 +1,6 @@
 import type { DiscoveryContext } from "../types";
 import { agentOutputJsonSchema } from "@/contracts/agentOutput";
+import { ELIGIBILITY_RULE_REFS, SUCCESS_RULE_REFS } from "@/contracts/rules";
 
 export function buildPrompt(context: DiscoveryContext, runId: string) {
   return `You are performing read-only UX discovery for VibeCheck run ${runId}.
@@ -13,7 +14,9 @@ Participant prompts describe a goal without naming controls or shortcuts or a
 suspected problem. Do not browse private networks or modify anything. If the URL is
 unreachable return needs_setup. If context is insufficient return cannot_assess.
 Do not invent traffic, complaints or observed failures. Distinguish signal from
-hypothesis. Return only this exact JSON shape:
+hypothesis. Use only these success_rule_ref values: ${SUCCESS_RULE_REFS.join(", ")}.
+Use only these eligibility_rule_ref values: ${ELIGIBILITY_RULE_REFS.join(", ")}.
+Return only this exact JSON shape:
 ${JSON.stringify(agentOutputJsonSchema)}
 
 Context:
