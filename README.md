@@ -42,5 +42,10 @@ npm run dev
 npm run worker
 ```
 
+Set `ALLOW_LOCAL_TARGETS=true` for localhost demo targets. `DEV_API_KEY` is
+printed by `npm run seed` and must be copied into `.env` for the UI. Run the
+worker in a second terminal. Database-backed tests require `DATABASE_URL`.
+Set `DISCOVERY_PROVIDER=devin` and `DEVIN_API_KEY` to use the Devin provider.
+
 The fixture discovery provider returns clearly labelled sample output from the
 VC-07 demo target. It is not agent inference or human research evidence.

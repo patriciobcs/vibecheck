@@ -7,7 +7,9 @@ import { devinProvider } from "@/agents/devin";
 
 export function providerFor(name: string, override?: DiscoveryProvider) {
   if (override) return override;
-  return name === "devin" ? devinProvider : fixtureProvider;
+  if (name === "devin") return devinProvider;
+  if (name === "fixture") return fixtureProvider;
+  throw new Error("unknown_provider");
 }
 
 const jsonValue = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -19,21 +21,24 @@ export async function handleDiscoveryRun(runId: string, providerOverride?: Disco
   const provider = providerFor(run.provider, providerOverride);
   const context = {
     url: run.product.url, description: run.product.description, audience: run.product.audience,
-    language: run.product.language, releaseNotes: run.product.releaseNotes,
+    language: run.product.language, sourceRevision: run.sourceRevision, releaseNotes: run.product.releaseNotes,
     complaints: run.product.supportComplaints, journeys: run.product.knownJourneys,
     events: run.product.productEvents,
   };
   let result = await provider.propose(context, { id: run.id });
   const initialRaw = result.raw;
   let parsed = agentOutputSchema.safeParse(result.raw);
+  let contextMatches = parsed.success && parsed.data.discovery_run_id === run.id && parsed.data.source_revision === run.sourceRevision;
   await prisma.discoveryRun.update({ where: { id: run.id }, data: { providerSessionId: result.handle.sessionId, providerSessionUrl: result.handle.url, rawResponses: [jsonValue(result.raw)] } });
-  if (!parsed.success) {
-    const correction = await provider.requestCorrection(result.handle, parsed.error.message);
+  if (!parsed.success || !contextMatches) {
+    const problems = parsed.success ? "discovery_run_id or source_revision mismatch" : parsed.error.message;
+    const correction = await provider.requestCorrection(result.handle, problems);
     result = correction;
     parsed = agentOutputSchema.safeParse(result.raw);
+    contextMatches = parsed.success && parsed.data.discovery_run_id === run.id && parsed.data.source_revision === run.sourceRevision;
     await prisma.discoveryRun.update({ where: { id: run.id }, data: { correctionAttempts: 1, rawResponses: [jsonValue(initialRaw), jsonValue(result.raw)] } });
   }
-  if (!parsed.success) {
+  if (!parsed.success || !contextMatches) {
     await prisma.discoveryRun.update({ where: { id: run.id }, data: { status: "failed", error: "malformed_agent_output" } });
     return;
   }

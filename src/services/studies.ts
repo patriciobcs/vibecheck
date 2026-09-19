@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { studyPlanSchema, type StudyPlan } from "@/contracts/studyPlan";
 
@@ -23,9 +24,7 @@ export async function publishStudy(tenantId: string, idempotencyKey: string, inp
   const run = await prisma.discoveryRun.findFirst({ where: { id: input.discovery_run_id, tenantId, productId: input.product_id }, include: { proposals: true } });
   const proposal = run?.proposals.find((item) => item.taskId === input.task_id);
   if (!product || !run || !proposal) return null;
-  const prior = await prisma.publishRequest.findUnique({ where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } }, include: { study: { include: { revisions: true } } } });
-  if (prior) return { status: 200, study: prior.study, plan: prior.study.revisions[0]?.plan, event: await prisma.outboxEvent.findUnique({ where: { idempotencyKey: `${prior.studyId}:revision_1:publish` } }) };
-  const studyId = crypto.randomUUID();
+  const studyId = randomUUID();
   const plan = studyPlanSchema.parse({
     schema_version: "1.0", study_id: studyId, study_revision: 1, product_id: product.id,
     task: { task_id: proposal.taskId, participant_prompt: input.task?.participant_prompt ?? proposal.participantPrompt,
@@ -35,13 +34,28 @@ export async function publishStudy(tenantId: string, idempotencyKey: string, inp
     capture: { ...defaults.capture, ...input.capture }, automation: { ...defaults.automation, ...input.automation },
   });
   return prisma.$transaction(async (tx) => {
-    const revisionId = crypto.randomUUID();
+    const revisionId = randomUUID();
     const eventId = randomUUID();
     const responseHash = createHash("sha256").update(JSON.stringify(plan)).digest("hex");
-    const study = await tx.study.create({ data: { id: studyId, productId: product.id, tenantId, status: "published", currentRevision: 1 } });
+    const study = await tx.study.create({ data: { id: studyId, productId: product.id, tenantId, status: "draft", currentRevision: 1 } });
+    await tx.publishRequest.create({ data: { tenantId, idempotencyKey, studyId, responseHash } });
+    await tx.study.update({ where: { id: study.id }, data: { status: "published" } });
     await tx.studyPlanRevision.create({ data: { id: revisionId, studyId, revision: 1, plan, publishedAt: new Date() } });
     const event = await tx.outboxEvent.create({ data: { eventId, eventType: "study.published", idempotencyKey: `${studyId}:revision_1:publish`, tenantId, productId: product.id, correlationId: studyId, payload: { study_id: studyId, study_revision: 1, plan_ref: `studyplan:${revisionId}` }, occurredAt: new Date() } });
-    await tx.publishRequest.create({ data: { tenantId, idempotencyKey, studyId, responseHash } });
-    return { status: 201, study, plan, event };
+    return { status: 201, study: { ...study, status: "published" as const }, plan, event };
+  }).catch(async (error: unknown) => {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+    const prior = await prisma.publishRequest.findUnique({
+      where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
+      include: { study: { include: { revisions: true } } },
+    });
+    if (!prior) throw error;
+    const revision = prior.study.revisions.find((item) => item.revision === prior.study.currentRevision);
+    return {
+      status: 200,
+      study: prior.study,
+      plan: revision?.plan,
+      event: await prisma.outboxEvent.findUnique({ where: { idempotencyKey: `${prior.studyId}:revision_1:publish` } }),
+    };
   });
 }

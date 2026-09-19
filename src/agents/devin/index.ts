@@ -12,9 +12,10 @@ async function poll(handle: ProviderHandle): Promise<ProviderResult> {
   let last: unknown;
   while (Date.now() < deadline) {
     const response = await fetch(`${base}/sessions/${handle.sessionId}`, { headers: headers() });
-    const body = await response.json() as { structured_output?: unknown; status_enum?: string; messages?: Array<{ text?: string }> };
+    if (!response.ok) throw new Error(`devin_api_${response.status}`);
+    const body = await response.json() as { structured_output?: unknown; status_enum?: string; messages?: Array<{ message?: string }> };
     if (body.structured_output != null) return { raw: body.structured_output, handle };
-    last = body.messages?.at(-1)?.text;
+    last = body.messages?.at(-1)?.message;
     if (["finished", "blocked", "expired"].includes(body.status_enum ?? "")) return { raw: last, handle };
     await new Promise((resolve) => setTimeout(resolve, pollMs()));
   }
@@ -28,15 +29,14 @@ export const devinProvider: DiscoveryProvider = {
       method: "POST", headers: headers(),
       body: JSON.stringify({ prompt: buildPrompt(context, run.id), title: `VibeCheck discovery ${run.id}`, tags: ["vibecheck", "discovery"], unlisted: true, structured_output_schema: agentOutputJsonSchema, max_acu_limit: Number(process.env.DEVIN_MAX_ACU ?? 5), idempotent: true }),
     });
+    if (!response.ok) throw new Error(`devin_api_${response.status}`);
     const body = await response.json() as { session_id?: string; url?: string };
     return poll({ sessionId: body.session_id, url: body.url });
   },
   async requestCorrection(handle, problems) {
     if (!handle.sessionId) return { raw: null, handle };
     const response = await fetch(`${base}/sessions/${handle.sessionId}/message`, { method: "POST", headers: headers(), body: JSON.stringify({ message: `Correct the JSON output. Problems: ${problems}` }) });
-    if (!response.ok) {
-      return this.propose({ url: "", description: `Correction required: ${problems}`, audience: "", language: "en", releaseNotes: [], complaints: [], journeys: [], events: [] }, { id: handle.sessionId });
-    }
+    if (!response.ok) throw new Error(`devin_api_${response.status}`);
     return poll(handle);
   },
 };

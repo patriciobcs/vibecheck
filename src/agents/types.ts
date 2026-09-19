@@ -1,5 +1,6 @@
 export type DiscoveryContext = {
   url: string;
+  sourceRevision: string;
   description: string;
   audience: string;
   language: string;
@@ -9,7 +10,7 @@ export type DiscoveryContext = {
   events: unknown;
 };
 
-export type ProviderHandle = { sessionId?: string; url?: string };
+export type ProviderHandle = { sessionId?: string; url?: string; runId?: string; sourceRevision?: string };
 export type ProviderResult = { raw: unknown; handle: ProviderHandle };
 export interface DiscoveryProvider {
   name: string;
