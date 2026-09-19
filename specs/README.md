@@ -98,15 +98,15 @@ The plan is stored as immutable JSON; events carry its reference. Secrets are ex
   "study_revision": 1,
   "product_id": "product_example",
   "task": {
-    "task_id": "task_reschedule",
-    "participant_prompt": "Your haircut is booked for September 22 at 3 p.m., but your plans have changed. You are available September 25 at 4 p.m. Use this app to arrange your appointment for that time.",
-    "research_question": "Can a customer change an existing appointment?",
+    "task_id": "task_capture_ideas",
+    "participant_prompt": "The board on screen collects ideas for a team offsite. Add these three ideas to the board so your teammates can read them: rooftop dinner, karaoke night, museum tour.",
+    "research_question": "Can a user capture several short ideas on an existing board?",
     "time_limit_seconds": 300,
-    "success_rule_ref": "booking_time_changed_v1",
-    "fixture_ref": "booking_fixture_v1"
+    "success_rule_ref": "stickynote_capture_v1",
+    "fixture_ref": "excalidraw_fixture_v1"
   },
   "baseline": {"commit_sha": "REPLACE_WITH_REAL_SHA", "environment_ref": "baseline_preview"},
-  "recruitment": {"source": "marketplace", "target_count": 2, "cohort": "fresh", "eligibility_rule_ref": "eligible_booking_users_v1"},
+  "recruitment": {"source": "marketplace", "target_count": 2, "cohort": "fresh", "eligibility_rule_ref": "eligible_whiteboard_users_v1"},
   "capture": {"screen": "required", "microphone": "required", "webcam": "off", "pointer": "on", "keyboard": "semantic_only", "text_values": "off", "retention_days": 30},
   "automation": {"mode": "prototype_and_retest", "max_variants": 1, "max_repair_attempts": 2, "agent_budget_ref": "demo_budget", "retest_target_count": 2}
 }
@@ -144,5 +144,5 @@ Add unresolved proposals under Open decisions until resolved. JSON schema versio
 - [ ] Verify Devin account/API capabilities, budgets and artifact retrieval with a real call.
 - [ ] Verify Vonage screen recording and SLNG timestamp/alignment behavior in the chosen browsers.
 - [ ] Select notification provider; local demo uses a test inbox.
-- [ ] Confirm the selected open-source demo and hackathon eligibility; see VC-07.
+- [ ] Confirm hackathon eligibility of the selected third-party demo target; see VC-07.
 

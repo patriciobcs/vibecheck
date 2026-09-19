@@ -7,66 +7,77 @@ Dependencies: [VC-02](02-test-delivery-and-recording.md), [VC-04](04-prototypes-
 
 Select a real open-source application that can be forked, run and seeded predictably, then demonstrate one complete human-research-to-code-to-retest workflow. This spec does not claim a repository has already been forked or that the suspected UX problem exists upstream.
 
-## Proposed target and evidence
+## Selected target and measured evidence
 
-First candidate: [Easy!Appointments](https://github.com/alextselegidis/easyappointments). Its upstream README describes self-hosted appointment scheduling, a Docker Compose development path, and PHP/MySQL requirements. The repository identifies GPL-3.0 code licensing. These facts were checked on 2026-09-19; inspect the license and setup at the actual pinned commit before use.
+Selected: [Excalidraw](https://github.com/excalidraw/excalidraw), MIT licensed (root `LICENSE`, "Copyright (c) 2020 Excalidraw"). Spike commit `97c68dd371e13c017a8dcca49f8b3995ba7890a8`, authored 2026-09-19.
 
-It is a candidate because it matches the agreed rescheduling story. Ease of setup and the exact customer rescheduling path are not yet verified locally. Deposit support is unverified and must not be claimed. Do not build a payment subsystem just to preserve an earlier script detail.
+Measured on a macOS machine with Node 24.20.0 and yarn 1.22.22 on 2026-09-19:
 
-Alternative: the [Cal.com repository link](https://github.com/calcom/cal.com) currently redirects to `calcom/cal.diy`. Treat it as an alternative requiring a separate setup and license spike; do not copy old installation assumptions. Prefer a successful small demo over a recognizable but time-consuming dependency stack.
+| Step | Command | Measured |
+| --- | --- | --- |
+| Clone | `git clone --depth 1` | 1m34s |
+| Install | `yarn install` | 4m24s; installs husky hooks |
+| Run | `yarn start` | Vite ready in 0.7s; app on `http://localhost:3001` |
+| Readiness | `curl http://localhost:3001` | HTTP 200 |
 
-## Selection gate
+The editor needs no backend, database, login, seed migration, API key or Docker daemon. Scene state persists in browser local storage (`excalidraw` for elements, `excalidraw-state` for app state; see `excalidraw-app/app_constants.ts`), which is also the observable surface for fixtures and success rules. Live collaboration and Excalidraw+ are hosted features and stay disabled in the demo.
 
-Spend a bounded initial spike (proposed 45 minutes) on the preferred candidate:
+Rejected candidates and why: Easy!Appointments, Documenso, Open WebUI and Stirling-PDF all require a Docker Compose stack, and the available development machine has no Docker. Mastra Studio runs in 28s from `create-mastra` but needs a model-provider API key to execute an agent, and its Agents/Workflows/Scorers/Traces surface requires participants who already know the framework, which conflicts with recruiting ordinary participants in VC-02.
 
-1. Inspect current license, contributing notes, release/tag and environment requirements.
-2. Run a clean checkout in the same style of environment available to Devin and preview hosting.
-3. Verify the customer journey can be accessed with isolated test data and no external calendar/payment accounts.
-4. Demonstrate automated fixture reset and browser tests.
-5. Confirm the embedded SDK can capture relevant safe events.
-6. Record selected commit, commands, measured setup time and unresolved constraints below.
+Trade-off accepted: success is observed from persisted client scene state rather than server records. This is weaker provenance than a database assertion, and checks must therefore read a post-session snapshot captured by the runner rather than trusting in-page claims.
 
-If the gate fails, evaluate the alternative or use a small original booking fixture built during the event. Document the selected approach and rationale in this spec. The target is independent from VibeCheck and must not leak app-specific logic into the general orchestration.
+## Scoped feature set
 
-## Hackathon eligibility and provenance
+Treat the demo as continuous research on a product VibeCheck already monitors, so discovery covers only recently merged editor features rather than the whole editor. Scope for the first study, taken from the commit range ending at the pinned SHA:
 
-The supplied event brief says no previous projects. Confirm whether an attributed third-party demo target is acceptable before relying on the fork for the submission. The VibeCheck platform must be built during the event. If organizers disallow the fork, use the newly built fixture and record that choice.
+| Feature | Upstream PR | Reachability verified |
+| --- | --- | --- |
+| Sticky notes | #12064 | Yes — shortcut `N`; a note renders with a creation-date footer |
+| Bucket fill and eyedropper | #11849, #11859 | Yes — "Bucket fill" in the More tools menu, shortcut `B` |
+| Customizable color top picks | #11872 | Not yet verified in the UI |
+| Right-click pan, wheel-button zoom and the "zoom with scroll wheel" preference | #12110, #12099 | Not yet verified in the UI |
+| Lasso selection `boxSelectionMode` | #11862 | Listed in the More tools menu; behavior not verified |
 
-Use a team-owned fork for modifications, issues and PRs. Preserve upstream notices and attribution. Record the pinned upstream SHA and every demo-specific modification. Do not submit deliberately introduced demo defects to upstream or portray them as flaws independently discovered in the original project.
+Publish at most three of these in the first study. The remaining entries are the backup pool if a chosen journey turns out to be frictionless.
 
 ## Baseline journey
 
-A customer has an appointment, their availability changes, and they need another slot. Example task:
+A user works on an existing board and captures several short ideas on it. Example task:
 
-> You have a haircut booked on September 22 at 3 p.m., but your plans have changed. You are available September 25 at 4 p.m. Use this app to arrange your appointment for that time.
+> The board on screen collects ideas for a team offsite. Add these three ideas to the board so your teammates can read them: rooftop dinner, karaoke night, museum tour.
 
-Render dates from the seeded scenario with an explicit app timezone rather than relying on ambiguous “tomorrow.” The participant task must not name the rescheduling control, cancellation problem or desired UI solution. Backend success checks and any deposit constraints are researcher-only unless genuinely needed for realistic task context.
+The participant task must not name the sticky note tool, its shortcut, or any suspected discoverability problem. Backend success checks stay researcher-only.
 
-First observe the actual baseline. If the flow is already easy, select another genuine journey or clearly label a deliberately modified baseline as a demo fixture. Never force a participant to fail or edit footage to manufacture a failure.
+First observe the actual baseline. If the flow is already easy, select another genuine journey from the backup pool or clearly label a deliberately modified baseline as a demo fixture. Never force a participant to fail or edit footage to manufacture a failure.
 
 ## Fixtures and environment
 
-- One business, one service/provider, fixed opening hours and deterministic available slots.
-- A baseline customer with a seeded appointment and a separate customer for authorization checks.
-- Fresh fixture/account per assignment so baseline and variant sessions have equivalent starting conditions.
-- Fixed locale/timezone and testable clock/date handling.
-- Sandbox mail transport and no live payment/calendar effects.
-- Baseline and candidate environments each tied to an immutable SHA and fixture revision.
-- One-command reset plus a health/readiness check; document dependency versions and commands.
+- `excalidraw_fixture_v1`: one seeded scene document (`.excalidraw`) holding a small pre-drawn board with stable element IDs, plus a seeded app state with light theme, 100% zoom, fixed scroll position, the welcome screen dismissed and an empty library.
+- Fresh browser profile and fresh fixture per assignment, so baseline and variant sessions start identically.
+- Reset: clear the `excalidraw`, `excalidraw-state`, `excalidraw-collab` and `excalidraw-theme` local storage keys and re-seed the scene before the page loads. Expose this as one command plus a readiness check that asserts the seeded element IDs are present.
+- Fixed locale (`en`) and an explicit timezone; sticky notes stamp a creation date, so the clock is part of the fixture.
+- Collaboration, Excalidraw+ and any network-dependent feature disabled; no external accounts.
+- Baseline and candidate environments each pinned to an immutable SHA and fixture revision.
 
-If deposits exist, seed a fake deposit and check it stays attached without using real money. If not, remove deposit language from code, validator, dashboard and video together, and update the scope in all affected specs.
+There is no payment, mail or calendar surface in this target, so deposit, notification and calendar language is removed from the demo scenario and from the specs that referenced it.
 
 ## Independent browser and state checks
 
-1. Customer can access the correct existing appointment.
-2. Rescheduling changes date/time and preserves service/customer identity.
-3. Old slot is released and new slot is reserved without duplicate bookings.
-4. Confirmation displays the actual persisted result, not only optimistic UI.
-5. Another customer cannot modify the booking through UI or direct requests.
-6. Cancellation remains a distinct intentional action.
-7. Deposit preserved only if supported by the actual fixture.
+1. The seeded scene loads with the expected element IDs and count.
+2. Ideas captured during the task persist across a reload with their text intact.
+3. A color change applies to the intended element only and leaves other elements untouched.
+4. Undo restores the previous element state.
+5. Export to PNG and SVG still produces a non-empty file containing the scene.
+6. The reset command restores the fixture byte-for-byte in terms of element IDs and app state fields.
+7. No collaboration or telemetry network calls occur in demo mode.
 
 Host acceptance checks in the VibeCheck-controlled runner, outside Devin's editable scope. Verify the baseline's unrelated regression checks before demonstrating repair. A deliberately seeded functional regression may demonstrate a retry if clearly disclosed; do not claim it happened spontaneously.
+
+## Hackathon eligibility and provenance
+
+The supplied event brief says no previous projects. Confirm whether an attributed third-party demo target is acceptable before relying on the fork for the submission. The VibeCheck platform must be built during the event. If organizers disallow the fork, use a newly built fixture app and record that choice.
+
+Use a team-owned fork for modifications, issues and PRs. MIT permits this; preserve upstream copyright and license notices. Record the pinned upstream SHA and every demo-specific modification. Do not submit deliberately introduced demo defects to upstream or portray them as flaws independently discovered in the original project.
 
 ## Three-minute capture plan
 
@@ -92,21 +103,19 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 - The PR displays functional checks and bounded human evidence separately.
 - Demo defects, sample complaints, staged dialogue and accelerated time are labeled accurately.
 - The demo works without production data, transactions or external customer notifications.
-- Deposit claims appear only if the implemented test scenario supports them.
 
 ## Selection record / open decisions
 
 | Item | Current value |
 | --- | --- |
-| Preferred candidate | Easy!Appointments; awaiting local spike |
-| Selected repository/fork | TBD |
-| Upstream commit/license reviewed | TBD |
-| Baseline commit | TBD |
-| Setup and reset commands verified | TBD |
-| Deposit support | Unverified; optional and excluded unless demonstrated |
-| Preview runtime | TBD |
+| Selected upstream | `excalidraw/excalidraw`, MIT |
+| Spike commit reviewed | `97c68dd371e13c017a8dcca49f8b3995ba7890a8` (2026-09-19) |
+| Team-owned fork | Not created yet; required before VC-04 writes anything |
+| Baseline commit | TBD; pin when the fork is created |
+| Setup verified | `yarn install` 4m24s, `yarn start` on port 3001, HTTP 200 |
+| Reset command | Not implemented; local storage reset plus scene re-seed is the intended mechanism |
+| Preview runtime | TBD; a static Vite build is sufficient because there is no backend |
 | Organizer confirmation for third-party target | Pending |
 | Measured baseline friction | No human sessions yet |
 
 Update this record with measured facts during implementation; do not infer completion from the presence of this spec.
-
