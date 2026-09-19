@@ -55,20 +55,42 @@ Agent output shape:
   "discovery_run_id": "discovery_example",
   "source_revision": "context_revision_1",
   "proposals": [{
-    "task_id": "task_reschedule",
-    "research_question": "Can customers change an appointment?",
-    "participant_prompt": "Your plans have changed. Arrange your existing appointment for the available time stated in your task.",
-    "rationale": "Imported feedback mentions accidental cancellation.",
-    "evidence_refs": ["support_item_example"],
+    "task_id": "task_capture_ideas",
+    "research_question": "Can a user capture several short ideas on an existing board?",
+    "participant_prompt": "Add the ideas listed in your task to the board so your teammates can read them.",
+    "rationale": "Release notes list a newly shipped way to capture ideas; no human evidence exists for it yet.",
+    "evidence_refs": ["release_note_example"],
     "evidence_type": "reported",
-    "eligibility_rule_ref": "booking_users_v1",
-    "success_rule_ref": "booking_time_changed_v1",
+    "eligibility_rule_ref": "whiteboard_users_v1",
+    "success_rule_ref": "stickynote_capture_v1",
     "uncertainties": ["No baseline human test has been completed."]
   }]
 }
 ```
 
 At publication resolve exact dates, environment, fixture and commit. Emit `study.published` using the complete StudyPlan contract in the index. The simplified discovery prompt above must be concretized before a participant sees it. URLs must pass server-side destination rules before any backend fetch; block private-network/metadata endpoints and recheck redirects.
+
+## First simulation run
+
+The first end-to-end exercise of this spec runs against the demo target selected in [VC-07](07-demo-target-app.md). It simulates a product VibeCheck has already been monitoring, so discovery is scoped to recently shipped features instead of the whole application.
+
+Simulated `ProductConfig` inputs, all labeled as sample material with their provenance:
+
+| Input | Value |
+| --- | --- |
+| URL / origins | Locally served build of the demo fork |
+| Repository | Team-owned fork, pinned to the VC-07 baseline commit |
+| Release notes | The scoped feature list in VC-07, taken verbatim from upstream commit subjects |
+| Support complaints | Sample, clearly labeled; no real user reports exist |
+| Product events | None; exploratory proposals must be labeled accordingly |
+
+Expected discovery output: three proposals, one per scoped feature, each naming a goal without naming the control. The owner publishes one. Concretely, for the first study:
+
+- `task_capture_ideas` — capture several short ideas on an existing board; success rule `stickynote_capture_v1`, satisfied when the persisted scene contains at least three idea elements with non-empty text.
+- `task_match_colors` — make several shapes share an existing shape's fill; success rule `fill_match_v1`, satisfied when the target element IDs carry the reference background color.
+- `task_navigate_board` — bring an off-screen region of the board into view; success rule `viewport_reached_v1`, satisfied when the persisted scroll position covers the target region.
+
+Success rules are evaluated by the VibeCheck runner against a post-session snapshot of persisted scene state, never by the agent and never from claims made inside the page. Publishing this run must not require any capability listed as deferred in the MVP scope.
 
 ## States and failures
 

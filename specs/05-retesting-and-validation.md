@@ -49,7 +49,7 @@ For the MVP show descriptive results such as `baseline 0/1 completed; variant 1/
   "pull_request_ref": "pr_example",
   "candidate_commit_sha": "REPLACE_WITH_REAL_SHA",
   "study_revision": 1,
-  "fixture_revision": "booking_fixture_v1",
+  "fixture_revision": "excalidraw_fixture_v1",
   "functional_status": "passed",
   "human_status": "tested_preliminary",
   "outcome": "encouraging",
