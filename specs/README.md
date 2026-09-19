@@ -1,0 +1,148 @@
+# VibeCheck specifications
+
+Status: Draft product specification; implementation has not been verified.
+
+VibeCheck organizes real-human usability research and turns evidence into issues, working code alternatives, and human retests. The embedded library and research engine are the core product. Shareable links and a marketplace supply participants when existing users are unavailable or should not be interrupted.
+
+## Spec map
+
+| ID | Spec | Responsibility |
+| --- | --- | --- |
+| VC-01 | [Product onboarding and planning](01-product-onboarding-and-test-planning.md) | Connect product/repository, propose challenges, select studies, publish a JSON handoff. |
+| VC-02 | [Test delivery and recording](02-test-delivery-and-recording.md) | Invitations, assignment, consent, tasks, configurable recording and uploads. |
+| VC-03 | [Evidence and GitHub issues](03-evidence-analysis-and-github-issues.md) | Analyze sessions through Devin, deduplicate findings, create/update issues. |
+| VC-04 | [Prototypes and verification](04-prototypes-and-verification.md) | Isolated changes, independent checks, retries, previews, draft PRs. |
+| VC-05 | [Retesting and validation](05-retesting-and-validation.md) | Invitations, fresh/repeat participants, comparison, commit-bound PR evidence. |
+| VC-06 | [Dashboard and orchestration](06-owner-dashboard-and-orchestration.md) | Owner views, settings, tenancy, durable jobs, audit trail and integrations. |
+| VC-07 | [Demo target app](07-demo-target-app.md) | Open-source candidate, reproducible fixture, checks and honest three-minute demo. |
+
+## Product decisions
+
+- Initial platform: web applications. Research can work against a URL; code changes additionally require repository access and a reproducible environment.
+- The owner selects proposed tasks by default. Optional `auto_launch` can launch bounded studies under preconfigured rules. This supports both owner-directed research and the autonomous demo.
+- Once a study is launched, processing follows its snapshotted automation policy. No repeated owner approval is necessary for authorized issue creation or isolated prototypes.
+- Modes: `issues_only`, `draft_pr`, `prototype_and_retest`. No automatic merge or production deployment in the MVP.
+- Devin is the initial agent provider for planning, analysis, and implementation. Jev is unavailable; Nebius is not required. Provider adapters may be added later.
+- Ordinary application code owns assignments, credit transactions, workflow state, validation execution and access control. Devin does not replace those services.
+- Vonage is the planned media provider; SLNG is the planned STT provider. Verify recording capabilities, access, and supported browser behavior during integration.
+- Branches/worktrees in an authorized repository are the default prototype mechanism. Forks are supported as an alternative, not required per variant.
+- Task success and participation quality are separate. Failure to complete a task can be valuable research. No honesty score or live reward meter.
+
+## MVP and exclusions
+
+Build one reusable web-app pipeline and prove it with one connected demo repository, one task, one baseline version, one variant, and a small invited participant pool. Provide both a direct link and embedded invitation. A basic claim queue is enough for the marketplace.
+
+Defer payments, complex reputation, generalized automatic setup of arbitrary repositories, native app capture, production rollout, advanced randomization, and enterprise identity integrations. Fixed credits for valid participation may use a ledger without implementing purchases. A prototype must not pretend these deferred capabilities exist.
+
+## Workflow
+
+```text
+Product configuration → discovery run → proposed tasks → selection/auto-launch
+    → immutable study plan → assignment → consent → session → uploaded evidence
+    → analysis → supported finding → deduplicate → GitHub issue
+       ├─ issues_only: stop
+       ├─ draft_pr: implement → validate → draft PR, no human retest
+       └─ prototype_and_retest: implement → validate → preview → draft PR
+            → retest invitation → human session → comparison → update PR evidence
+```
+
+No finding is a valid result. No participant, missing media, setup failure, exhausted agent budget, or inconclusive retesting must remain visible outcomes; none is silently converted to success.
+
+## Shared contract conventions
+
+These examples are target contracts, not shipped endpoints. Validate inputs/outputs against runtime schemas. IDs are opaque strings, timestamps UTC ISO-8601, relative times integer milliseconds. Every message contains `schema_version`, `event_id`, `event_type`, `occurred_at`, `tenant_id`, `product_id`, `correlation_id`, `idempotency_key`, and `payload`. The server derives tenant access from authentication; a caller-provided tenant ID is never sufficient authorization.
+
+Events may arrive more than once or out of order. Deduplicate by event ID and business operation key. Version rows or use transactional transitions to reject stale updates. External side effects use an outbox and reconciliation record.
+
+```json
+{
+  "schema_version": "1.0",
+  "event_id": "evt_example",
+  "event_type": "study.published",
+  "occurred_at": "2026-09-19T10:00:00Z",
+  "tenant_id": "tenant_example",
+  "product_id": "product_example",
+  "correlation_id": "workflow_example",
+  "idempotency_key": "study_example:revision_1:publish",
+  "payload": {
+    "study_id": "study_example",
+    "study_revision": 1,
+    "plan_ref": "studyplan_example"
+  }
+}
+```
+
+`*_ref` values resolve through authenticated services; they are not embedded credentials or permanently public URLs. Credential references identify secrets stored server-side. Signed media links expire and must not be copied into permanent issues or logs.
+
+### Entity ownership
+
+| Entity | Essential fields | Producer → consumers |
+| --- | --- | --- |
+| ProductConfig | URL/origins, repo binding, audience, credential refs, setup adapter, policies | VC-01/06 → all |
+| StudyPlan | immutable task revision, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
+| Assignment | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
+| SessionManifest | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
+| Finding | observation, hypothesis, evidence refs, uncertainty, fingerprint | VC-03 → VC-04/06 |
+| RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version | VC-04 → VC-05/06 |
+| Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
+| ValidationSummary | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
+
+### Study plan handoff
+
+The plan is stored as immutable JSON; events carry its reference. Secrets are excluded.
+
+```json
+{
+  "schema_version": "1.0",
+  "study_id": "study_example",
+  "study_revision": 1,
+  "product_id": "product_example",
+  "task": {
+    "task_id": "task_reschedule",
+    "participant_prompt": "Your haircut is booked for September 22 at 3 p.m., but your plans have changed. You are available September 25 at 4 p.m. Use this app to arrange your appointment for that time.",
+    "research_question": "Can a customer change an existing appointment?",
+    "time_limit_seconds": 300,
+    "success_rule_ref": "booking_time_changed_v1",
+    "fixture_ref": "booking_fixture_v1"
+  },
+  "baseline": {"commit_sha": "REPLACE_WITH_REAL_SHA", "environment_ref": "baseline_preview"},
+  "recruitment": {"source": "marketplace", "target_count": 2, "cohort": "fresh", "eligibility_rule_ref": "eligible_booking_users_v1"},
+  "capture": {"screen": "required", "microphone": "required", "webcam": "off", "pointer": "on", "keyboard": "semantic_only", "text_values": "off", "retention_days": 30},
+  "automation": {"mode": "prototype_and_retest", "max_variants": 1, "max_repair_attempts": 2, "agent_budget_ref": "demo_budget", "retest_target_count": 2}
+}
+```
+
+These are example counts and proposed defaults, not powered sample sizes or verified provider limits. Freeze the neutral task and equivalent fixture across retests. Changes to task wording or success definition create a new study revision and affect comparability.
+
+## Cross-cutting requirements
+
+- Consent precedes media capture. Record capture configuration, consent version and permissions. Capture only the declared surface; keyboard content is off by default. See VC-02 for actual browser boundaries.
+- Each artifact is tenant-scoped. Public issues contain sanitized summaries and authenticated evidence links, not raw participant data.
+- SDK secrets never ship to browsers. An origin-bound publishable key can identify an app, but cannot grant administration or repository access.
+- A model's analysis is a hypothesis. Deterministic checks prove declared functional properties; human sessions supply bounded usability evidence. Neither is a guarantee of overall quality.
+- Claims of human validation attach to the exact tested commit, task revision, fixture and cohort. New code makes earlier validation historical.
+- The app may send notifications only to participants who agreed to invitations, following configured delivery rules. Development uses test inboxes.
+- Retention and deletion apply to media, transcripts, derived findings and provider copies according to the configured policy; retain only necessary non-content audit metadata.
+
+## Implementation coordination
+
+First agree on schemas and sample payloads. Person A owns VC-02 and dashboard UI; Person B owns VC-01/03/04/05 and orchestration. Person A also prepares the demo app and independent browser checks so repair work does not become a bottleneck. Both own shared contracts. This split does not authorize spawning agents automatically.
+
+Suggested milestones: (1) supplied finding → checked preview; (2) genuine recording → finding; (3) published task → assignment; (4) preview → retest → PR evidence; (5) discovery and demo polish.
+
+## Keeping these specs flexible
+
+See [agent instructions](../AGENTS.md). Update affected specs directly in the same change as implementation. Git history is the change log: do not maintain manual change logs, per-change files, document revision counters, or routine updated-date fields.
+
+Specs describe the current intended behavior. Replace obsolete requirements and keep relevant rationale, compatibility and migration notes next to the affected design. Explain why a change was made in the commit or PR description. Explicit user requirements take precedence; a spec change alone does not require user permission.
+
+Add unresolved proposals under Open decisions until resolved. JSON schema versions and runtime study revisions still matter: update them when contracts or immutable study plans change. Record source verification dates when a decision relies on live documentation; these are evidence provenance, not document revision metadata.
+
+## Open decisions
+
+- [ ] Choose durable worker/runtime and preview provider after a successful integration spike.
+- [ ] Verify Devin account/API capabilities, budgets and artifact retrieval with a real call.
+- [ ] Verify Vonage screen recording and SLNG timestamp/alignment behavior in the chosen browsers.
+- [ ] Select notification provider; local demo uses a test inbox.
+- [ ] Confirm the selected open-source demo and hackathon eligibility; see VC-07.
+

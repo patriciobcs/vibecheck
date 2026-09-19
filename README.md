@@ -1,0 +1,31 @@
+# VibeCheck
+
+**Real people. Honest feedback. Tested improvements.**
+
+VibeCheck helps founders and product teams discover where users struggle—and turn those findings into working design alternatives.
+
+## How it works
+
+1. **Connect your app.** Add the embedded library and connect your repository.
+2. **Identify what to test.** The UX research agent uses product events, feedback, and release context to propose focused studies.
+3. **Bring in real people.** Invite your users or friends, or recruit through the testing marketplace.
+4. **Capture the evidence.** Record sessions, transcribe feedback, and connect findings to actual interactions.
+5. **Build and retest.** Devin creates an alternative, independent checks verify functionality, and fresh testers try the preview.
+
+## Who it’s for
+
+- Solo founders who need their first testers.
+- Startups that want continuous UX research.
+- Product teams testing with existing users or external participants.
+
+## MVP scope
+
+A connected web app, recorded task-based testing, evidence-backed findings, and an automated code-change-to-preview loop.
+
+Changes run in isolated test environments. Human retesting evaluates usability; automated checks verify functionality.
+
+*VibeCheck is under development.*
+
+## Specifications
+
+See [specs/README.md](specs/README.md) for the workflow specifications, shared contracts, and change policy.
