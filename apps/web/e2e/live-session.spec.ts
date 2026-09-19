@@ -42,15 +42,24 @@ test("speech from a fake microphone ends up as a transcript aligned to a verifie
   await dialog.getByRole("button", { name: "Agree and continue" }).click();
   await dialog.getByRole("button", { name: "Allow" }).click();
   await expect(dialog.getByText("We can hear you")).toBeVisible({ timeout: 20_000 });
-  await dialog.getByRole("button", { name: "Share and start" }).click();
+  // Audio-only studies (capture policy screen: off) skip the screen picker.
+  await dialog.getByRole("button", { name: /^(Share and start|Start)$/ }).click();
   await expect(dialog.getByText("Recording", { exact: true })).toBeVisible({ timeout: 60_000 });
 
-  // "Use" the product while the fake microphone plays the sentence (it loops).
+  // "Use" the product while the fake microphone plays the sentence (it loops): draw a rectangle
+  // and open help, so the app reports semantic events into the study session alongside the audio.
   await page.waitForTimeout(2_000);
   await page.mouse.click(400, 400);
-  await page.mouse.move(600, 500);
+  await page.keyboard.press("r");
+  await page.mouse.move(400, 300);
+  await page.mouse.down();
+  await page.mouse.move(600, 450, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  await page.keyboard.press("?");
+  await page.waitForTimeout(800);
   await page.keyboard.press("Escape");
-  await page.waitForTimeout(14_000);
+  await page.waitForTimeout(12_000);
 
   await dialog.getByRole("button", { name: "Done" }).click();
   await dialog.getByText("How did it go?").waitFor({ timeout: 20_000 });
@@ -65,6 +74,7 @@ test("speech from a fake microphone ends up as a transcript aligned to a verifie
     completeness: string;
     transcript_status: string;
     events: number;
+    semantic_events: number;
     assets: { status: string; provider_status: string | null; duration_ms: number | null }[];
     transcript: { start_ms: number; end_ms: number; text: string }[];
   };
@@ -85,6 +95,8 @@ test("speech from a fake microphone ends up as a transcript aligned to a verifie
   expect(state.assets[0]?.duration_ms ?? 0).toBeGreaterThan(10_000);
   expect(state.completeness).toBe("complete");
   expect(state.events).toBeGreaterThan(0);
+  // Instrumentation logs are the evidence next to the transcript: the drawing and help request.
+  expect(state.semantic_events).toBeGreaterThan(0);
   expect(state.transcript_status).toBe("done");
   const text = state.transcript
     .map((t) => t.text)

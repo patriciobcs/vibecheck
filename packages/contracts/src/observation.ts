@@ -15,7 +15,7 @@ export const OBSERVATION_EVENT_TYPES = [
 ] as const;
 export type ObservationEventType = (typeof OBSERVATION_EVENT_TYPES)[number];
 
-const SafeRef = z
+export const SafeRef = z
   .string()
   .min(1)
   .max(120)

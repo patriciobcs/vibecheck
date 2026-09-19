@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { fail, json, route } from "@/lib/api";
 
@@ -23,6 +23,10 @@ export const GET = route(async (req) => {
     schema.sessionEvents,
     eq(schema.sessionEvents.sessionId, session.id),
   );
+  const semanticEvents = await db.$count(
+    schema.sessionEvents,
+    and(eq(schema.sessionEvents.sessionId, session.id), eq(schema.sessionEvents.type, "semantic")),
+  );
   return json({
     session_id: session.id,
     completeness: session.completeness,
@@ -30,6 +34,7 @@ export const GET = route(async (req) => {
     outcome: session.participantReportedOutcome,
     pauses: session.pauses,
     events,
+    semantic_events: semanticEvents,
     assets: assets.map((a) => ({
       status: a.status,
       provider_status: a.providerStatus,

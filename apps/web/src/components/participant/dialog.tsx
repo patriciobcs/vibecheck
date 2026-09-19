@@ -172,6 +172,7 @@ export function ParticipantDialog({
   );
 
   const rec = useRecorder({ api, assignmentId, onSession });
+  const audioOnly = view?.assignment.capturePolicy.screen === "off";
 
   // Auto-pause while the participant is away from the window; resume when they return,
   // unless they paused on purpose themselves.
@@ -246,7 +247,9 @@ export function ParticipantDialog({
             : step === "consent"
               ? "What is recorded"
               : step === "device_check"
-                ? "Share screen and microphone"
+                ? audioOnly
+                  ? "Share your microphone"
+                  : "Share screen and microphone"
                 : step === "outcome"
                   ? "How did it go?"
                   : step === "done"
@@ -288,7 +291,7 @@ export function ParticipantDialog({
                 Recording is not available: the media provider is not configured. Nothing is
                 simulated.
               </p>
-            ) : rec.screenSupported === false ? (
+            ) : !audioOnly && rec.screenSupported === false ? (
               <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 This browser cannot share its screen. Use a recent Chrome, Edge, Firefox or Safari.
               </p>
@@ -314,14 +317,22 @@ export function ParticipantDialog({
                 </li>
                 <li className="flex items-center gap-2">
                   <StepBadge n={2} done={rec.status === "recording"} />
-                  <span className="flex-1 text-muted-foreground">Screen: pick this app's tab</span>
+                  <span className="flex-1 text-muted-foreground">
+                    {audioOnly
+                      ? "No screen capture: your actions are logged in the app"
+                      : "Screen: pick this app's tab"}
+                  </span>
                   <Button
                     size="sm"
                     className="w-32 rounded-full"
                     disabled={rec.status !== "mic_ready"}
-                    onClick={() => void rec.startWithScreen()}
+                    onClick={() => void (audioOnly ? rec.startAudioOnly() : rec.startWithScreen())}
                   >
-                    {rec.status === "starting" ? "Connecting…" : "Share and start"}
+                    {rec.status === "starting"
+                      ? "Connecting…"
+                      : audioOnly
+                        ? "Start"
+                        : "Share and start"}
                   </Button>
                 </li>
               </ol>
@@ -441,7 +452,14 @@ function ConsentBody({
   const cp = view.assignment.capturePolicy;
   const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
   const rows = [
-    { icon: Monitor, label: "Screen", value: `${cap(cp.screen)}, you pick the tab` },
+    {
+      icon: Monitor,
+      label: "Screen",
+      value:
+        cp.screen === "off"
+          ? "Off, actions are logged instead"
+          : `${cap(cp.screen)}, you pick the tab`,
+    },
     { icon: Mic, label: "Microphone", value: `${cap(cp.microphone)}, transcribed` },
     { icon: cp.webcam === "off" ? CameraOff : Camera, label: "Webcam", value: cap(cp.webcam) },
     {

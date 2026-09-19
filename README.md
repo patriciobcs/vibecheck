@@ -44,6 +44,8 @@ LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2
 LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2e/live-monitoring.spec.ts
 #   ^ real Jev screening of a help request on the instrumented Excalidraw clone (needs JEV_API_KEY, worker, :3200)
 #     Devin detector authoring: POST /api/owner/products/:id/detectors {"mode":"generate","provider":"devin",...}
+# Live demo: open /products/product_excalidraw_local/monitoring/live in a second window; it polls
+#   persisted state every second (waiting state → session tabs → signals, screening, Jev, candidates)
 pnpm db:reset-sample     # clears assignments on the sample studies so they recruit again
 ```
 

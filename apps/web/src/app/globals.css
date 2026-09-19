@@ -191,3 +191,30 @@ html.embed body {
 html.embed nextjs-portal {
   display: none;
 }
+
+/* Live analysis board: rows fade in as persisted state arrives; dots pulse while something is live. */
+@keyframes live-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.live-in {
+  animation: live-in 0.35s ease-out both;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.live-pulse {
+  animation: live-pulse 1.6s ease-in-out infinite;
+}

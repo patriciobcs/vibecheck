@@ -199,6 +199,47 @@ export function useRecorder(opts: {
     }
   }, [api, assignmentId, onSession, teardown]);
 
+  /** Audio-only studies (capture policy screen: off): one click after the microphone is allowed. */
+  const startAudioOnly = useCallback(async () => {
+    setError(null);
+    const OT = await loadOT();
+    setStatus("starting");
+    try {
+      const clockOrigin = Date.now();
+      clockOriginRef.current = clockOrigin;
+      const resp = await api.post<StartResponse>(
+        `/api/assignments/${assignmentId}/recording/start`,
+        { instrumentation: "sdk", client_clock_origin_ms: clockOrigin },
+      );
+      startRef.current = resp;
+      const session = OT.initSession(resp.media.application_id, resp.media.session_id);
+      sessionRef.current = session;
+      await new Promise<void>((resolve, reject) =>
+        session.connect(resp.media.token, (err) =>
+          err ? reject(new Error(err.message)) : resolve(),
+        ),
+      );
+      const mic = micRef.current;
+      if (!mic) throw new Error("Microphone is not ready");
+      await new Promise<void>((resolve, reject) =>
+        session.publish(mic, (err) => (err ? reject(new Error(err.message)) : resolve())),
+      );
+      await api.post(`/api/assignments/${assignmentId}/recording/archive`, {
+        t_ms: Math.max(0, Date.now() - clockOrigin),
+      });
+      setStatus("recording");
+      onSession({
+        sessionId: resp.session_id,
+        clockOriginMs: clockOrigin,
+        eventsToken: resp.events_token,
+      });
+    } catch (e) {
+      setError(friendly(e));
+      teardown();
+      setStatus("failed");
+    }
+  }, [api, assignmentId, onSession, teardown]);
+
   const pausedRef = useRef(false);
   const busyRef = useRef(false);
 
@@ -266,6 +307,7 @@ export function useRecorder(opts: {
     micHeard,
     requestMic,
     startWithScreen,
+    startAudioOnly,
     pause,
     resume,
     markStuck,

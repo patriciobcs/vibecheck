@@ -45,7 +45,13 @@ export default async function MonitoringPage({ params }: PageProps<"/products/[i
             produce findings and issues.
           </p>
         </div>
-        <div className="flex gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Link
+            href={`/products/${product.id}/monitoring/live`}
+            className="rounded-full bg-foreground px-3 py-1.5 font-medium text-background transition-opacity hover:opacity-90"
+          >
+            Live analysis
+          </Link>
           <Pill
             ok={o.policy.enabled}
             label={o.policy.enabled ? "Collection on" : "Collection off"}

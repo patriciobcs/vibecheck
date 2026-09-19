@@ -33,6 +33,26 @@ describe("ClientEventSchema", () => {
     expect(ClientEventSchema.parse(ev)).toEqual(ev);
   });
 
+  it("accepts a semantic event from the host app with allowlisted refs only", () => {
+    const semantic = {
+      session_id: "session_1",
+      sequence: 2,
+      t_ms: 1500,
+      type: "semantic",
+      semantic_type: "action_result",
+      journey_id: "share_drawing",
+      action_ref: "export_image",
+      result: "success",
+    };
+    expect(ClientEventSchema.parse(semantic)).toEqual(semantic);
+    expect(
+      ClientEventSchema.safeParse({ ...semantic, action_ref: "export image <b>" }).success,
+    ).toBe(false);
+    expect(ClientEventSchema.safeParse({ ...semantic, note: "typed text" }).success).toBe(false);
+    const { semantic_type: _t, ...missingType } = semantic;
+    expect(ClientEventSchema.safeParse(missingType).success).toBe(false);
+  });
+
   it("rejects negative t_ms", () => {
     expect(ClientEventSchema.safeParse({ ...click, t_ms: -1 }).success).toBe(false);
   });

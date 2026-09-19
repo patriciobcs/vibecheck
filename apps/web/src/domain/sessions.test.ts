@@ -1,3 +1,4 @@
+import { SAMPLE_STUDY_PLAN } from "@vibecheck/contracts";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
@@ -19,6 +20,7 @@ beforeEach(resetDb);
 
 function fakeMedia() {
   const calls: string[] = [];
+  const archiveOptions: { hasVideo: boolean }[] = [];
   let n = 0;
   const client: MediaClient = {
     async createSession() {
@@ -26,8 +28,9 @@ function fakeMedia() {
       return { sessionId: "vsess_1" };
     },
     clientToken: () => "tok",
-    async startArchive() {
+    async startArchive(_sessionId, _name, opts) {
       calls.push("startArchive");
+      archiveOptions.push({ hasVideo: opts?.hasVideo ?? true });
       n += 1;
       return { archiveId: `arch_${n}` };
     },
@@ -45,11 +48,11 @@ function fakeMedia() {
       };
     },
   };
-  return { client, calls };
+  return { client, calls, archiveOptions };
 }
 
-async function assigned() {
-  const seeded = await seedStudy();
+async function assigned(overrides: Parameters<typeof seedStudy>[0] = {}) {
+  const seeded = await seedStudy(overrides);
   const { participantId } = await seedParticipant();
   const claim = await claimAssignment({
     studyId: seeded.studyId,
@@ -205,6 +208,26 @@ describe("recording lifecycle", () => {
     const session = await db.query.sessions.findFirst();
     expect(session?.participantReportedOutcome).toBe("stuck");
     expect(session?.instrumentedOutcome).toBe("unknown");
+  });
+
+  it("records audio only when the study's capture policy turns the screen off", async () => {
+    const { participantId, assignment, plan } = await assigned({
+      capture: { ...SAMPLE_STUDY_PLAN.capture, screen: "off" },
+    });
+    expect(plan.capture.screen).toBe("off");
+    const { client: media, archiveOptions } = fakeMedia();
+    await recordConsent({ assignmentId: assignment.id, participantId, consentVersion: "v1" });
+    const started = await startRecording({
+      assignmentId: assignment.id,
+      participantId,
+      media,
+      instrumentation: "sdk",
+      clientClockOriginMs: 0,
+    });
+    expect(started.ok).toBe(true);
+    await startArchive({ assignmentId: assignment.id, participantId, media, tMs: 0 });
+    expect(archiveOptions).toEqual([{ hasVideo: false }]);
+    expect((await db.query.assets.findFirst())?.kind).toBe("audio");
   });
 
   it("starting the archive twice is a no-op", async () => {

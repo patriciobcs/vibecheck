@@ -67,6 +67,8 @@ const EXCALIDRAW_STUDY_PLAN: StudyPlan = {
     cohort: "fresh",
     eligibility_rule_ref: "any_visitor_v1",
   },
+  // Demo: instrumentation logs plus the transcribed microphone are the evidence; no screen capture.
+  capture: { ...SAMPLE_STUDY_PLAN.capture, screen: "off" },
 };
 
 /**
@@ -224,14 +226,17 @@ async function main() {
   // DEMO ONLY: passive monitoring is disabled by default for real products. The local Excalidraw
   // target gets an enabled policy and a fixture detector so the screening loop can be exercised.
   const monitoring = await currentMonitoringPolicy(EXCALIDRAW_PRODUCT_ID);
-  if (monitoring.revision === 0) {
+  const previousSeed =
+    monitoring.policy.batch_delay_ms === 4000 && monitoring.policy.cooldown_ms === 30_000;
+  if (monitoring.revision === 0 || previousSeed) {
+    // Short batch delay and cooldown so a live demo shows the screening within seconds.
     await setMonitoringPolicy(
       EXCALIDRAW_PRODUCT_ID,
       {
         enabled: true,
         allowed_journeys: ["share_drawing"],
-        batch_delay_ms: 4000,
-        cooldown_ms: 30_000,
+        batch_delay_ms: 1500,
+        cooldown_ms: 8_000,
         max_evaluations_per_product_day: 200,
       },
       null,

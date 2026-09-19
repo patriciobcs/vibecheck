@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OBSERVATION_EVENT_TYPES, SafeRef } from "./observation";
 
 /** Keys the SDK may report. Typed characters are never allowed (VC-02 keyboard: semantic only). */
 export const SEMANTIC_KEYS = [
@@ -25,6 +26,8 @@ export const ClientEventTypeSchema = z.enum([
   "edit_count",
   "task_marker",
   "moderation_prompt",
+  /** Host-app semantic event (`VibeCheck.track`) during a study: allowlisted refs, no content. */
+  "semantic",
 ]);
 
 const ViewportSchema = z.object({
@@ -50,12 +53,32 @@ const BaseEvent = z.object({
   label: z
     .enum(["pause", "resume", "stuck", "finished_early", "withdraw", "what_are_you_looking_for"])
     .optional(),
+  /** For semantic: the same allowlisted vocabulary as passive observation. */
+  semantic_type: z.enum(OBSERVATION_EVENT_TYPES).optional(),
+  journey_id: SafeRef.optional(),
+  action_ref: SafeRef.optional(),
+  progress_ref: SafeRef.optional(),
+  target_ref: SafeRef.optional(),
+  result: z.enum(["success", "failed", "validation_failed", "cancelled"]).optional(),
+  error_code: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Z0-9_]+$/)
+    .optional(),
 });
 
 /** Strict: any extra field (text, value, clipboard…) is rejected so content can never leak in. */
 export const ClientEventSchema = BaseEvent.strict().superRefine((ev, ctx) => {
   if (ev.type === "keydown" && !ev.key) {
     ctx.addIssue({ code: "custom", message: "keydown requires a semantic key", path: ["key"] });
+  }
+  if (ev.type === "semantic" && !ev.semantic_type) {
+    ctx.addIssue({
+      code: "custom",
+      message: "semantic requires a semantic_type",
+      path: ["semantic_type"],
+    });
   }
 });
 

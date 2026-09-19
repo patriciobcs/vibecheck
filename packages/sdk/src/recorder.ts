@@ -25,7 +25,36 @@ export type RecordedEvent = {
   key?: string;
   count?: number;
   label?: string;
+  semantic_type?: string;
+  journey_id?: string;
+  action_ref?: string;
+  progress_ref?: string;
+  target_ref?: string;
+  result?: string;
+  error_code?: string;
 };
+
+/** Mirrors contracts OBSERVATION_EVENT_TYPES and the semantic refs the server accepts. */
+const SEMANTIC_TYPES = new Set([
+  "journey_start",
+  "progress",
+  "action_attempt",
+  "action_result",
+  "validation_error",
+  "navigation",
+  "help_request",
+  "completion",
+  "exit",
+  "visibility",
+]);
+const SEMANTIC_KEYS_ALLOWED = [
+  "journey_id",
+  "action_ref",
+  "progress_ref",
+  "target_ref",
+  "result",
+  "error_code",
+] as const;
 
 export type EventBatch = { session_id: string; batch_sequence: number; events: RecordedEvent[] };
 
@@ -99,6 +128,20 @@ export class EventRecorder {
       ...ev,
     });
     if (this.queue.length >= this.maxBatch) void this.flush();
+  }
+
+  /** Host-app semantic event during a study: allowlisted type and string refs only, never content. */
+  semantic(type: string, payload: Record<string, unknown> = {}) {
+    if (!SEMANTIC_TYPES.has(type)) return;
+    const ev: Omit<RecordedEvent, "session_id" | "sequence" | "t_ms"> = {
+      type: "semantic",
+      semantic_type: type,
+    };
+    for (const key of SEMANTIC_KEYS_ALLOWED) {
+      const v = payload[key];
+      if (typeof v === "string" && v.length <= 120) ev[key] = v;
+    }
+    this.push(ev);
   }
 
   onClick(e: MouseEvent) {

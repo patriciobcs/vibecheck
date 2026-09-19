@@ -195,6 +195,12 @@ export function setCollectionPermission(permission: CollectionPermission) {
 
 /** Host apps emit allowlisted semantic events: `VibeCheck.track("action_result", { action_ref: "export_image", result: "success" })`. */
 export function track(type: string, payload: Record<string, unknown> = {}) {
+  // During a study the participant consented to instrumentation: semantic events join the session
+  // evidence (with the transcript) instead of passive screening, whatever the passive permission.
+  if (recorder) {
+    recorder.semantic(type, payload);
+    return;
+  }
   if (collectionPermission !== "granted") return;
   if (observer) {
     observer.track(type, payload);

@@ -187,7 +187,14 @@ export async function startArchive(input: {
     });
     if (!session?.mediaSessionId) return { fail: "not_found" as const };
     const active = await activeAsset(tx, session.id);
-    return { session, tenantId: a.tenantId, alreadyRecording: active !== undefined };
+    // The study's snapshotted capture policy decides what the archive contains.
+    const screen = (a.capturePolicy as { screen?: string } | null)?.screen ?? "required";
+    return {
+      session,
+      tenantId: a.tenantId,
+      alreadyRecording: active !== undefined,
+      hasVideo: screen !== "off",
+    };
   });
   if ("fail" in ctx && ctx.fail) return { ok: false, reason: ctx.fail };
   if (!("session" in ctx) || ctx.alreadyRecording || !ctx.session.mediaSessionId)
@@ -195,7 +202,11 @@ export async function startArchive(input: {
   let archiveId: string;
   try {
     archiveId = (
-      await input.media.startArchive(ctx.session.mediaSessionId, `assignment ${input.assignmentId}`)
+      await input.media.startArchive(
+        ctx.session.mediaSessionId,
+        `assignment ${input.assignmentId}`,
+        { hasVideo: ctx.hasVideo },
+      )
     ).archiveId;
   } catch (err) {
     console.error("startArchive failed", err);
@@ -205,7 +216,7 @@ export async function startArchive(input: {
     id: newId("asset"),
     tenantId: ctx.tenantId,
     sessionId: ctx.session.id,
-    kind: "screen_audio",
+    kind: ctx.hasVideo ? "screen_audio" : "audio",
     providerArchiveId: archiveId,
     providerStatus: "started",
     status: "recording",
@@ -274,10 +285,12 @@ export async function resumeRecording(input: {
     if (!session?.mediaSessionId) return null;
     const pauses = [...session.pauses];
     const open = pauses.at(-1);
-    if (!open || open.end_ms !== null) return { session, resumed: false };
+    const screen = (a.capturePolicy as { screen?: string } | null)?.screen ?? "required";
+    const hasVideo = screen !== "off";
+    if (!open || open.end_ms !== null) return { session, resumed: false, hasVideo };
     pauses[pauses.length - 1] = { start_ms: open.start_ms, end_ms: input.tMs };
     await tx.update(schema.sessions).set({ pauses }).where(eq(schema.sessions.id, session.id));
-    return { session, resumed: true, tenantId: a.tenantId };
+    return { session, resumed: true, tenantId: a.tenantId, hasVideo };
   });
   if (!ctx) return { ok: false, reason: "not_found" };
   if (!ctx.resumed || !ctx.session.mediaSessionId) return { ok: true };
@@ -286,6 +299,7 @@ export async function resumeRecording(input: {
     ({ archiveId } = await input.media.startArchive(
       ctx.session.mediaSessionId,
       `assignment ${input.assignmentId} resume`,
+      { hasVideo: ctx.hasVideo },
     ));
   } catch (err) {
     // Reopen the pause so the clock map stays truthful; the client shows the error and stays paused.
@@ -306,7 +320,7 @@ export async function resumeRecording(input: {
     id: newId("asset"),
     tenantId: ctx.session.tenantId,
     sessionId: ctx.session.id,
-    kind: "screen_audio",
+    kind: ctx.hasVideo ? "screen_audio" : "audio",
     providerArchiveId: archiveId,
     providerStatus: "started",
     status: "recording",

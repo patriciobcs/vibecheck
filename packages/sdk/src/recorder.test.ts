@@ -83,6 +83,27 @@ describe("EventRecorder", () => {
     });
   });
 
+  it("records host semantic events with allowlisted keys only, dropping free text", () => {
+    const { recorder } = makeRecorder();
+    recorder.semantic("action_result", {
+      journey_id: "share_drawing",
+      action_ref: "export_image",
+      result: "success",
+      note: "typed something",
+    });
+    recorder.semantic("not_a_type", { journey_id: "x" });
+    expect(recorder.pending()).toEqual([
+      expect.objectContaining({
+        type: "semantic",
+        semantic_type: "action_result",
+        journey_id: "share_drawing",
+        action_ref: "export_image",
+        result: "success",
+      }),
+    ]);
+    expect(recorder.pending()[0]).not.toHaveProperty("note");
+  });
+
   it("sends batches with increasing batch_sequence and clears the queue", async () => {
     const { recorder, sent } = makeRecorder();
     recorder.onNavigation("https://a.test/1");

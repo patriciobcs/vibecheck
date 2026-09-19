@@ -30,7 +30,11 @@ export type ArchiveInfo = {
 export type MediaClient = {
   createSession(): Promise<{ sessionId: string }>;
   clientToken(sessionId: string, data: string): string;
-  startArchive(sessionId: string, name: string): Promise<{ archiveId: string }>;
+  startArchive(
+    sessionId: string,
+    name: string,
+    opts?: { hasVideo: boolean },
+  ): Promise<{ archiveId: string }>;
   stopArchive(archiveId: string): Promise<void>;
   getArchive(archiveId: string): Promise<ArchiveInfo>;
 };
@@ -56,11 +60,11 @@ export function createVonageClient(config: VonageConfig): MediaClient {
         expireTime: Math.floor(Date.now() / 1000) + 60 * 60 * 2,
       });
     },
-    async startArchive(sessionId, name) {
+    async startArchive(sessionId, name, opts) {
       const archive = await video.startArchive(sessionId, {
         name,
         hasAudio: true,
-        hasVideo: true,
+        hasVideo: opts?.hasVideo ?? true,
         outputMode: ArchiveOutputMode.COMPOSED,
         resolution: Resolution.HD_LANDSCAPE,
         layout: { type: LayoutType.BEST_FIT, screenshareType: "bestFit" },
