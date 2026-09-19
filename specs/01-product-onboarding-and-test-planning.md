@@ -86,8 +86,8 @@ Simulated `ProductConfig` inputs, all labeled as sample material with their prov
 
 | Input | Value |
 | --- | --- |
-| URL / origins | Locally served build of the demo fork |
-| Repository | Team-owned fork, pinned to the VC-07 baseline commit |
+| URL / origins | Locally served build of the demo clone |
+| Repository | Authorized local clone, pinned to the VC-07 baseline commit |
 | Release notes | The scoped feature list in VC-07, taken verbatim from upstream commit subjects |
 | Support complaints | Sample, clearly labeled; no real user reports exist |
 | Product events | None; exploratory proposals must be labeled accordingly |
@@ -122,7 +122,7 @@ Discovery jobs are retried with backoff; a non-final failure returns the run to 
 
 Implemented in the first slice: API-key tenant authentication (`Authorization: Bearer`, hashed at rest), `POST/GET /products`, `POST /products/:id/discovery-runs`, `GET /discovery-runs/:id`, `POST/GET /studies`, both discovery providers, malformed-output correction, durable worker processing, idempotent publication with `StudyPlanRevision` and outbox event, and a thin owner UI (product list, onboarding form, run status with proposal cards, publish form, study view).
 
-Not yet implemented, so the corresponding acceptance criteria are open: GitHub installation and `repo_binding` validation (accepted as opaque JSON), `launch_policy` / `auto_launch` and automatic limits, editing proposal cards before publication (only `participant_prompt` and `time_limit_seconds` are overridable), study revisions after the first, and the `recruiting` transition, which belongs to VC-02.
+Not yet implemented, so the corresponding acceptance criteria are open: GitHub installation and setup UX, `launch_policy` / `auto_launch` and automatic limits, editing proposal cards before publication (only `participant_prompt` and `time_limit_seconds` are overridable), study revisions after the first, and the `recruiting` transition, which belongs to VC-02. Repository bindings now validate as either a local clone path or a GitHub repository.
 
 ## Open decisions / future changes
 
@@ -131,4 +131,3 @@ Not yet implemented, so the corresponding acceptance criteria are open: GitHub i
 - [ ] Release-trigger integration versus manual release description for the first build.
 - [ ] Multi-task studies and audience quotas after the one-task pipeline works.
 - [ ] Scheduling continuous discovery based on actual customer usage.
-

@@ -61,3 +61,9 @@ publication uses `GITHUB_ISSUES_TOKEN` and `APP_BASE_URL`. Set
 `ISSUE_PUBLISHER=memory` for local in-process publication tests. Live GitHub
 publication was not run without a token. The VC-02 evidence source will replace
 the fixture source when its owner API is available.
+
+The VC-03 demo binds the seeded product to the local Excalidraw clone at
+`DEMO_TARGET_REPO_PATH` (default `/Users/devin/repos/excalidraw`). Findings
+from a local binding remain in the VibeCheck dashboard and are not sent to an
+issue tracker. The GitHub publisher remains available for tenants that configure
+a `github` repository binding. Agent-driven issue opening is deferred to VC-04.

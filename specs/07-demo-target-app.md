@@ -5,7 +5,10 @@ Dependencies: [VC-02](02-test-delivery-and-recording.md), [VC-04](04-prototypes-
 
 ## Goal
 
-Select a real open-source application that can be forked, run and seeded predictably, then demonstrate one complete human-research-to-code-to-retest workflow. This spec does not claim a repository has already been forked or that the suspected UX problem exists upstream.
+Select a real open-source application that can be cloned, run and seeded
+predictably, then demonstrate one complete human-research-to-code-to-retest
+workflow. The VC-03 demo currently uses an authorized local clone; this spec
+does not claim that the suspected UX problem exists upstream.
 
 ## Selected target and measured evidence
 
@@ -75,9 +78,19 @@ Host acceptance checks in the VibeCheck-controlled runner, outside Devin's edita
 
 ## Hackathon eligibility and provenance
 
-The supplied event brief says no previous projects. Confirm whether an attributed third-party demo target is acceptable before relying on the fork for the submission. The VibeCheck platform must be built during the event. If organizers disallow the fork, use a newly built fixture app and record that choice.
+The supplied event brief says no previous projects. Confirm whether an attributed
+third-party demo target is acceptable before relying on the clone for the
+submission. The VibeCheck platform must be built during the event. If
+organizers disallow the clone, use a newly built fixture app and record that
+choice.
 
-Use a team-owned fork for modifications, issues and PRs. MIT permits this; preserve upstream copyright and license notices. Record the pinned upstream SHA and every demo-specific modification. Do not submit deliberately introduced demo defects to upstream or portray them as flaws independently discovered in the original project.
+VC-03 uses the authorized local clone for read-only repository context and
+retains findings in VibeCheck instead of opening issues. A team-owned fork or
+other write-authorized repository is required before VC-04 creates
+modifications, issues or PRs. MIT permits this; preserve upstream copyright
+and license notices. Record the pinned upstream SHA and every demo-specific
+modification. Do not submit deliberately introduced demo defects to upstream
+or portray them as flaws independently discovered in the original project.
 
 ## Three-minute capture plan
 
@@ -97,7 +110,8 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 ## Acceptance criteria
 
 - Chosen app has documented source/license, pinned revision, successful clean setup and reset.
-- All changes, issues and PRs target the authorized demo repo, not upstream.
+- All future changes, issues and PRs target an authorized demo repo, not upstream;
+  the current VC-03 local binding does not open issues.
 - A human baseline session generates real evidence that reaches the agent workflow.
 - A code candidate is verified and deployed at the same SHA that the retester sees.
 - The PR displays functional checks and bounded human evidence separately.
@@ -110,8 +124,8 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 | --- | --- |
 | Selected upstream | `excalidraw/excalidraw`, MIT |
 | Spike commit reviewed | `97c68dd371e13c017a8dcca49f8b3995ba7890a8` (2026-09-19) |
-| Team-owned fork | Not created yet; required before VC-04 writes anything |
-| Baseline commit | TBD; pin when the fork is created |
+| Team-owned fork | Not created; VC-03 uses the authorized local clone and VC-04 writes are gated |
+| Baseline commit | `97c68dd371e13c017a8dcca49f8b3995ba7890a8` |
 | Setup verified | `yarn install` 4m24s, `yarn start` on port 3001, HTTP 200 |
 | Reset command | Not implemented; local storage reset plus scene re-seed is the intended mechanism |
 | Preview runtime | TBD; a static Vite build is sufficient because there is no backend |

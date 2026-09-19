@@ -155,14 +155,15 @@ export async function publishFinding(
     return skipped;
   };
   const binding = repoBindingSchema.safeParse(productRow.repoBinding);
-  if (!binding.success || !binding.data.issues_enabled) {
+  if (!binding.success || binding.data.provider !== "github" || !binding.data.issues_enabled) {
     return recordSkipped("github_disconnected");
   }
+  const githubBinding = binding.data;
   if (!publisher && !process.env.GITHUB_ISSUES_TOKEN && process.env.ISSUE_PUBLISHER !== "memory") {
     return recordSkipped("no_token");
   }
   const issuePublisher = publisherFor(publisher);
-  const repo = { owner: binding.data.owner, repo: binding.data.repo };
+  const repo = { owner: githubBinding.owner, repo: githubBinding.repo };
   const marker = `<!-- vibecheck:fingerprint=${row.fingerprint} -->`;
   const existingIssue = await issuePublisher.findByMarker(repo, marker);
   const dashboardUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
@@ -191,7 +192,7 @@ export async function publishFinding(
   await db.transaction(async (tx) => {
     await tx
       .update(finding)
-      .set({ issueRepo: `${binding.data.owner}/${binding.data.repo}`, issueNumber, issueUrl })
+      .set({ issueRepo: `${githubBinding.owner}/${githubBinding.repo}`, issueNumber, issueUrl })
       .where(eq(finding.id, row.id));
     await tx.insert(issuePublishRequest).values({
       tenantId: row.tenantId,
@@ -214,7 +215,7 @@ export async function publishFinding(
           finding_id: row.id,
           issue_ref: {
             provider: "github",
-            repo: `${binding.data.owner}/${binding.data.repo}`,
+            repo: `${githubBinding.owner}/${githubBinding.repo}`,
             number: issueNumber,
             url: issueUrl,
           },
@@ -236,7 +237,7 @@ export async function publishFinding(
             finding_id: row.id,
             issue_ref: {
               provider: "github",
-              repo: `${binding.data.owner}/${binding.data.repo}`,
+              repo: `${githubBinding.owner}/${githubBinding.repo}`,
               number: issueNumber,
               url: issueUrl,
             },

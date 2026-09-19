@@ -78,7 +78,7 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 
 | Entity | Essential fields | Producer → consumers |
 | --- | --- | --- |
-| ProductConfig | URL/origins, repo binding, audience, credential refs, setup adapter, policies | VC-01/06 → all |
+| ProductConfig | URL/origins, repo binding (`local` clone or `github` repository), audience, credential refs, setup adapter, policies | VC-01/06 → all |
 | StudyPlan | immutable task revision, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
 | Assignment | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
 | SessionManifest | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
@@ -145,4 +145,3 @@ Add unresolved proposals under Open decisions until resolved. JSON schema versio
 - [ ] Verify Vonage screen recording and SLNG timestamp/alignment behavior in the chosen browsers.
 - [ ] Select notification provider; local demo uses a test inbox.
 - [ ] Confirm hackathon eligibility of the selected third-party demo target; see VC-07.
-

@@ -331,7 +331,11 @@ async function persistAnalysis(
         occurredAt: new Date(),
       })
       .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
-    if (binding.success && binding.data.issues_enabled) {
+    if (
+      binding.success &&
+      (binding.data.provider === "local" ||
+        (binding.data.provider === "github" && binding.data.issues_enabled))
+    ) {
       for (const findingId of findingIds) {
         await tx.insert(job).values({
           type: "issue.publish",

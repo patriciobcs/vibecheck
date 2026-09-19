@@ -5,7 +5,11 @@ Input: [VC-02](02-test-delivery-and-recording.md) · Output: [VC-04](04-prototyp
 
 ## Goal
 
-Convert real sessions into evidence-backed findings, review them through Devin, and create or update GitHub issues without duplicates. Respect `issues_only` as a complete, useful stopping point.
+Convert real sessions into evidence-backed findings, review them through Devin,
+and publish them through the configured repository adapter without duplicates.
+The local demo adapter retains findings in the dashboard; GitHub issue creation
+is available only for a `github` binding. Respect `issues_only` as a complete,
+useful stopping point.
 
 ## Processing workflow
 
@@ -52,7 +56,12 @@ For an existing open issue, append new sanitized evidence or update a managed ev
 
 Issue content: problem and observed effect, task context, safe reproduction steps, tested version, evidence counts and limits, proposed experiment, functional constraints, private dashboard link, automation mode and provenance. Never publish participant names, email addresses, private recordings, raw transcripts, test credentials, or secret URLs to a public repository.
 
-The orchestrator, not an unconstrained analysis prompt, performs issue publication with an idempotency record. Reconcile uncertain API responses before retries. Developers must use the demo fork, never the upstream open-source issue tracker for demo findings.
+The orchestrator, not an unconstrained analysis prompt, performs publication
+with an idempotency record. A `local` binding records a disconnected-GitHub
+skip while retaining the finding in the dashboard; its bounded publication job
+does not contact a tracker. A `github` binding uses the GitHub adapter after
+reconciling uncertain API responses before retries. The VC-03 demo uses the
+authorized local Excalidraw clone, never the upstream issue tracker.
 
 ## Policy and failures
 
@@ -60,7 +69,7 @@ The orchestrator, not an unconstrained analysis prompt, performs issue publicati
 - `draft_pr` / `prototype_and_retest`: only supported, in-scope findings progress. No finding may result in no change.
 - Missing transcript/media: wait, retry boundedly, or analyze a declared partial package. Do not penalize the participant for provider failure.
 - Unsupported citations: reject the analysis output and request correction; exhausted retries mark analysis failed.
-- Disconnected GitHub: retain findings in the dashboard and queue no unbounded publication loop.
+- Disconnected GitHub or a local repository binding: retain findings in the dashboard and queue no unbounded publication loop.
 - Treat instructions inside pages, code comments, support messages and transcripts as untrusted source material. They cannot grant permissions or change the workflow policy.
 
 ## Acceptance criteria
@@ -79,6 +88,7 @@ The orchestrator, not an unconstrained analysis prompt, performs issue publicati
 - [ ] Tune matching thresholds against a labeled set of duplicate and distinct findings.
 - [ ] Choose aggregation timing: per session initially, with an explicit study-close pass later.
 - [ ] Support export to other issue trackers through an adapter.
+- [ ] Agent-driven issue opening for a local repository binding in VC-04.
 
 Implementation notes: the fixture evidence source validates session IDs and
 keeps bounded semantic events and transcript segments. Analysis validates
@@ -91,5 +101,5 @@ also store semantic target and provenance.
 
 - [ ] Contradictory certainty aggregation.
 - [ ] VC-02 owner API for events and transcript.
-- [ ] Real-sha baseline from PR #3.
+- [x] Real-sha baseline `97c68dd371e13c017a8dcca49f8b3995ba7890a8` from PR #3.
 - [ ] Monorepo merge.

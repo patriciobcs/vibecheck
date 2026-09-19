@@ -1,6 +1,6 @@
-import type { RepoBinding } from "@/contracts/repoBinding";
+import type { GithubRepoBinding } from "@/contracts/repoBinding";
 
-export type IssueRepository = Pick<RepoBinding, "owner" | "repo">;
+export type IssueRepository = Pick<GithubRepoBinding, "owner" | "repo">;
 export type PublishedIssue = { number: number; url: string };
 export type ExistingIssue = {
   number: number;

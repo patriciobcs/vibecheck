@@ -3,6 +3,7 @@ import { agentOutputJsonSchema, agentOutputSchema } from "./agentOutput";
 import { studyPlanSchema } from "./studyPlan";
 import { analysisOutputSchema } from "./analysisOutput";
 import { sessionManifestSchema } from "./session";
+import { repoBindingSchema } from "./repoBinding";
 
 describe("contracts", () => {
   it("accepts the study plan handoff", () => {
@@ -109,5 +110,17 @@ describe("contracts", () => {
         ],
       }).success,
     ).toBe(false);
+  });
+  it("accepts local and GitHub repository bindings", () => {
+    expect(repoBindingSchema.parse({ provider: "local", path: "/tmp/excalidraw" })).toEqual({
+      provider: "local",
+      path: "/tmp/excalidraw",
+    });
+    expect(repoBindingSchema.parse({ provider: "github", owner: "owner", repo: "repo" })).toEqual({
+      provider: "github",
+      owner: "owner",
+      repo: "repo",
+      issues_enabled: true,
+    });
   });
 });

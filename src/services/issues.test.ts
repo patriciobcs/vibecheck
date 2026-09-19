@@ -275,4 +275,26 @@ describe.skipIf(!process.env.DATABASE_URL)("issue publication", () => {
     });
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });
+
+  it("retains findings for a local repository binding", async () => {
+    const data = await fixture({
+      repoBinding: { provider: "local", path: "/Users/devin/repos/excalidraw" },
+    });
+    const result = await publishFinding(data.findingRow.id, new MemoryIssuePublisher());
+    const [request] = await db
+      .select()
+      .from(issuePublishRequest)
+      .where(eq(issuePublishRequest.findingId, data.findingRow.id));
+    const [stored] = await db.select().from(finding).where(eq(finding.id, data.findingRow.id));
+    expect({
+      action: result.action,
+      skipReason: request?.skipReason,
+      findingId: stored?.id,
+    }).toEqual({
+      action: "skipped",
+      skipReason: "github_disconnected",
+      findingId: data.findingRow.id,
+    });
+    await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+  });
 });

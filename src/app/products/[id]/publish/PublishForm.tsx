@@ -71,7 +71,7 @@ export function PublishForm({ productId, proposal }: { productId: string; propos
       </label>
       <label>
         Baseline commit
-        <input name="commitSha" defaultValue="REPLACE_WITH_REAL_SHA" required />
+        <input name="commitSha" defaultValue="97c68dd371e13c017a8dcca49f8b3995ba7890a8" required />
       </label>
       <label>
         Environment ref
