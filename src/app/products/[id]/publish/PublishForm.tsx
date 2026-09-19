@@ -71,7 +71,12 @@ export function PublishForm({ productId, proposal }: { productId: string; propos
       </label>
       <label>
         Baseline commit
-        <input name="commitSha" defaultValue="97c68dd371e13c017a8dcca49f8b3995ba7890a8" required />
+        <input
+          name="commitSha"
+          defaultValue={process.env.NEXT_PUBLIC_DEMO_BASELINE_SHA ?? ""}
+          placeholder="40-hex commit sha of the tested build"
+          required
+        />
       </label>
       <label>
         Environment ref
