@@ -31,26 +31,34 @@ export type CallbackResult =
       action: "fetch_enqueued" | "marked_failed" | "status_recorded" | "unknown_archive";
     };
 
+export type CallbackDeps = { enqueue?: typeof enqueueJob };
+
 /**
  * Deduplicates by (archiveId, status), records provider status on the asset and turns
- * "available" into a durable fetch job. Never trusts the callback URL beyond triggering a fetch.
+ * "available" into a durable fetch job. Receipt, status and job commit together: if processing
+ * fails, the provider's retry is processed instead of being treated as a duplicate.
+ * Never trusts the callback URL beyond triggering a fetch.
  */
-export async function handleArchiveCallback(rawBody: unknown): Promise<CallbackResult> {
+export async function handleArchiveCallback(
+  rawBody: unknown,
+  deps: CallbackDeps = {},
+): Promise<CallbackResult> {
   const body = ArchiveCallbackSchema.parse(rawBody);
-  const inserted = await db
-    .insert(schema.webhookReceipts)
-    .values({ id: newId("wh"), provider: "vonage", dedupeKey: `${body.id}:${body.status}`, body })
-    .onConflictDoNothing()
-    .returning({ id: schema.webhookReceipts.id });
-  if (inserted.length === 0) return { ok: true, duplicate: true };
+  const enqueue = deps.enqueue ?? enqueueJob;
+  return db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(schema.webhookReceipts)
+      .values({ id: newId("wh"), provider: "vonage", dedupeKey: `${body.id}:${body.status}`, body })
+      .onConflictDoNothing()
+      .returning({ id: schema.webhookReceipts.id });
+    if (inserted.length === 0) return { ok: true, duplicate: true };
 
-  const asset = await db.query.assets.findFirst({
-    where: eq(schema.assets.providerArchiveId, body.id),
-  });
-  if (!asset) return { ok: true, duplicate: false, action: "unknown_archive" };
+    const asset = await tx.query.assets.findFirst({
+      where: eq(schema.assets.providerArchiveId, body.id),
+    });
+    if (!asset) return { ok: true, duplicate: false, action: "unknown_archive" };
 
-  if (body.status === "failed") {
-    await db.transaction(async (tx) => {
+    if (body.status === "failed") {
       await tx
         .update(schema.assets)
         .set({
@@ -64,24 +72,27 @@ export async function handleArchiveCallback(rawBody: unknown): Promise<CallbackR
         .update(schema.sessions)
         .set({ completeness: "incomplete" })
         .where(eq(schema.sessions.id, asset.sessionId));
-    });
-    return { ok: true, duplicate: false, action: "marked_failed" };
-  }
+      return { ok: true, duplicate: false, action: "marked_failed" };
+    }
 
-  await db
-    .update(schema.assets)
-    .set({ providerStatus: body.status, updatedAt: new Date() })
-    .where(eq(schema.assets.id, asset.id));
+    await tx
+      .update(schema.assets)
+      .set({ providerStatus: body.status, updatedAt: new Date() })
+      .where(eq(schema.assets.id, asset.id));
 
-  if (body.status === "available") {
-    await enqueueJob({
-      type: "archive.fetch",
-      payload: { archiveId: body.id },
-      dedupeKey: `archive.fetch:${body.id}`,
-    });
-    return { ok: true, duplicate: false, action: "fetch_enqueued" };
-  }
-  return { ok: true, duplicate: false, action: "status_recorded" };
+    if (body.status === "available") {
+      await enqueue(
+        {
+          type: "archive.fetch",
+          payload: { archiveId: body.id },
+          dedupeKey: `archive.fetch:${body.id}`,
+        },
+        tx,
+      );
+      return { ok: true, duplicate: false, action: "fetch_enqueued" };
+    }
+    return { ok: true, duplicate: false, action: "status_recorded" };
+  });
 }
 
 /* ---------------- Job: fetch + verify archive ---------------- */
@@ -145,14 +156,7 @@ export async function fetchArchiveJob(
     });
     const allVerified = all.every((a) => a.status === "verified");
     const anyFailed = all.some((a) => a.status === "failed" || a.status === "missing");
-    const stillRecording = all.some((a) => a.status === "recording");
-    const completeness = allVerified
-      ? "complete"
-      : anyFailed
-        ? "partial"
-        : stillRecording
-          ? "pending"
-          : "pending";
+    const completeness = allVerified ? "complete" : anyFailed ? "partial" : "pending";
     await tx
       .update(schema.sessions)
       .set({ completeness, transcriptStatus: "queued" })
@@ -178,12 +182,15 @@ export async function fetchArchiveJob(
         });
       }
     }
-  });
 
-  await enqueueJob({
-    type: "asset.transcribe",
-    payload: { assetId: asset.id },
-    dedupeKey: `asset.transcribe:${asset.id}`,
+    await enqueueJob(
+      {
+        type: "asset.transcribe",
+        payload: { assetId: asset.id },
+        dedupeKey: `asset.transcribe:${asset.id}`,
+      },
+      tx,
+    );
   });
 }
 
@@ -203,10 +210,16 @@ export async function transcribeAssetJob(
   try {
     raw = (await deps.stt.transcribe({ audio: media, filename: `${asset.id}.mp4` })).raw;
   } catch (err) {
-    await db
-      .update(schema.sessions)
-      .set({ transcriptStatus: "failed" })
-      .where(eq(schema.sessions.id, asset.sessionId));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.assets)
+        .set({ transcriptStatus: "failed", updatedAt: new Date() })
+        .where(eq(schema.assets.id, asset.id));
+      await tx
+        .update(schema.sessions)
+        .set({ transcriptStatus: "failed" })
+        .where(eq(schema.sessions.id, asset.sessionId));
+    });
     throw err;
   }
   const segments = mapDeepgramResponse(raw, { offsetMs: asset.offsetMs });
@@ -230,18 +243,17 @@ export async function transcribeAssetJob(
         })),
       );
     }
-    const pending = await tx.query.assets.findMany({
+    // Per-asset status, not "has segments": a silent archive is transcribed too, just empty.
+    await tx
+      .update(schema.assets)
+      .set({ transcriptStatus: "done", updatedAt: new Date() })
+      .where(eq(schema.assets.id, asset.id));
+    const all = await tx.query.assets.findMany({
       where: eq(schema.assets.sessionId, asset.sessionId),
     });
-    const verified = pending.filter((a) => a.status === "verified");
-    const transcribed = new Set(
-      (
-        await tx.query.transcriptSegments.findMany({
-          where: eq(schema.transcriptSegments.sessionId, asset.sessionId),
-        })
-      ).map((s) => s.assetId),
-    );
-    const done = verified.every((a) => transcribed.has(a.id) || a.id === asset.id);
+    const done = all
+      .filter((a) => a.status === "verified")
+      .every((a) => a.transcriptStatus === "done");
     if (done)
       await tx
         .update(schema.sessions)

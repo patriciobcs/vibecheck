@@ -429,11 +429,7 @@ function showToast(cfg: VibeCheckConfig, offer: Offer) {
     void fetch(`${cfg.apiOrigin}/api/sdk/dismiss`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-VibeCheck-Key": cfg.publishableKey },
-      body: JSON.stringify({
-        publishable_key: cfg.publishableKey,
-        study_id: offer.studyId,
-        product_id: offer.productId,
-      }),
+      body: JSON.stringify({ publishable_key: cfg.publishableKey, study_id: offer.studyId }),
     }).catch(() => {});
   });
   el.querySelector(".vc-accept")?.addEventListener("click", () => {

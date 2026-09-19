@@ -10,12 +10,16 @@ type JoinState = { token: string; assignmentId: string } | { error: string };
 // Module-level so React's development double-invoked effects share one claim (one device, one assignment).
 let inflight: Promise<JoinState> | null = null;
 
-async function deviceToken(): Promise<string> {
+async function deviceToken(publishableKey: string): Promise<string> {
   try {
     const existing = localStorage.getItem(DEVICE_KEY);
     if (existing) return existing;
   } catch {}
-  const res = await fetch("/api/embed/device", { method: "POST" });
+  const res = await fetch("/api/embed/device", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ publishable_key: publishableKey }),
+  });
   const token = ((await res.json()) as { device_token: string }).device_token;
   try {
     localStorage.setItem(DEVICE_KEY, token);
@@ -24,7 +28,7 @@ async function deviceToken(): Promise<string> {
 }
 
 async function join(studyId: string, publishableKey: string): Promise<JoinState> {
-  const device = await deviceToken();
+  const device = await deviceToken(publishableKey);
   const res = await fetch("/api/embed/claim", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${device}` },

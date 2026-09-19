@@ -108,6 +108,25 @@ describe("handleArchiveCallback", () => {
     expect(asset?.providerStatus).toBe("available");
   });
 
+  it("does not keep the receipt when processing fails, so the provider's retry is handled", async () => {
+    await finishedSession();
+    const body = { id: "arch_1", event: "archive", status: "available", url: "https://x" };
+    await expect(
+      handleArchiveCallback(body, {
+        enqueue: async () => {
+          throw new Error("queue unavailable");
+        },
+      }),
+    ).rejects.toThrow("queue unavailable");
+    expect(await db.$count(schema.webhookReceipts)).toBe(0);
+    expect(await handleArchiveCallback(body)).toEqual({
+      ok: true,
+      duplicate: false,
+      action: "fetch_enqueued",
+    });
+    expect(await db.$count(schema.jobs)).toBe(1);
+  });
+
   it("marks the asset failed on a failed status", async () => {
     await finishedSession();
     await handleArchiveCallback({
@@ -191,5 +210,53 @@ describe("transcribeAssetJob", () => {
     });
     const session = await db.query.sessions.findFirst();
     expect(session?.transcriptStatus).toBe("done");
+    expect(asset && (await db.query.assets.findFirst())?.transcriptStatus).toBe("done");
+  });
+
+  it("a silent asset counts as transcribed, so a multi-archive session still finishes", async () => {
+    const { sessionId } = await finishedSession();
+    const { client: storage } = fakeStorage();
+    await fetchArchiveJob({ archiveId: "arch_1" }, { media, storage, fetchImpl });
+    const first = await db.query.assets.findFirst();
+    if (!first) throw new Error("asset");
+    await db.insert(schema.assets).values({
+      id: "asset_silent",
+      tenantId: first.tenantId,
+      sessionId,
+      kind: "screen_audio",
+      providerArchiveId: "arch_2",
+      status: "verified",
+      offsetMs: 60_000,
+      storagePath: first.storagePath,
+    });
+    const silent: SttClient = {
+      transcribe: async () => ({
+        requestId: "req",
+        raw: { metadata: {}, results: { channels: [], utterances: [] } },
+      }),
+    };
+    await transcribeAssetJob({ assetId: "asset_silent" }, { storage, stt: silent });
+    expect((await db.query.sessions.findFirst())?.transcriptStatus).toBe("queued");
+    await transcribeAssetJob({ assetId: first.id }, { storage, stt });
+    expect((await db.query.sessions.findFirst())?.transcriptStatus).toBe("done");
+    expect(await db.$count(schema.transcriptSegments)).toBe(1);
+  });
+
+  it("marks the session transcript failed when the provider fails", async () => {
+    await finishedSession();
+    const { client: storage } = fakeStorage();
+    await fetchArchiveJob({ archiveId: "arch_1" }, { media, storage, fetchImpl });
+    const asset = await db.query.assets.findFirst();
+    if (!asset) throw new Error("asset");
+    const broken: SttClient = {
+      transcribe: async () => {
+        throw new Error("stt down");
+      },
+    };
+    await expect(
+      transcribeAssetJob({ assetId: asset.id }, { storage, stt: broken }),
+    ).rejects.toThrow("stt down");
+    expect((await db.query.assets.findFirst())?.transcriptStatus).toBe("failed");
+    expect((await db.query.sessions.findFirst())?.transcriptStatus).toBe("failed");
   });
 });

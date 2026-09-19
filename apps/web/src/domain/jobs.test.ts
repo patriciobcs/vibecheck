@@ -54,6 +54,36 @@ describe("job queue", () => {
     expect(row?.lastError).toContain("boom again");
   });
 
+  it("commits a job with the transaction that enqueued it, never on its own", async () => {
+    await db
+      .transaction(async (tx) => {
+        await enqueueJob({ type: "t", payload: {} }, tx);
+        throw new Error("rollback");
+      })
+      .catch(() => {});
+    expect(await db.$count(schema.jobs)).toBe(0);
+  });
+
+  it("counts an expired lease as a failed attempt and dead-letters a job that keeps crashing", async () => {
+    await enqueueJob({ type: "t", payload: {}, maxAttempts: 2 });
+    const first = await leaseNextJob({ workerId: "w1", leaseSeconds: -1 });
+    expect(first?.attempts).toBe(0);
+    const second = await leaseNextJob({ workerId: "w2", leaseSeconds: -1 });
+    expect(second?.attempts).toBe(1);
+    expect(second?.lastError).toMatch(/lease expired/);
+    const third = await leaseNextJob({ workerId: "w3", leaseSeconds: 60 });
+    expect(third).toBeNull();
+    expect((await db.query.jobs.findFirst())?.status).toBe("dead");
+  });
+
+  it("leases only the requested job types", async () => {
+    await enqueueJob({ type: "a", payload: {} });
+    await enqueueJob({ type: "b", payload: {} });
+    const onlyB = await leaseNextJob({ workerId: "w", leaseSeconds: 60, types: ["b"] });
+    expect(onlyB?.type).toBe("b");
+    expect(await leaseNextJob({ workerId: "w", leaseSeconds: 60, types: ["b"] })).toBeNull();
+  });
+
   it("marks a job done", async () => {
     const job = await enqueueJob({ type: "t", payload: {} });
     await leaseNextJob({ workerId: "w", leaseSeconds: 60 });

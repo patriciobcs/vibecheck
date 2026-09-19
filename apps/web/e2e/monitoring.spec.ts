@@ -125,8 +125,9 @@ test("passive signal → Jev screening → candidate → task proposal, with col
   const dup = await request.post(`${APP}/api/observe/events`, { headers, data: batch });
   expect(((await dup.json()) as { duplicate: boolean }).duplicate).toBe(true);
 
-  // The scan runs as a job; the evaluation is answered by a stub so no provider is needed here.
-  await request.post(`${APP}/api/dev/drain-jobs`);
+  // The scan runs as a job; the evaluation is answered by a stub so no provider is needed here
+  // (only scans are drained, so a configured JEV_API_KEY never turns this into a billed call).
+  await request.post(`${APP}/api/dev/drain-jobs`, { data: { types: ["monitoring.scan"] } });
   let state = (await (
     await request.get(`${APP}/api/dev/monitoring?product_id=${product.id}`)
   ).json()) as {
@@ -174,7 +175,7 @@ test("passive signal → Jev screening → candidate → task proposal, with col
   await expect(page.getByText("reschedule · discoverability").first()).toBeVisible();
   await page.getByRole("button", { name: "Request task proposal" }).first().click();
   await expect(page.getByText("Discovery run queued")).toBeVisible();
-  await request.post(`${APP}/api/dev/drain-jobs`);
+  await request.post(`${APP}/api/dev/drain-jobs`, { data: { types: ["discovery.run"] } });
   await page.goto(`/products/${product.id}`);
   await expect(page.getByText("From passive signal").first()).toBeVisible({ timeout: 15_000 });
   const cand = proposed[0]?.id ?? "";

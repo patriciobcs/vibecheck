@@ -33,9 +33,11 @@ cp .env.example apps/web/.env.local   # fill Vonage + SLNG values; local Supabas
 pnpm db:migrate && pnpm db:seed       # applies migrations, seeds a labeled sample study
 pnpm dev                 # http://localhost:3000
 pnpm worker              # archive fetch, transcription, monitoring scans, Jev evaluations, Devin jobs (separate terminal; restart after pulling)
-pnpm check && pnpm test  # Biome + typecheck, unit/integration tests (isolated vibecheck_test database)
+pnpm check && pnpm test  # Biome + `next typegen` + tsc, unit/integration tests (isolated vibecheck_test database;
+#   .env.test carries dummy non-secret values so this works from a clean checkout; CI runs the same)
 pnpm test:e2e            # Playwright; starts its own dev server on :3100
-E2E_BASE_URL=http://localhost:3000 pnpm test:e2e   # or reuse a running `pnpm dev`
+E2E_BASE_URL=http://localhost:3000 pnpm test:e2e   # or reuse a running `pnpm dev` (stop `pnpm worker` first:
+#   the browser tests drain jobs inline by type and stub the evaluation; a live worker would race them)
 LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2e/live-session.spec.ts
 #   ^ simulated full session against real Vonage + SLNG: fake mic plays e2e/fixtures/speech.wav,
 #     waits for the archive callback (needs `pnpm tunnel`) and asserts the transcript text

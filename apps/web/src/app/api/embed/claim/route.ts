@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db, schema } from "@/db/client";
 import { claimAssignment } from "@/domain/assignments";
 import { recordDelivery } from "@/domain/invitations";
-import { resolveActor } from "@/lib/actor";
+import { requireClaimActor } from "@/lib/actor";
 import { fail, json, parseBody, route, statusFor } from "@/lib/api";
 import { issueAssignmentToken } from "@/lib/assignment-token";
 
@@ -11,8 +11,7 @@ const Body = z.object({ study_id: z.string().min(1), publishable_key: z.string()
 
 /** Embedded channel claim: device (or signed-in) participant + publishable key → assignment token. */
 export const POST = route(async (req) => {
-  const actor = await resolveActor(req);
-  if (!actor) return fail(401, "unauthorized");
+  const actor = await requireClaimActor(req);
   const body = await parseBody(req, Body);
   const study = await db.query.studies.findFirst({ where: eq(schema.studies.id, body.study_id) });
   if (!study) return fail(404, "not_found");

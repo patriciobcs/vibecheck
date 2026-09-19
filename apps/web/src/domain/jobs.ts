@@ -1,5 +1,5 @@
-import { and, eq, lte, or, sql } from "drizzle-orm";
-import { db, schema } from "@/db/client";
+import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { type Db, db, schema, type Tx } from "@/db/client";
 import { newId } from "@/lib/ids";
 
 export type JobRow = typeof schema.jobs.$inferSelect;
@@ -8,15 +8,19 @@ export type JobRow = typeof schema.jobs.$inferSelect;
  * Durable job queue on a database table with leases, heartbeats and retries (VC-06).
  * Not a workflow engine: one row per unit of work, business-keyed for idempotency.
  */
-export async function enqueueJob(input: {
-  type: string;
-  payload: Record<string, unknown>;
-  dedupeKey?: string;
-  maxAttempts?: number;
-  runAt?: Date;
-}): Promise<JobRow> {
+export async function enqueueJob(
+  input: {
+    type: string;
+    payload: Record<string, unknown>;
+    dedupeKey?: string;
+    maxAttempts?: number;
+    runAt?: Date;
+  },
+  /** Pass the surrounding transaction so the job commits (or rolls back) with the data it needs. */
+  executor: Db | Tx = db,
+): Promise<JobRow> {
   const id = newId("job");
-  const [inserted] = await db
+  const [inserted] = await executor
     .insert(schema.jobs)
     .values({
       id,
@@ -29,7 +33,7 @@ export async function enqueueJob(input: {
     .onConflictDoNothing({ target: schema.jobs.dedupeKey })
     .returning();
   if (inserted) return inserted;
-  const existing = await db.query.jobs.findFirst({
+  const existing = await executor.query.jobs.findFirst({
     where: eq(schema.jobs.dedupeKey, input.dedupeKey ?? ""),
   });
   if (!existing) throw new Error("job insert conflict without existing row");
@@ -49,21 +53,42 @@ export async function leaseNextJob(input: {
       and(eq(schema.jobs.status, "queued"), lte(schema.jobs.nextRunAt, now)),
       and(eq(schema.jobs.status, "running"), lte(schema.jobs.leaseExpiresAt, now)),
     );
-    const typeFilter = input.types?.length
-      ? sql`${schema.jobs.type} = ANY(${input.types})`
-      : undefined;
+    const typeFilter = input.types?.length ? inArray(schema.jobs.type, input.types) : undefined;
     const [candidate] = await tx
-      .select({ id: schema.jobs.id })
+      .select()
       .from(schema.jobs)
       .where(typeFilter ? and(runnable, typeFilter) : runnable)
       .orderBy(schema.jobs.nextRunAt)
       .limit(1)
       .for("update", { skipLocked: true });
     if (!candidate) return null;
+    // An expired lease means the previous worker died mid-job: that was an attempt, so a job that
+    // keeps crashing its worker is dead-lettered instead of looping forever.
+    const expired = candidate.status === "running";
+    const attempts = expired ? candidate.attempts + 1 : candidate.attempts;
+    const lastError = expired
+      ? `lease expired while running on ${candidate.lockedBy ?? "unknown worker"}`
+      : candidate.lastError;
+    if (expired && attempts >= candidate.maxAttempts) {
+      await tx
+        .update(schema.jobs)
+        .set({
+          status: "dead",
+          attempts,
+          lastError,
+          leaseExpiresAt: null,
+          lockedBy: null,
+          updatedAt: now,
+        })
+        .where(eq(schema.jobs.id, candidate.id));
+      return null;
+    }
     const [leased] = await tx
       .update(schema.jobs)
       .set({
         status: "running",
+        attempts,
+        lastError,
         lockedBy: input.workerId,
         leaseExpiresAt: leaseUntil,
         updatedAt: now,

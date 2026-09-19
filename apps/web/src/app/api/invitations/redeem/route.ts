@@ -3,15 +3,14 @@ import { z } from "zod";
 import { db, schema } from "@/db/client";
 import { participantDestination } from "@/domain/handoff";
 import { redeemDirectLinkInvitation } from "@/domain/invitations";
-import { resolveActor } from "@/lib/actor";
+import { requireClaimActor } from "@/lib/actor";
 import { fail, json, parseBody, route, statusFor } from "@/lib/api";
 import { issueAssignmentToken } from "@/lib/assignment-token";
 
 const Body = z.object({ token: z.string().min(1) });
 
 export const POST = route(async (req) => {
-  const actor = await resolveActor(req);
-  if (!actor) return fail(401, "unauthorized");
+  const actor = await requireClaimActor(req);
   const { token } = await parseBody(req, Body);
   const result = await redeemDirectLinkInvitation({ token, participantId: actor.participantId });
   if (!result.ok) return fail(statusFor(result.reason), result.reason);

@@ -22,10 +22,12 @@ test("VC-01: connect a product, run fixture discovery, publish one proposal, han
   await expect(page.getByText("Needs setup")).toHaveCount(0);
   const productUrl = page.url();
 
-  // Run discovery with the fixture provider; the worker job is drained inline.
+  // Run discovery with the fixture provider (chosen explicitly: the page defaults to Devin when a
+  // key is configured, and this test must never start a billed agent session). Drained inline.
+  await page.getByRole("combobox").selectOption("fixture");
   await page.getByRole("button", { name: "Run discovery" }).click();
   await expect(page.getByText(/Queued|Inspecting/)).toBeVisible();
-  const drained = await request.post("/api/dev/drain-jobs");
+  const drained = await request.post("/api/dev/drain-jobs", { data: { types: ["discovery.run"] } });
   expect(drained.ok()).toBe(true);
   await page.goto(productUrl);
   await expect(page.getByText("Proposed", { exact: true })).toBeVisible();

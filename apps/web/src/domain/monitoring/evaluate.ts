@@ -1,4 +1,4 @@
-import { type JevQuestions, validateAnswersAgainstQuestions } from "@vibecheck/contracts";
+import { type JevQuestions, parseJevAnswers } from "@vibecheck/contracts";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { type JevClient, JevProviderError } from "@/providers/jev";
@@ -39,7 +39,8 @@ export async function evaluateJob(
       ),
   });
   if (!detector) throw new Error("detector missing");
-  const reservedMicros = Number(evaluation.statusReason?.split(":")[2] ?? 0) || 0;
+  // The reservation held at scan time; released or replaced by actual usage exactly once below.
+  const reservedMicros = evaluation.reservedMicros;
 
   await db
     .update(schema.jevEvaluations)
@@ -48,7 +49,11 @@ export async function evaluateJob(
 
   const rows = window.eventIds.length
     ? await db.query.observationEvents.findMany({
-        where: (e, { inArray }) => inArray(e.id, window.eventIds),
+        where: (e, { and, eq, inArray }) =>
+          and(
+            eq(e.observationSessionId, window.observationSessionId),
+            inArray(e.id, window.eventIds),
+          ),
       })
     : [];
   const events: JourneyEvent[] = rows.map((r) => ({
@@ -83,7 +88,7 @@ export async function evaluateJob(
         .update(schema.jevEvaluations)
         .set({
           status: "queued",
-          statusReason: `transient:${err.code}:reserved::${reservedMicros}`,
+          statusReason: `transient:${err.code}`,
         })
         .where(eq(schema.jevEvaluations.id, evaluation.id));
       throw err; // the job queue retries with backoff, within the same reservation
@@ -108,13 +113,13 @@ export async function evaluateJob(
     throw err;
   }
 
-  const problems = validateAnswersAgainstQuestions(questions, result.answers);
-  if (problems.length) {
+  const parsed = parseJevAnswers(questions, result.answers);
+  if (!parsed.ok) {
     await db
       .update(schema.jevEvaluations)
       .set({
         status: "failed",
-        statusReason: `malformed_answers: ${problems.join("; ").slice(0, 500)}`,
+        statusReason: `malformed_answers: ${parsed.problems.join("; ").slice(0, 500)}`,
         returnedModel: result.model,
         providerRequestId: result.requestId,
         completedAt: new Date(),
@@ -147,17 +152,22 @@ export async function evaluateJob(
     reservedMicros,
   });
 
-  const answers = result.answers as Record<
-    string,
-    { type: string; noul?: number; choice?: string; confidence?: number }
-  >;
-  const friction = answers.ux_friction_observed?.noul ?? 0;
-  const research = answers.targeted_research_warranted?.noul ?? 0;
-  const evidence = (answers.evidence_sufficiency?.choice ?? "insufficient") as
+  const { answers } = parsed;
+  const noul = (key: string) => {
+    const a = answers[key];
+    return a?.type === "noul" ? a.noul : 0;
+  };
+  const choice = (key: string, fallback: string) => {
+    const a = answers[key];
+    return a?.type === "choice" ? a.choice : fallback;
+  };
+  const friction = noul("ux_friction_observed");
+  const research = noul("targeted_research_warranted");
+  const evidence = choice("evidence_sufficiency", "insufficient") as
     | "sufficient"
     | "partial"
     | "insufficient";
-  const category = answers.problem_category?.choice ?? "other_or_uncertain";
+  const category = choice("problem_category", "other_or_uncertain");
 
   await db.transaction(async (tx) => {
     await tx
@@ -165,7 +175,7 @@ export async function evaluateJob(
       .set({
         status: "completed",
         statusReason: null,
-        answers: result.answers,
+        answers,
         returnedModel: result.model,
         providerRequestId: result.requestId,
         inputTokens,

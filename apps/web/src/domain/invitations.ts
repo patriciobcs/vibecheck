@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { StudyPlanSchema } from "@vibecheck/contracts";
-import { and, desc, eq } from "drizzle-orm";
-import { db, schema } from "@/db/client";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { type Db, db, schema, type Tx } from "@/db/client";
 import { newId, newToken } from "@/lib/ids";
-import { type AssignmentRow, type Channel, claimAssignment } from "./assignments";
+import { type AssignmentRow, type Channel, claimAssignmentIn } from "./assignments";
 import { isInCooldown } from "./cooldown";
 
 export type InvitationRow = typeof schema.invitations.$inferSelect;
@@ -65,7 +65,10 @@ export type RedeemResult =
         | "study_not_recruiting";
     };
 
-/** Exchanges a direct-link token for an assignment; the token never becomes a credential. */
+/**
+ * Exchanges a direct-link token for an assignment; the token never becomes a credential.
+ * The use count and the claim commit together, so a failed claim never burns a use.
+ */
 export async function redeemDirectLinkInvitation(input: {
   token: string;
   participantId: string;
@@ -82,66 +85,58 @@ export async function redeemDirectLinkInvitation(input: {
   });
   if (existing) return { ok: true, assignment: existing };
 
-  const reserved = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [row] = await tx
       .select()
       .from(schema.invitations)
       .where(eq(schema.invitations.id, invitation.id))
       .for("update");
-    if (!row) return false;
-    if (row.maxUses !== null && row.uses >= row.maxUses) return false;
-    await tx
-      .update(schema.invitations)
-      .set({ uses: row.uses + 1 })
-      .where(eq(schema.invitations.id, row.id));
-    return true;
-  });
-  if (!reserved) return { ok: false, reason: "invitation_exhausted" };
-
-  const claim = await claimAssignment({
-    studyId: invitation.studyId,
-    participantId: input.participantId,
-    channel: "direct_link",
-  });
-  if (!claim.ok) {
-    await db.transaction(async (tx) => {
-      const [row] = await tx
-        .select()
-        .from(schema.invitations)
-        .where(eq(schema.invitations.id, invitation.id))
-        .for("update");
-      if (row)
-        await tx
-          .update(schema.invitations)
-          .set({ uses: Math.max(0, row.uses - 1) })
-          .where(eq(schema.invitations.id, row.id));
+    if (!row) return { ok: false, reason: "not_found" };
+    if (row.maxUses !== null && row.uses >= row.maxUses)
+      return { ok: false, reason: "invitation_exhausted" };
+    const claim = await claimAssignmentIn(tx, {
+      studyId: invitation.studyId,
+      participantId: input.participantId,
+      channel: "direct_link",
     });
-    return claim;
-  }
-  await recordDelivery({
-    productId: claim.assignment.productId,
-    studyId: invitation.studyId,
-    participantId: input.participantId,
-    channel: "direct_link",
-    outcome: "accepted",
+    if (!claim.ok) return claim;
+    if (claim.created) {
+      await tx
+        .update(schema.invitations)
+        .set({ uses: row.uses + 1 })
+        .where(eq(schema.invitations.id, row.id));
+      await recordDelivery(
+        {
+          productId: claim.assignment.productId,
+          studyId: invitation.studyId,
+          participantId: input.participantId,
+          channel: "direct_link",
+          outcome: "accepted",
+        },
+        tx,
+      );
+    }
+    return { ok: true, assignment: claim.assignment };
   });
-  return { ok: true, assignment: claim.assignment };
 }
 
 /* ---------------- Deliveries and cooldown ---------------- */
 
-export async function recordDelivery(input: {
-  productId: string;
-  studyId: string;
-  participantId: string;
-  channel: Channel;
-  outcome: "shown" | "dismissed" | "accepted";
-}) {
-  const product = await db.query.products.findFirst({
+export async function recordDelivery(
+  input: {
+    productId: string;
+    studyId: string;
+    participantId: string;
+    channel: Channel;
+    outcome: "shown" | "dismissed" | "accepted";
+  },
+  executor: Db | Tx = db,
+) {
+  const product = await executor.query.products.findFirst({
     where: eq(schema.products.id, input.productId),
   });
   if (!product) throw new Error("product not found");
-  await db.insert(schema.invitationDeliveries).values({
+  await executor.insert(schema.invitationDeliveries).values({
     id: newId("delivery"),
     tenantId: product.tenantId,
     productId: input.productId,
@@ -150,6 +145,33 @@ export async function recordDelivery(input: {
     channel: input.channel,
     outcome: input.outcome,
   });
+}
+
+/**
+ * A dismissed embedded toast feeds the cooldown, so the study must belong to the product behind
+ * the publishable key: a page cannot mark deliveries against products it does not represent.
+ */
+export async function recordEmbeddedDismissal(input: {
+  publishableKey: string;
+  studyId: string;
+  participantId: string;
+}): Promise<{ ok: true } | { ok: false; reason: "not_found" }> {
+  const product = await db.query.products.findFirst({
+    where: eq(schema.products.publishableKey, input.publishableKey),
+  });
+  if (!product) return { ok: false, reason: "not_found" };
+  const study = await db.query.studies.findFirst({
+    where: and(eq(schema.studies.id, input.studyId), eq(schema.studies.productId, product.id)),
+  });
+  if (!study) return { ok: false, reason: "not_found" };
+  await recordDelivery({
+    productId: product.id,
+    studyId: study.id,
+    participantId: input.participantId,
+    channel: "embedded",
+    outcome: "dismissed",
+  });
+  return { ok: true };
 }
 
 /* ---------------- Embedded SDK ---------------- */
@@ -211,31 +233,43 @@ export async function checkEmbeddedEligibility(input: {
     }
   }
 
-  const studies = await db.query.studies.findMany({
-    where: and(eq(schema.studies.productId, product.id), eq(schema.studies.status, "recruiting")),
-  });
-  const published = await db.query.studies.findMany({
-    where: and(eq(schema.studies.productId, product.id), eq(schema.studies.status, "published")),
-  });
-  for (const study of [...studies, ...published]) {
-    const rev = await db.query.studyRevisions.findFirst({
-      where: and(
-        eq(schema.studyRevisions.studyId, study.id),
-        eq(schema.studyRevisions.revision, study.currentRevision),
+  // Hot SDK path: open studies joined to their current revision in one query, recruiting first.
+  const open = await db
+    .select({ study: schema.studies, plan: schema.studyRevisions.plan })
+    .from(schema.studies)
+    .innerJoin(
+      schema.studyRevisions,
+      and(
+        eq(schema.studyRevisions.studyId, schema.studies.id),
+        eq(schema.studyRevisions.revision, schema.studies.currentRevision),
       ),
-    });
-    if (!rev) continue;
-    const plan = StudyPlanSchema.parse(rev.plan);
+    )
+    .where(
+      and(
+        eq(schema.studies.productId, product.id),
+        inArray(schema.studies.status, ["recruiting", "published"]),
+      ),
+    )
+    .orderBy(desc(sql`${schema.studies.status} = 'recruiting'`), desc(schema.studies.createdAt));
+  const assigned = new Set(
+    input.participantId
+      ? (
+          await db.query.assignments.findMany({
+            where: and(
+              eq(schema.assignments.participantId, input.participantId),
+              inArray(
+                schema.assignments.studyId,
+                open.map((o) => o.study.id),
+              ),
+            ),
+          })
+        ).map((a) => a.studyId)
+      : [],
+  );
+  for (const { study, plan: rawPlan } of open) {
+    const plan = StudyPlanSchema.parse(rawPlan);
     if (plan.recruitment.source !== "embedded") continue;
-    if (input.participantId) {
-      const existing = await db.query.assignments.findFirst({
-        where: and(
-          eq(schema.assignments.studyId, study.id),
-          eq(schema.assignments.participantId, input.participantId),
-        ),
-      });
-      if (existing) continue;
-    }
+    if (assigned.has(study.id)) continue;
     return {
       ok: true,
       study: {

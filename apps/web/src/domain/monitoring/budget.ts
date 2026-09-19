@@ -33,13 +33,15 @@ export async function reserveEvaluation(input: {
   policy: BudgetPolicy;
   priceMicrosPer1k: PriceMicros;
   estimatedInputTokens: number;
+  now?: Date;
 }): Promise<ReserveResult> {
   if (input.estimatedInputTokens > input.policy.max_input_tokens)
     return { ok: false, reason: "input_tokens_cap" };
+  const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
     await tx
       .insert(schema.evaluationBudgetLedger)
-      .values({ id: newId("budget"), productId: input.productId, day: day() })
+      .values({ id: newId("budget"), productId: input.productId, day: day(now) })
       .onConflictDoNothing();
     const [ledger] = await tx
       .select()
@@ -47,7 +49,7 @@ export async function reserveEvaluation(input: {
       .where(
         and(
           eq(schema.evaluationBudgetLedger.productId, input.productId),
-          eq(schema.evaluationBudgetLedger.day, day()),
+          eq(schema.evaluationBudgetLedger.day, day(now)),
         ),
       )
       .for("update");
@@ -55,7 +57,7 @@ export async function reserveEvaluation(input: {
     if (ledger.evaluations >= input.policy.max_evaluations_per_product_day)
       return { ok: false, reason: "product_day_cap" };
 
-    const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const [{ n }] = await tx
       .select({ n: sql<number>`count(*)::int` })
       .from(schema.evaluationReservations)
@@ -84,6 +86,7 @@ export async function reserveEvaluation(input: {
       productId: input.productId,
       observationSessionId: input.observationSessionId,
       estimatedCostMicros: reservedMicros,
+      reservedAt: now,
     });
     await tx
       .update(schema.evaluationBudgetLedger)
@@ -93,14 +96,20 @@ export async function reserveEvaluation(input: {
   });
 }
 
-/** Replace the reservation's estimate with returned usage (or release it entirely on failure). */
+/**
+ * Replace the reservation's estimate with returned usage (or release it entirely on failure).
+ * The `evaluations` counter is intentionally never decremented: a call that reached the provider
+ * counts against the daily call cap whether or not it produced usable answers.
+ */
 export async function reconcileUsage(input: {
   productId: string;
   inputTokens: number;
   outputTokens: number;
   priceMicrosPer1k: PriceMicros;
   reservedMicros?: number;
+  now?: Date;
 }) {
+  const now = input.now ?? new Date();
   const actual =
     estimateMicros(input.inputTokens, input.outputTokens, input.priceMicrosPer1k) -
     (input.reservedMicros ?? 0);
@@ -109,7 +118,7 @@ export async function reconcileUsage(input: {
     .values({
       id: newId("budget"),
       productId: input.productId,
-      day: day(),
+      day: day(now),
       inputTokens: input.inputTokens,
       outputTokens: input.outputTokens,
       estimatedCostMicros: actual,

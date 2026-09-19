@@ -1,6 +1,6 @@
 import { StudyPlanSchema } from "@vibecheck/contracts";
 import { and, eq, sql } from "drizzle-orm";
-import { db, schema } from "@/db/client";
+import { db, schema, type Tx } from "@/db/client";
 import { newId } from "@/lib/ids";
 import { emitEvent } from "./events";
 
@@ -23,7 +23,15 @@ export async function claimAssignment(input: {
   participantId: string;
   channel: Channel;
 }): Promise<ClaimResult> {
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => claimAssignmentIn(tx, input));
+}
+
+/** The claim itself, for callers that must commit it together with their own rows. */
+export async function claimAssignmentIn(
+  tx: Tx,
+  input: { studyId: string; participantId: string; channel: Channel },
+): Promise<ClaimResult> {
+  {
     const [study] = await tx
       .select()
       .from(schema.studies)
@@ -113,5 +121,5 @@ export async function claimAssignment(input: {
     });
 
     return { ok: true, assignment, created: true };
-  });
+  }
 }

@@ -58,6 +58,7 @@ export const JevAnswerSchema = z.discriminatedUnion("type", [
   }),
 ]);
 export type JevAnswer = z.infer<typeof JevAnswerSchema>;
+export type JevAnswers = Record<string, JevAnswer>;
 
 export const JevResponseSchema = z.object({
   model: z.string(),
@@ -103,4 +104,14 @@ export function validateAnswersAgainstQuestions(
     if (a.type === "score" && !Number.isFinite(a.score)) problems.push(`${key}: score not finite`);
   }
   return problems;
+}
+
+/** Typed answers once they validated against the questions; otherwise the list of problems. */
+export function parseJevAnswers(
+  questions: JevQuestions,
+  rawAnswers: unknown,
+): { ok: true; answers: JevAnswers } | { ok: false; problems: string[] } {
+  const problems = validateAnswersAgainstQuestions(questions, rawAnswers);
+  if (problems.length) return { ok: false, problems };
+  return { ok: true, answers: z.record(z.string(), JevAnswerSchema).parse(rawAnswers) };
 }

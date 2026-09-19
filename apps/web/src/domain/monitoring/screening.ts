@@ -1,10 +1,10 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { env } from "@/lib/env";
 import { newId } from "@/lib/ids";
 import { emitEvent } from "../events";
 import { enqueueJob } from "../jobs";
-import { reserveEvaluation } from "./budget";
+import { type PriceMicros, reserveEvaluation } from "./budget";
 import { activeDetectorsForJourney, detectorRef } from "./detectors";
 import { currentMonitoringPolicy } from "./policy";
 import { evaluateTriggers, type JourneyEvent, type Trigger } from "./triggers";
@@ -18,19 +18,39 @@ export type ScanResult = {
 };
 
 const CHARS_PER_TOKEN = 4;
+const IDLE_JOURNEY_MS = 5 * 60_000;
 
-async function journeyEvents(journeyInstanceId: string): Promise<JourneyEvent[]> {
+/** Budget refusals that can clear on their own; a deferred evaluation with one of these is retried. */
+const RETRYABLE_BUDGET_REASONS = new Set(["product_day_cap", "session_hour_cap", "spend_cap"]);
+
+type EvaluationRow = typeof schema.jevEvaluations.$inferSelect;
+type WindowRow = typeof schema.observationWindows.$inferSelect;
+type Policy = Awaited<ReturnType<typeof currentMonitoringPolicy>>["policy"];
+
+/** A journey instance id is client-chosen; it only identifies a journey together with its session. */
+const journeyScope = (observationSessionId: string, journeyInstanceId: string) =>
+  and(
+    eq(schema.observationEvents.observationSessionId, observationSessionId),
+    eq(schema.observationEvents.journeyInstanceId, journeyInstanceId),
+  );
+
+async function journeyEvents(observationSessionId: string, journeyInstanceId: string) {
   const rows = await db.query.observationEvents.findMany({
-    where: eq(schema.observationEvents.journeyInstanceId, journeyInstanceId),
+    where: journeyScope(observationSessionId, journeyInstanceId),
     orderBy: asc(schema.observationEvents.sequence),
   });
-  return rows.map((r) => ({
+  const events: JourneyEvent[] = rows.map((r) => ({
     id: r.id,
     sequence: r.sequence,
     t_ms: r.tMs,
     type: r.type,
     payload: r.payload as Record<string, unknown>,
   }));
+  return { events, journeyId: rows[0]?.journeyId ?? "", rows };
+}
+
+function configuredPrice(): PriceMicros {
+  return env().jev?.priceMicrosPer1k ?? null;
 }
 
 /**
@@ -43,6 +63,8 @@ export async function scanJourney(input: {
   observationSessionId: string;
   productId: string;
   nowMs?: number;
+  /** Defaults to the configured Jev price; tests inject one to exercise spend accounting. */
+  priceMicrosPer1k?: PriceMicros;
 }): Promise<ScanResult[]> {
   const { policy, policyRef } = await currentMonitoringPolicy(input.productId);
   if (!policy.enabled) return [{ action: "skipped", reason: "monitoring_disabled" }];
@@ -50,30 +72,21 @@ export async function scanJourney(input: {
     where: eq(schema.observationSessions.id, input.observationSessionId),
   });
   if (!session) return [{ action: "skipped", reason: "session_not_found" }];
+  if (session.productId !== input.productId)
+    return [{ action: "skipped", reason: "session_product_mismatch" }];
   const tenant = await db.query.tenants.findFirst({
     where: eq(schema.tenants.id, session.tenantId),
   });
   if (tenant?.paused) return [{ action: "skipped", reason: "tenant_paused" }];
+  const price = input.priceMicrosPer1k === undefined ? configuredPrice() : input.priceMicrosPer1k;
 
-  const events = await journeyEvents(input.journeyInstanceId);
-  const first = events[0];
-  if (!first) return [{ action: "skipped", reason: "no_events" }];
-  const journeyId =
-    (
-      await db.query.observationEvents.findFirst({
-        where: eq(schema.observationEvents.id, first.id),
-      })
-    )?.journeyId ?? "";
-  const lastReceived = await db.query.observationEvents.findFirst({
-    where: eq(schema.observationEvents.journeyInstanceId, input.journeyInstanceId),
-    orderBy: (e, { desc }) => desc(e.receivedAt),
-  });
+  const { events, journeyId, rows } = await journeyEvents(session.id, input.journeyInstanceId);
+  const [firstRow] = rows;
+  if (!firstRow) return [{ action: "skipped", reason: "no_events" }];
+  const lastReceived = rows.reduce((m, r) => (r.receivedAt > m.receivedAt ? r : m), firstRow);
   // The journey clock: "now" is the last event time plus wall-clock elapsed since it arrived.
   const nowMs =
-    input.nowMs ??
-    (lastReceived
-      ? lastReceived.tMs + Math.max(0, Date.now() - lastReceived.receivedAt.getTime())
-      : (events.at(-1)?.t_ms ?? 0));
+    input.nowMs ?? lastReceived.tMs + Math.max(0, Date.now() - lastReceived.receivedAt.getTime());
 
   const triggers = evaluateTriggers(events, {
     nowMs,
@@ -99,9 +112,16 @@ export async function scanJourney(input: {
       schema.observationWindows,
       eq(schema.jevEvaluations.windowId, schema.observationWindows.id),
     )
-    .where(eq(schema.observationWindows.journeyInstanceId, input.journeyInstanceId));
+    .where(
+      and(
+        eq(schema.observationWindows.observationSessionId, session.id),
+        eq(schema.observationWindows.journeyInstanceId, input.journeyInstanceId),
+      ),
+    );
   const inFlight = recent.some((r) => r.status === "queued" || r.status === "running");
-  const lastAt = recent.reduce((m, r) => Math.max(m, r.requestedAt.getTime()), 0);
+  const lastAt = recent
+    .filter((r) => r.status !== "deferred")
+    .reduce((m, r) => Math.max(m, r.requestedAt.getTime()), 0);
   const inCooldown = lastAt > 0 && Date.now() - lastAt < policy.cooldown_ms;
 
   const results: ScanResult[] = [];
@@ -148,7 +168,13 @@ export async function scanJourney(input: {
       ),
     });
     if (existing) {
-      results.push({ action: "unchanged_window", detectorId: detector.detectorId });
+      // An unchanged window whose evaluation was refused for budget is retried, never forgotten.
+      const deferred = await retryableDeferredFor(existing.id);
+      results.push(
+        deferred
+          ? await requeueDeferred(deferred, existing, policy, price)
+          : { action: "unchanged_window", detectorId: detector.detectorId },
+      );
       continue;
     }
     if (inFlight) {
@@ -192,71 +218,171 @@ export async function scanJourney(input: {
       (JSON.stringify(built.state).length + JSON.stringify(detector.questions).length) /
         CHARS_PER_TOKEN,
     );
+    const requestedModel = env().jev?.model ?? "jev-latest";
+    const evaluationId = newId("eval");
+    const base = {
+      id: evaluationId,
+      tenantId: session.tenantId,
+      productId: input.productId,
+      windowId: window.id,
+      detectorRef: ref,
+      policyRef,
+      requestHash: `${built.contentHash}:${ref}:${policyRef}:${requestedModel}`,
+      requestedModel,
+      triggerReason: primary.reason,
+      estimatedInputTokens,
+    };
     const reserved = await reserveEvaluation({
       productId: input.productId,
       observationSessionId: session.id,
       policy,
-      priceMicrosPer1k: env().jev?.priceMicrosPer1k ?? null,
+      priceMicrosPer1k: price,
       estimatedInputTokens,
     });
     if (!reserved.ok) {
-      await db.insert(schema.jevEvaluations).values({
-        id: newId("eval"),
-        tenantId: session.tenantId,
-        productId: input.productId,
-        windowId: window.id,
-        detectorRef: ref,
-        policyRef,
-        requestHash: `${built.contentHash}:${ref}:${policyRef}`,
-        requestedModel: env().jev?.model ?? "jev-latest",
-        triggerReason: primary.reason,
-        status: "deferred",
-        statusReason: reserved.reason,
-      });
+      await db
+        .insert(schema.jevEvaluations)
+        .values({ ...base, status: "deferred", statusReason: reserved.reason });
       results.push({
         action: "deferred",
         reason: reserved.reason,
         detectorId: detector.detectorId,
+        evaluationId,
       });
       continue;
     }
-    const evaluationId = newId("eval");
     await db.transaction(async (tx) => {
       await tx.insert(schema.jevEvaluations).values({
-        id: evaluationId,
-        tenantId: session.tenantId,
-        productId: input.productId,
-        windowId: window.id,
-        detectorRef: ref,
-        policyRef,
-        requestHash: `${built.contentHash}:${ref}:${policyRef}:${env().jev?.model ?? "jev-latest"}`,
-        requestedModel: env().jev?.model ?? "jev-latest",
-        triggerReason: primary.reason,
+        ...base,
         status: "queued",
-        statusReason: `reserved:${reserved.reservationId}:${reserved.reservedMicros}`,
+        reservationId: reserved.reservationId,
+        reservedMicros: reserved.reservedMicros,
       });
-      await emitEvent(tx, {
-        type: "evaluation.requested",
-        tenantId: session.tenantId,
-        productId: input.productId,
-        correlationId: input.journeyInstanceId,
-        idempotencyKey: `${evaluationId}:requested`,
-        payload: {
-          evaluation_id: evaluationId,
-          window_id: window.id,
-          detector_ref: ref,
-          trigger_reason: primary.reason,
-          sampled: primary.reason === "normal_sample",
-        },
-      });
-    });
-    await enqueueJob({
-      type: "jev.evaluate",
-      payload: { evaluationId },
-      dedupeKey: `jev.evaluate:${evaluationId}`,
-      maxAttempts: 3,
+      await announceQueued(tx, { ...base, journeyInstanceId: input.journeyInstanceId });
     });
     results.push({ action: "evaluation_queued", detectorId: detector.detectorId, evaluationId });
+  }
+  return results;
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Emits `evaluation.requested` and enqueues the job in the same transaction as the row change. */
+async function announceQueued(
+  tx: Tx,
+  e: {
+    id: string;
+    tenantId: string;
+    productId: string;
+    windowId: string;
+    detectorRef: string;
+    triggerReason: string;
+    journeyInstanceId: string;
+  },
+) {
+  await emitEvent(tx, {
+    type: "evaluation.requested",
+    tenantId: e.tenantId,
+    productId: e.productId,
+    correlationId: e.journeyInstanceId,
+    idempotencyKey: `${e.id}:requested`,
+    payload: {
+      evaluation_id: e.id,
+      window_id: e.windowId,
+      detector_ref: e.detectorRef,
+      trigger_reason: e.triggerReason,
+      sampled: e.triggerReason === "normal_sample",
+    },
+  });
+  await enqueueJob(
+    {
+      type: "jev.evaluate",
+      payload: { evaluationId: e.id },
+      dedupeKey: `jev.evaluate:${e.id}`,
+      maxAttempts: 3,
+    },
+    tx,
+  );
+}
+
+async function retryableDeferredFor(windowId: string): Promise<EvaluationRow | null> {
+  const row = await db.query.jevEvaluations.findFirst({
+    where: and(
+      eq(schema.jevEvaluations.windowId, windowId),
+      eq(schema.jevEvaluations.status, "deferred"),
+    ),
+  });
+  return row && RETRYABLE_BUDGET_REASONS.has(row.statusReason ?? "") ? row : null;
+}
+
+/** Tries the reservation again for a deferred evaluation; queues it or records the new refusal. */
+async function requeueDeferred(
+  evaluation: EvaluationRow,
+  window: WindowRow,
+  policy: Policy,
+  price: PriceMicros,
+  now = new Date(),
+): Promise<ScanResult> {
+  const detectorId = evaluation.detectorRef.split(":")[0];
+  const reserved = await reserveEvaluation({
+    productId: evaluation.productId,
+    observationSessionId: window.observationSessionId,
+    policy,
+    priceMicrosPer1k: price,
+    estimatedInputTokens: evaluation.estimatedInputTokens,
+    now,
+  });
+  if (!reserved.ok) {
+    await db
+      .update(schema.jevEvaluations)
+      .set({ statusReason: reserved.reason })
+      .where(eq(schema.jevEvaluations.id, evaluation.id));
+    return { action: "deferred", reason: reserved.reason, detectorId, evaluationId: evaluation.id };
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schema.jevEvaluations)
+      .set({
+        status: "queued",
+        statusReason: null,
+        reservationId: reserved.reservationId,
+        reservedMicros: reserved.reservedMicros,
+        requestedAt: now,
+      })
+      .where(eq(schema.jevEvaluations.id, evaluation.id));
+    await announceQueued(tx, { ...evaluation, journeyInstanceId: window.journeyInstanceId });
+  });
+  return { action: "evaluation_queued", detectorId, evaluationId: evaluation.id };
+}
+
+const utcDay = (d: Date) => d.toISOString().slice(0, 10);
+
+/**
+ * Budget-deferred evaluations are retried once their cap can have cleared: day caps on a new UTC
+ * day, the session-hour cap an hour later. Runs with the sweep; a policy that is now off skips them.
+ */
+export async function retryDeferredEvaluations(now = new Date()): Promise<ScanResult[]> {
+  const deferred = await db.query.jevEvaluations.findMany({
+    where: and(
+      eq(schema.jevEvaluations.status, "deferred"),
+      inArray(schema.jevEvaluations.statusReason, [...RETRYABLE_BUDGET_REASONS]),
+    ),
+    orderBy: asc(schema.jevEvaluations.requestedAt),
+  });
+  const results: ScanResult[] = [];
+  for (const e of deferred) {
+    const eligible =
+      e.statusReason === "session_hour_cap"
+        ? now.getTime() - e.requestedAt.getTime() >= 60 * 60_000
+        : utcDay(e.requestedAt) !== utcDay(now);
+    if (!eligible) continue;
+    const window = await db.query.observationWindows.findFirst({
+      where: eq(schema.observationWindows.id, e.windowId),
+    });
+    if (!window) continue;
+    const { policy } = await currentMonitoringPolicy(e.productId);
+    if (!policy.enabled) continue;
+    results.push(await requeueDeferred(e, window, policy, configuredPrice(), now));
   }
   return results;
 }
@@ -279,7 +405,7 @@ function pickTrigger(triggers: Trigger[]): Trigger {
 
 /** Retrospective journey ends: five minutes without journey events, evaluated as unknown outcome. */
 export async function sweepIdleJourneys(now = new Date()): Promise<ScanResult[]> {
-  const cutoff = new Date(now.getTime() - 5 * 60_000);
+  const cutoff = new Date(now.getTime() - IDLE_JOURNEY_MS);
   const idle = await db
     .select({
       journeyInstanceId: schema.observationEvents.journeyInstanceId,
@@ -296,11 +422,9 @@ export async function sweepIdleJourneys(now = new Date()): Promise<ScanResult[]>
     );
   const results: ScanResult[] = [];
   for (const j of idle) {
+    const scope = journeyScope(j.observationSessionId, j.journeyInstanceId);
     const ended = await db.query.observationEvents.findFirst({
-      where: and(
-        eq(schema.observationEvents.journeyInstanceId, j.journeyInstanceId),
-        inArray(schema.observationEvents.type, ["completion", "exit"]),
-      ),
+      where: and(scope, inArray(schema.observationEvents.type, ["completion", "exit"])),
     });
     const alreadyEnded = await db
       .select({ id: schema.jevEvaluations.id })
@@ -311,6 +435,7 @@ export async function sweepIdleJourneys(now = new Date()): Promise<ScanResult[]>
       )
       .where(
         and(
+          eq(schema.observationWindows.observationSessionId, j.observationSessionId),
           eq(schema.observationWindows.journeyInstanceId, j.journeyInstanceId),
           eq(schema.jevEvaluations.triggerReason, "journey_end"),
         ),
@@ -322,14 +447,14 @@ export async function sweepIdleJourneys(now = new Date()): Promise<ScanResult[]>
     });
     if (!session) continue;
     const last = await db.query.observationEvents.findFirst({
-      where: eq(schema.observationEvents.journeyInstanceId, j.journeyInstanceId),
-      orderBy: (e, { desc }) => desc(e.sequence),
+      where: scope,
+      orderBy: desc(schema.observationEvents.sequence),
     });
     const r = await scanJourney({
       journeyInstanceId: j.journeyInstanceId,
       observationSessionId: j.observationSessionId,
       productId: session.productId,
-      nowMs: (last?.tMs ?? 0) + 5 * 60_000 + 1,
+      nowMs: (last?.tMs ?? 0) + IDLE_JOURNEY_MS + 1,
     });
     results.push(...r);
   }

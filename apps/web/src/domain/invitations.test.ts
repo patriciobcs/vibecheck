@@ -1,12 +1,15 @@
+import { SAMPLE_STUDY_PLAN } from "@vibecheck/contracts";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
 import { resetDb } from "@/test/db";
 import { seedParticipant, seedStudy } from "@/test/fixtures";
+import { claimAssignment } from "./assignments";
 import {
   checkEmbeddedEligibility,
   createDirectLinkInvitation,
   recordDelivery,
+  recordEmbeddedDismissal,
   redeemDirectLinkInvitation,
   resolveInvitationToken,
 } from "./invitations";
@@ -59,6 +62,56 @@ describe("direct link invitations", () => {
     expect(second).toEqual({ ok: false, reason: "invitation_exhausted" });
     const inv = await db.query.invitations.findFirst();
     expect(inv?.uses).toBe(1);
+  });
+});
+
+describe("direct link redemption", () => {
+  it("does not consume an invitation use when the claim itself fails", async () => {
+    const { studyId, plan } = await seedStudy({
+      recruitment: { ...SAMPLE_STUDY_PLAN.recruitment, target_count: 1 },
+    });
+    expect(plan.recruitment.target_count).toBe(1);
+    const taken = await seedParticipant();
+    await claimAssignment({ studyId, participantId: taken.participantId, channel: "marketplace" });
+    const { token } = await createDirectLinkInvitation({
+      studyId,
+      createdByUserId: "u1",
+      expiresInDays: 7,
+      maxUses: 5,
+    });
+    const late = await seedParticipant();
+    expect(await redeemDirectLinkInvitation({ token, participantId: late.participantId })).toEqual({
+      ok: false,
+      reason: "study_full",
+    });
+    expect((await db.query.invitations.findFirst())?.uses).toBe(0);
+  });
+});
+
+describe("embedded dismissal", () => {
+  it("records a dismissal only for a study of the product behind the key", async () => {
+    const mine = await seedStudy();
+    const theirs = await seedStudy();
+    const product = await db.query.products.findFirst({
+      where: (p, { eq }) => eq(p.id, mine.productId),
+    });
+    if (!product) throw new Error("product");
+    const { participantId } = await seedParticipant();
+    const foreign = await recordEmbeddedDismissal({
+      publishableKey: product.publishableKey,
+      studyId: theirs.studyId,
+      participantId,
+    });
+    expect(foreign).toEqual({ ok: false, reason: "not_found" });
+    expect(await db.$count(schema.invitationDeliveries)).toBe(0);
+    const own = await recordEmbeddedDismissal({
+      publishableKey: product.publishableKey,
+      studyId: mine.studyId,
+      participantId,
+    });
+    expect(own).toEqual({ ok: true });
+    const delivery = await db.query.invitationDeliveries.findFirst();
+    expect(delivery).toMatchObject({ productId: mine.productId, outcome: "dismissed" });
   });
 });
 

@@ -14,7 +14,12 @@ export const POST = route(async (req) => {
   if (!claims) return withCors(fail(401, "invalid_observation_token"), cors);
   const body = await req.text();
   if (body.length > 256 * 1024) return withCors(fail(413, "batch_too_large"), cors);
-  const batch = JSON.parse(body || "null") as unknown;
+  let batch: unknown;
+  try {
+    batch = JSON.parse(body);
+  } catch {
+    return withCors(fail(400, "invalid_json"), cors);
+  }
   const result = await ingestObservationBatch({ sessionId: claims.observationSessionId, batch });
   if (!result.ok)
     return withCors(fail(statusFor(result.reason), result.reason, result.issues), cors);

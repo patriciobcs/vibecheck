@@ -7,7 +7,11 @@ import {
 import { completeJob, failJob, heartbeatJob, leaseNextJob } from "@/domain/jobs";
 import { detectorGeneratorFor, generateDetector } from "@/domain/monitoring/detectors";
 import { evaluateJob } from "@/domain/monitoring/evaluate";
-import { scanJourney, sweepIdleJourneys } from "@/domain/monitoring/screening";
+import {
+  retryDeferredEvaluations,
+  scanJourney,
+  sweepIdleJourneys,
+} from "@/domain/monitoring/screening";
 import { env } from "@/lib/env";
 import { jevClient, mediaClient, sttClient } from "@/providers";
 import { storage } from "@/providers/storage";
@@ -38,6 +42,7 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     }
     case "monitoring.sweep":
       await sweepIdleJourneys();
+      await retryDeferredEvaluations();
       return;
     case "jev.evaluate": {
       const jev = jevClient();
@@ -80,9 +85,10 @@ async function onJobFailure(
 /** Leases and runs one job; returns false when nothing was runnable. */
 export async function tick(
   workerId: string,
+  types?: string[],
 ): Promise<{ ran: false } | { ran: true; id: string; type: string; ok: boolean; error?: string }> {
   const leaseSeconds = env().WORKER_LEASE_SECONDS;
-  const job = await leaseNextJob({ workerId, leaseSeconds });
+  const job = await leaseNextJob({ workerId, leaseSeconds, types });
   if (!job) return { ran: false };
   const heartbeat = setInterval(
     () => void heartbeatJob(job.id, leaseSeconds),
@@ -107,11 +113,11 @@ export async function tick(
   }
 }
 
-/** Runs runnable jobs until the queue is empty or `max` is reached. */
-export async function drain(workerId: string, max = 20) {
+/** Runs runnable jobs (optionally only some types) until the queue is empty or `max` is reached. */
+export async function drain(workerId: string, max = 20, types?: string[]) {
   const results = [];
   for (let i = 0; i < max; i += 1) {
-    const r = await tick(workerId);
+    const r = await tick(workerId, types);
     if (!r.ran) break;
     results.push(r);
   }

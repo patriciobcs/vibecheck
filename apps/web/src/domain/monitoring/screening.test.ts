@@ -1,6 +1,7 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
-import type { JevClient } from "@/providers/jev";
+import { type JevClient, JevProviderError } from "@/providers/jev";
 import { resetDb } from "@/test/db";
 import { seedStudy } from "@/test/fixtures";
 import { dismissCandidate } from "./candidates";
@@ -8,7 +9,7 @@ import { createManualDetector } from "./detectors";
 import { evaluateJob } from "./evaluate";
 import { ingestObservationBatch, openObservationSession } from "./ingest";
 import { setMonitoringPolicy } from "./policy";
-import { scanJourney, sweepIdleJourneys } from "./screening";
+import { retryDeferredEvaluations, scanJourney, sweepIdleJourneys } from "./screening";
 
 const questions = {
   evidence_sufficiency: {
@@ -179,6 +180,80 @@ describe("screening", () => {
     expect(deferred?.reason).toMatch(/needs_instrumentation/);
   });
 
+  it("scopes a journey to its observation session when another session reuses instance and event ids", async () => {
+    const { productId, sessionId } = await setup();
+    const product = await db.query.products.findFirst({
+      where: (p, { eq }) => eq(p.id, productId),
+    });
+    if (!product) throw new Error("product");
+    const other = await openObservationSession({
+      publishableKey: product.publishableKey,
+      origin: "https://app.example.test",
+      buildRef: "build_1",
+      collectionPermission: "granted",
+    });
+    if (!other.ok) throw new Error("open");
+    await helpJourney(sessionId);
+    await helpJourney(other.sessionId);
+    // Same client event ids in two sessions are two distinct rows.
+    expect(await db.$count(schema.observationEvents)).toBe(4);
+    const scans = (await db.query.jobs.findMany()).filter((j) => j.type === "monitoring.scan");
+    expect(scans).toHaveLength(2);
+
+    const a = await scanJourney({
+      journeyInstanceId: "journey_1",
+      observationSessionId: sessionId,
+      productId,
+    });
+    const b = await scanJourney({
+      journeyInstanceId: "journey_1",
+      observationSessionId: other.sessionId,
+      productId,
+    });
+    expect(a.map((r) => r.action)).toEqual(["evaluation_queued"]);
+    expect(b.map((r) => r.action)).toEqual(["evaluation_queued"]);
+    const windows = await db.query.observationWindows.findMany();
+    expect(windows).toHaveLength(2);
+    for (const w of windows) {
+      const own = (
+        await db.query.observationEvents.findMany({
+          where: eq(schema.observationEvents.observationSessionId, w.observationSessionId),
+        })
+      ).map((e) => e.id);
+      expect(w.eventIds).toHaveLength(2);
+      expect(w.eventIds.every((id) => own.includes(id))).toBe(true);
+    }
+  });
+
+  it("re-queues a budget-deferred evaluation once the cap frees instead of dropping the window", async () => {
+    const { productId, sessionId } = await setup();
+    await setMonitoringPolicy(productId, { max_evaluations_per_product_day: 1 }, null);
+    await helpJourney(sessionId, "journey_1", "b1");
+    await helpJourney(sessionId, "journey_2", "b2");
+    const scan = (journeyInstanceId: string) =>
+      scanJourney({ journeyInstanceId, observationSessionId: sessionId, productId });
+    expect((await scan("journey_1")).map((r) => r.action)).toEqual(["evaluation_queued"]);
+    expect(await scan("journey_2")).toMatchObject([
+      { action: "deferred", reason: "product_day_cap" },
+    ]);
+    // Same day, same window: still deferred, never silently "unchanged".
+    expect(await scan("journey_2")).toMatchObject([
+      { action: "deferred", reason: "product_day_cap" },
+    ]);
+    expect(await db.$count(schema.jevEvaluations)).toBe(2);
+
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60_000);
+    const retried = await retryDeferredEvaluations(tomorrow);
+    expect(retried.map((r) => r.action)).toEqual(["evaluation_queued"]);
+    const queued = await db.query.jevEvaluations.findMany({
+      where: eq(schema.jevEvaluations.status, "queued"),
+    });
+    expect(queued).toHaveLength(2);
+    expect(queued.every((e) => e.reservationId)).toBe(true);
+    const jobs = (await db.query.jobs.findMany()).filter((j) => j.type === "jev.evaluate");
+    expect(jobs).toHaveLength(2);
+  });
+
   it("does nothing when monitoring is disabled or the tenant is paused", async () => {
     const { productId, sessionId } = await setup();
     await helpJourney(sessionId);
@@ -255,6 +330,47 @@ describe("evaluation and candidates", () => {
     expect((await db.query.eventOutbox.findMany()).map((e) => e.eventType)).toContain(
       "research_candidate.updated",
     );
+  });
+
+  it("keeps the budget reservation across a transient provider failure and reconciles once", async () => {
+    const { productId, sessionId } = await setup();
+    const price = { input: 3000, output: 15000 };
+    await helpJourney(sessionId);
+    await scanJourney({
+      journeyInstanceId: "journey_1",
+      observationSessionId: sessionId,
+      productId,
+      priceMicrosPer1k: price,
+    });
+    const evaluation = await db.query.jevEvaluations.findFirst();
+    if (!evaluation) throw new Error("evaluation");
+    expect(evaluation.reservationId).toBeTruthy();
+    expect(evaluation.reservedMicros).toBeGreaterThan(0);
+    expect((await db.query.evaluationBudgetLedger.findFirst())?.estimatedCostMicros).toBe(
+      evaluation.reservedMicros,
+    );
+
+    let calls = 0;
+    const flaky: JevClient = {
+      async evaluate() {
+        calls += 1;
+        if (calls === 1) throw new JevProviderError("rate_limited", 429, true, "");
+        return {
+          model: "jev-1.13.0",
+          answers: answersFriction as Record<string, unknown>,
+          usage: { input_tokens: 500, output_tokens: 30 },
+          requestId: "req_2",
+        };
+      },
+    };
+    await expect(
+      evaluateJob({ evaluationId: evaluation.id }, { jev: flaky, priceMicrosPer1k: price }),
+    ).rejects.toBeInstanceOf(JevProviderError);
+    expect((await db.query.jevEvaluations.findFirst())?.status).toBe("queued");
+    await evaluateJob({ evaluationId: evaluation.id }, { jev: flaky, priceMicrosPer1k: price });
+    const ledger = await db.query.evaluationBudgetLedger.findFirst();
+    expect(ledger?.estimatedCostMicros).toBe(Math.round((500 * 3000) / 1000 + (30 * 15000) / 1000));
+    expect(ledger?.evaluations).toBe(1);
   });
 
   it("low scores or insufficient evidence produce no candidate, and malformed answers fail the evaluation", async () => {

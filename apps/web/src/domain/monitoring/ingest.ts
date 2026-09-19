@@ -146,7 +146,8 @@ export async function ingestObservationBatch(input: {
             ...payload
           } = e;
           return {
-            id: event_id,
+            id: newId("oevent"),
+            eventId: event_id,
             tenantId: session.tenantId,
             observationSessionId: session.id,
             journeyInstanceId: journey_instance_id,
@@ -180,21 +181,25 @@ export async function ingestObservationBatch(input: {
       },
     });
 
-    // Batch for `batch_delay_ms`, then one deterministic scan per journey instance per delay bucket.
+    // Batch for `batch_delay_ms`, then one deterministic scan per (session, journey instance) per
+    // delay bucket. Journey instance ids are client-chosen, so they only mean something per session.
     const delay = policy.batch_delay_ms;
     const bucket = Math.floor(Date.now() / Math.max(1000, delay));
     for (const journeyInstanceId of new Set(sorted.map((e) => e.journey_instance_id))) {
-      await enqueueJob({
-        type: "monitoring.scan",
-        payload: {
-          journeyInstanceId,
-          observationSessionId: session.id,
-          productId: session.productId,
+      await enqueueJob(
+        {
+          type: "monitoring.scan",
+          payload: {
+            journeyInstanceId,
+            observationSessionId: session.id,
+            productId: session.productId,
+          },
+          dedupeKey: `monitoring.scan:${session.id}:${journeyInstanceId}:${bucket}`,
+          runAt: new Date(Date.now() + delay),
+          maxAttempts: 3,
         },
-        dedupeKey: `monitoring.scan:${journeyInstanceId}:${bucket}`,
-        runAt: new Date(Date.now() + delay),
-        maxAttempts: 3,
-      });
+        tx,
+      );
     }
     return { ok: true, stored: inserted.length, ignored, duplicate: false, gaps };
   });

@@ -106,6 +106,7 @@ export function buildWindow(events: JourneyEvent[], input: WindowInput): BuiltWi
   const contentHash = createHash("sha256")
     .update(
       JSON.stringify({
+        s: input.observationSessionId,
         j: input.journeyInstanceId,
         b: input.buildRef,
         e: sorted.map((e) => [e.id, e.sequence, e.t_ms, e.type, e.payload]),

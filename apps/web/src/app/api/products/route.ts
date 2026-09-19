@@ -7,7 +7,11 @@ import { primaryTenant, requireTenantActor } from "@/lib/tenant-access";
 /** VC-01: connect a product. Suggested endpoint `POST /products`. */
 export const POST = route(async (req) => {
   const actor = await requireTenantActor(req);
-  const product = await createProduct(primaryTenant(actor), await req.json());
+  const { tenant_id, ...config } = (await req.json().catch(() => ({}))) as {
+    tenant_id?: unknown;
+  } & Record<string, unknown>;
+  const tenantId = primaryTenant(actor, typeof tenant_id === "string" ? tenant_id : null);
+  const product = await createProduct(tenantId, config);
   return json(product, { status: 201 });
 });
 

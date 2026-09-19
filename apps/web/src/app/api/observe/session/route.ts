@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { openObservationSession } from "@/domain/monitoring/ingest";
-import { fail, json, parseBody, route, statusFor } from "@/lib/api";
+import { fail, json, parseBody, route } from "@/lib/api";
 import { corsHeadersFor, preflight, withCors } from "@/lib/cors";
 import { issueObservationToken } from "@/lib/session-token";
 
@@ -51,5 +51,3 @@ export const POST = route(async (req) => {
     cors,
   );
 });
-
-export { statusFor };

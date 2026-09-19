@@ -38,9 +38,18 @@ export async function requireTenantActor(req: Request): Promise<TenantActor> {
   return actor;
 }
 
-/** The tenant a create-style request acts for: the API key's tenant, or the session's first membership. */
-export function primaryTenant(actor: TenantActor): string {
-  const id = actor.tenantIds[0];
-  if (!id) throw new ApiError(403, "no_tenant");
-  return id;
+/**
+ * The tenant a create-style request acts for: an explicitly named tenant the actor belongs to, or
+ * the actor's only tenant. A user with several memberships must say which one; never "the first".
+ */
+export function primaryTenant(actor: TenantActor, explicitTenantId?: string | null): string {
+  if (actor.tenantIds.length === 0) throw new ApiError(403, "no_tenant");
+  if (explicitTenantId) {
+    if (!actor.tenantIds.includes(explicitTenantId)) throw new ApiError(403, "not_a_member");
+    return explicitTenantId;
+  }
+  const [only, ...rest] = actor.tenantIds;
+  if (!only || rest.length > 0)
+    throw new ApiError(400, "tenant_required", "pass tenant_id: you belong to several tenants");
+  return only;
 }

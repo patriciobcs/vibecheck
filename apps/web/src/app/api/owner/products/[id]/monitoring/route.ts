@@ -1,5 +1,4 @@
 import { MonitoringPolicySchema } from "@vibecheck/contracts";
-import { z } from "zod";
 import { monitoringOverview } from "@/domain/monitoring/overview";
 import { setMonitoringPolicy } from "@/domain/monitoring/policy";
 import { ownerProduct } from "@/domain/owner-products";
@@ -28,5 +27,3 @@ export const PUT = route(async (req, ctx: RouteContext<"/api/owner/products/[id]
   const patch = await parseBody(req, Patch);
   return json(await setMonitoringPolicy(product.id, patch, user.id));
 });
-
-export { z };

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "worker": "tsx --env-file-if-exists=.env.local src/worker/main.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

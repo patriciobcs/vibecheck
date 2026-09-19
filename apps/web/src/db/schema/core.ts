@@ -377,6 +377,8 @@ export const assets = pgTable(
     sizeBytes: integer("size_bytes"),
     storagePath: text("storage_path"),
     failureReason: text("failure_reason"),
+    /** Per-asset transcription outcome; null until a transcription job has run. */
+    transcriptStatus: text("transcript_status", { enum: ["done", "failed"] }),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").defaultNow().notNull(),
   },
@@ -593,11 +595,14 @@ export const observationSessions = pgTable(
 export const observationEvents = pgTable(
   "observation_events",
   {
+    /** Server-generated; the client-supplied `event_id` is only unique within its session. */
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull(),
     observationSessionId: text("observation_session_id")
       .notNull()
       .references(() => observationSessions.id, { onDelete: "cascade" }),
+    eventId: text("event_id").notNull(),
+    /** Client-chosen and only meaningful together with the observation session. */
     journeyInstanceId: text("journey_instance_id").notNull(),
     journeyId: text("journey_id").notNull(),
     sequence: integer("sequence").notNull(),
@@ -608,7 +613,12 @@ export const observationEvents = pgTable(
   },
   (t) => [
     uniqueIndex("observation_events_session_seq_uq").on(t.observationSessionId, t.sequence),
-    index("observation_events_journey_idx").on(t.journeyInstanceId, t.tMs),
+    uniqueIndex("observation_events_session_event_uq").on(t.observationSessionId, t.eventId),
+    index("observation_events_journey_idx").on(
+      t.observationSessionId,
+      t.journeyInstanceId,
+      t.sequence,
+    ),
   ],
 );
 
@@ -666,6 +676,10 @@ export const jevEvaluations = pgTable(
       enum: ["queued", "running", "completed", "failed", "deferred", "unknown_outcome"],
     }).notNull(),
     statusReason: text("status_reason"),
+    /** Budget reservation held for this evaluation (null while deferred). */
+    reservationId: text("reservation_id"),
+    reservedMicros: integer("reserved_micros").default(0).notNull(),
+    estimatedInputTokens: integer("estimated_input_tokens").default(0).notNull(),
     answers: jsonb("answers"),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
