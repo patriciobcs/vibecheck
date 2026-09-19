@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { currentSession } from "@/auth/current-user";
 import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { ownerOverview } from "@/domain/owner";
+import { env } from "@/lib/env";
 import { InviteLinkButton } from "./invite-link-button";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function OwnerPage() {
   const session = await currentSession();
   if (!session) redirect("/sign-in?next=/owner");
   const overview = await ownerOverview(session.user.id);
+  const demo = env().demo;
 
   return (
     <Shell
@@ -51,10 +53,12 @@ export default async function OwnerPage() {
       {overview.tenants.length === 0 ? (
         <div className="surface p-8 text-center">
           <p className="font-medium">You are not a member of any product yet.</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Run <code className="font-mono text-xs">pnpm db:seed</code> and sign in with the seed
-            owner email to see the sample study.
-          </p>
+          {!demo ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Run <code className="font-mono text-xs">pnpm db:seed</code> and sign in with the seed
+              owner email to see the sample study.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -89,7 +93,7 @@ export default async function OwnerPage() {
               </span>
               <InviteLinkButton studyId={s.id} />
             </div>
-            {s.product ? (
+            {s.product && !demo ? (
               <p className="mt-4 rounded-xl bg-secondary/70 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
                 SDK: &lt;script src="/sdk/vibecheck.js" data-key="{s.product.publishableKey}"
                 defer&gt;&lt;/script&gt;

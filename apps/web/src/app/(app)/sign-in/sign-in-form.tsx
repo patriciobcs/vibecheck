@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function SignInForm({ next }: { next: string }) {
+export function SignInForm({ next, showInbox = true }: { next: string; showInbox?: boolean }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +32,14 @@ export function SignInForm({ next }: { next: string }) {
           We sent a sign-in link to <span className="text-foreground">{email}</span>. It expires in
           15 minutes.
         </p>
-        <a
-          href="/dev/inbox"
-          className="inline-block pt-2 text-brand underline-offset-4 hover:underline"
-        >
-          Open the local test inbox
-        </a>
+        {showInbox ? (
+          <a
+            href="/dev/inbox"
+            className="inline-block pt-2 text-brand underline-offset-4 hover:underline"
+          >
+            Open the local test inbox
+          </a>
+        ) : null}
       </div>
     );
   }

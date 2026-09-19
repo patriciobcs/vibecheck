@@ -81,10 +81,12 @@ export function PageTitle({
   );
 }
 
+/** Sample material is always labeled; demo mode says "Demo data" but never hides the label. */
 export function SampleBadge() {
+  const demo = process.env.DEMO_MODE === "true" && process.env.NODE_ENV !== "production";
   return (
     <span className="inline-flex items-center rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-foreground">
-      Sample data
+      {demo ? "Demo data" : "Sample data"}
     </span>
   );
 }

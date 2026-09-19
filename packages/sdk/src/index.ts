@@ -415,13 +415,16 @@ function showToast(cfg: VibeCheckConfig, offer: Offer) {
   style.textContent = TOAST_STYLE;
   document.head.appendChild(style);
   const minutes = Math.max(1, Math.round(offer.estimatedSeconds / 60));
+  // Say exactly what the study's capture policy records; audio-only studies never mention the screen.
+  const recorded =
+    offer.capture.screen === "off" ? "your voice recorded" : "your screen and voice recorded";
   const el = document.createElement("div");
   el.className = "vc-toast";
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", "Invitation to a short usability test");
   el.innerHTML = `
     <h3>Help improve this app?</h3>
-    <p>One short task, about ${minutes} min, with your screen and voice recorded. Stop any time.</p>
+    <p>One short task, about ${minutes} min, with ${recorded}. Stop any time.</p>
     <div class="vc-actions"><button type="button" class="vc-dismiss">Not now</button><button type="button" class="vc-accept">See the task</button></div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add("vc-in"));

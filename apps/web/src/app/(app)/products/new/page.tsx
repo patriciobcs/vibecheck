@@ -79,7 +79,7 @@ export default async function NewProductPage() {
             type="url"
             required
             placeholder="https://app.example.com"
-            hint="Must resolve to a public address, or set ALLOW_LOCAL_TARGETS for local demos."
+            hint="Where your users are. Discovery reads it; the SDK runs on it."
           />
           <Field
             label="Permitted origins"

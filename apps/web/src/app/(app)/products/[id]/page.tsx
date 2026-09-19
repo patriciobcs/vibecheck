@@ -80,7 +80,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             defaultValue={devinReady ? "devin" : "fixture"}
             className="h-9 rounded-full border border-border bg-card px-3 text-sm"
           >
-            <option value="fixture">Fixture (sample proposals)</option>
+            <option value="fixture">Sample proposals (no agent)</option>
             <option value="devin" disabled={!devinReady}>
               Devin {devinReady ? "" : "(not configured)"}
             </option>
@@ -104,7 +104,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                 <div>
                   <p className="text-sm font-medium">
                     Run {run.id.slice(-8)} ·{" "}
-                    {run.provider === "fixture" ? "fixture (sample)" : "Devin"}
+                    {run.provider === "fixture" ? "sample proposals" : "Devin"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(run.createdAt).toLocaleString()} · outcome {run.outcome ?? "pending"}

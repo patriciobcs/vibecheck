@@ -39,6 +39,8 @@ const CoreSchema = z.object({
   DEVIN_MAX_ACU: z.coerce.number().positive().default(5),
   ALLOW_LOCAL_TARGETS: z.enum(["true", "false"]).default("false"),
   DEV_API_KEY: optionalSecret,
+  /** Hides developer-only copy (seed hints, SDK snippets, test inbox) and enables one-click demo sign-in. Never in production. */
+  DEMO_MODE: z.enum(["true", "false"]).default("false"),
   // Jev screening (typesafe.ai)
   JEV_API_KEY: optionalSecret,
   JEV_BASE_URL: z.url().default("https://api.typesafe.ai"),
@@ -73,6 +75,8 @@ export type JevEnvConfig = {
 
 export type Env = z.infer<typeof CoreSchema> & {
   appUrl: string;
+  /** DEMO_MODE=true outside production: developer copy hidden, one-click demo sign-in. */
+  demo: boolean;
   webhookBaseUrl: string;
   vonage: VonageConfig | null;
   slng: SlngConfig | null;
@@ -153,6 +157,7 @@ export function parseEnv(
     devin,
     jev,
     appUrl: core.NEXT_PUBLIC_APP_URL,
+    demo: core.DEMO_MODE === "true" && process.env.NODE_ENV !== "production",
     webhookBaseUrl: core.PUBLIC_WEBHOOK_BASE_URL ?? core.NEXT_PUBLIC_APP_URL,
     vonage,
     slng,

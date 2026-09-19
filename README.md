@@ -49,6 +49,18 @@ LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2
 pnpm db:reset-sample     # clears assignments on the sample studies so they recruit again
 ```
 
+### Demo mode and the recorded demo
+
+Set `DEMO_MODE=true` in `apps/web/.env.local` (ignored in production). The app then hides developer
+copy (seed hints, SDK snippets, the test inbox), labels sample material "Demo data", and the
+landing and sign-in pages offer "Enter the demo", a one-click sign-in as the seed owner.
+
+`pnpm demo:record` (in `apps/web`) records the two-window demo as `demo-recordings/demo.mp4`:
+the visitor on the Excalidraw clone on the left, the owner's live analysis on the right. It drives
+the real pipeline (fake microphone → passive screening with Jev → audio-only study → transcript)
+and composes the halves with ffmpeg. Needs `pnpm dev` with demo mode, `pnpm tunnel`, the clone on
+:3200 and real provider keys.
+
 ### Excalidraw demo target
 
 The participant dialog runs inside the product page through the SDK. A local Excalidraw clone
