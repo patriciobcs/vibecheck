@@ -2,7 +2,7 @@
 
 Status: In progress — first slice implemented (see [Implementation status](#implementation-status))
 Depends on: [shared contracts](README.md), [VC-06](06-owner-dashboard-and-orchestration.md)
-Output consumer: [VC-02](02-test-delivery-and-recording.md)
+Output consumers: VC-03 screening and [VC-02](02-test-delivery-and-recording.md)
 
 ## Goal
 
@@ -108,6 +108,24 @@ Study: `draft → published → recruiting`; later lifecycle belongs to VC-06.
 
 Discovery jobs are retried with backoff; a non-final failure returns the run to `queued`, and only a terminal failure marks it `failed` with the error. Repo access failure must not prevent URL-only research. An inaccessible app produces a setup request, not fabricated task recommendations. Editing a published plan creates a new immutable revision; existing sessions stay attached to the original. Deduplicate repeated publish requests.
 
+## Continuous detector authoring and candidate intake
+
+Implemented 2026-09-19: `POST /api/owner/products/:id/detectors` publishes a hand-authored detector (`mode: manual`) or queues generation (`mode: generate`, provider `fixture` or `devin`, job `detector.generate`); `DetectorDefinitionSchema` and `validateDetectorQuestions` in `packages/contracts` enforce the base questions, `other_or_uncertain`, stand-alone instructions and size limits; generated output must also pass `GeneratedDetectorSchema` and lists `missing_instrumentation`, which yields `needs_instrumentation` instead of activation. A new observed build marks older detectors `stale`. Candidate intake: discovery runs accept `source_candidate_refs`; the Devin prompt includes the candidates and the fixture provider echoes the refs on its first proposal. Original intent: discovery also emits immutable `DetectorDefinition` records from the shared contract. Devin reads authorized code, routes, semantic actions, success rules and known instrumentation. It maps each journey to observable progress, success, failures and help requests. Distinguish existing telemetry from instrumentation that still needs implementation; inactive detectors with missing signals return `needs_instrumentation`. Read-only discovery cannot silently edit the target app to add events. Verified 2026-09-19 with a real Devin session (`provider: devin`, journey hint "share a drawing via a live collaboration link", build `vibecheck-demo`): Devin returned a six-question detector in about 40 seconds that passed `GeneratedDetectorSchema` and was stored as `needs_instrumentation`, because the clone emits only `journey_start`, `progress` and `help_request` and the share flow needs `action_attempt`, `action_result`, `completion` and `exit` events. Nothing was activated; the missing events are listed on the detector's status reason.
+
+Generate Jev `questions` JSON using supported `noul`, `choice` and `score` types. Every instruction must stand alone: question keys are not a substitute for instructions, and questions cannot depend on another answer. Include evidence sufficiency, observable friction, research warranted and an `other_or_uncertain` category. Known goal and outcomes must come from declared tasks or instrumented rules; inferred intentions are labeled. Silence, slow reading and inactive tabs cannot establish frustration or dishonesty.
+
+Validate schema, required event coverage, question size and criteria before publishing a detector. Store code/build identity, source references, instrumentation version and generation provenance. Exercise labeled success, friction, normal hesitation and missing-data fixtures before activation. Enable only within the owner's monitoring policy. New builds require compatibility verification; otherwise pause the old detector as stale rather than silently applying it to changed controls.
+
+VC-03 research candidates become optional discovery inputs. Devin converts their suspected problems into neutral task proposals, with `source_candidate_refs`, supporting evidence and uncertainty. Do not expose the suspected failure or Jev score to participants. Owner selection remains the default; `auto_launch` uses existing audience, invitation, concurrent-study and spending limits. Repeated detector output updates a candidate instead of launching duplicate studies. A candidate can be dismissed or produce no useful task.
+
+Additional acceptance criteria:
+
+- Unsupported/malformed question schemas and missing telemetry prevent detector activation.
+- A deployment with incompatible instrumentation marks its detectors stale.
+- Candidate-derived studies preserve source references and neutral wording.
+- Duplicate candidate deliveries cannot create duplicate studies or bypass launch policy.
+
+
 ## Acceptance criteria
 
 - An owner can connect a product, inspect proposed tasks and publish only selected tasks.
@@ -130,5 +148,5 @@ Not yet implemented, so the corresponding acceptance criteria are open: GitHub i
 - [ ] GitHub App scope and setup wizard UX after provider verification.
 - [ ] Release-trigger integration versus manual release description for the first build.
 - [ ] Multi-task studies and audience quotas after the one-task pipeline works.
-- [ ] Scheduling continuous discovery based on actual customer usage.
+- [ ] Calibrate generated detectors and discovery cadence against labeled journeys before broader rollout.
 

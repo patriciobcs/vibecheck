@@ -139,6 +139,49 @@ Real example from the simulated session of 2026-09-19 (one 18 s archive at offse
 
 Not yet verified: a human session with real speech in Safari, timestamp alignment tolerance between video, transcript and events, Safari and Firefox screen-share end to end, and marketplace eligibility rules beyond "signed in".
 
+## Passive observation mode
+
+Implemented on 2026-09-19 (`packages/sdk/src/observer.ts`, `apps/web/src/domain/monitoring/ingest.ts`, `/api/observe/session`, `/api/observe/events`). The recorder described above remains assignment-bound and opt-in. This mode is independently enabled per product (monitoring policy, disabled by default); it does not reuse recording consent or the recording token. Product disclosure and applicable collection permissions must be satisfied before sending observation events. Provide a host integration to report permission changes; unknown or withdrawn permission disables collection and clears unsent buffers. A study's recording permission never overrides a passive-collection opt-out.
+
+Collect allowlisted semantic events: journey start, meaningful progress, action attempt/result, validation error codes, navigation, help request, verified completion and explicit exit. No raw key characters, input values, clipboard, DOM snapshots, microphone or video. Use safe stable target IDs and route templates; reject unknown properties and scrub URLs before transmission. Generic pointer movement is not a reason to call Jev. Distinguish observed client outcomes from trusted server-confirmed business outcomes.
+
+Example event payload inside the shared envelope:
+
+```json
+{
+  "observation_session_id": "obs_example",
+  "journey_instance_id": "journey_example",
+  "sequence": 17,
+  "t_ms": 43000,
+  "build_ref": "build_example",
+  "instrumentation_schema_version": "1.0",
+  "collection_policy_ref": "collection_policy_example",
+  "type": "action_result",
+  "action_ref": "booking_change",
+  "attempt_id": "attempt_example",
+  "result": "validation_failed",
+  "error_code": "SLOT_UNAVAILABLE",
+  "goal_source": "unknown"
+}
+```
+
+Use short-lived observation-scoped ingestion credentials, origin checks, payload/rate limits and server-derived tenant binding. Browser-origin validation is not proof of a genuine human; client events remain untrusted. Rotate pseudonymous observation session IDs; do not fingerprint users or assume sessions equal people. Navigation cannot by itself establish the user's goal.
+
+Buffer small batches and retry with stable event IDs and sequence numbers. Server ingestion deduplicates, tracks receive time versus monotonic event time, records sequence gaps and builds bounded journey windows for VC-03. Late events create a subsequent window revision when still within retention; never mutate a completed evaluation. Separate tabs and journey instances so overlapping navigation is not a false loop. Limit memory and queue size; record dropped-event coverage rather than retaining unlimited offline activity.
+
+Admin settings include enabled journeys/events, collection policy, retention and ingestion caps. VC-03 owns trigger timing and evaluation budgets. Turning monitoring off stops new ingestion/evaluation; withdrawal and deletion follow the disclosed retention policy. Study pause must not leak research activity through passive collection: suppress passive events during an active research assignment, including pauses, unless separately and explicitly configured with participant permission. Never count the same event twice when evidence is linked.
+
+Implementation notes: the host reports `collectionPermission` (`granted`/`denied`/`unknown`) through the script tag or `VibeCheck.setCollectionPermission`; anything but `granted` opens no session and clears buffers. Events are collected only inside a journey started by the host (`VibeCheck.track("journey_start", { journey_id })`), with an allowlisted payload; navigation alone is never a journey. The SDK suppresses passive collection while research instrumentation is active. Observation sessions get a scoped bearer token; batches carry stable ids and sequence numbers, are deduplicated server-side, and record sequence gaps and receive time. Ingestion schedules one deterministic scan per journey per batch-delay bucket; it never evaluates. The Excalidraw demo fork emits `journey_start`/`progress` on the first drawn element, `progress`/`action_attempt` when the export dialog opens, `help_request` when the help dialog opens, and a client-observed `action_result`/`completion` on export (labeled demo instrumentation in `excalidraw-app/vibecheck.ts`).
+
+Additional acceptance criteria:
+
+- SDK installation alone sends no passive observations; no screen/audio permission is requested in observation mode.
+- Required permission is checked before collection; disabling it stops collection and drops unsent buffers.
+- Free text, secrets, oversized batches and unauthorized origins are rejected.
+- Duplicate/out-of-order events preserve coverage and do not multiply trigger counts.
+- Missing progress instrumentation is reported as unknown, not user failure.
+
+
 ## Acceptance criteria
 
 - The same published task can be entered by direct link, toast and marketplace claim.

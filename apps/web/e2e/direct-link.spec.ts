@@ -66,12 +66,18 @@ test("marketplace claim is transactional and idempotent for one participant", as
   const email = `claimer+${Date.now()}@example.test`;
   await signIn(page, request, email);
   await page.goto("/marketplace");
-  const claim = page.getByRole("button", { name: "Claim task" }).first();
+  const sampleCard = page.locator("li", { hasText: "Sample booking app" }).first();
+  const claim = sampleCard.getByRole("button", { name: "Claim task" });
   if (await claim.isVisible()) {
     await claim.click();
     await expect(page).toHaveURL(/demo-target/);
     await page.goto("/marketplace");
-    await expect(page.getByRole("link", { name: "Continue your task" }).first()).toBeVisible();
+    await expect(
+      page
+        .locator("li", { hasText: "Sample booking app" })
+        .first()
+        .getByRole("link", { name: "Continue your task" }),
+    ).toBeVisible();
   } else {
     await expect(page.getByText(/All spots claimed|No studies are recruiting/)).toBeVisible();
   }

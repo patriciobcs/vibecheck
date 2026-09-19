@@ -35,3 +35,33 @@ export async function verifyEventsToken(
     return null;
   }
 }
+
+/** Observation-scoped ingestion credential for the passive SDK (one pseudonymous session, short-lived). */
+export async function issueObservationToken(input: {
+  observationSessionId: string;
+  productId: string;
+  ttlSeconds?: number;
+}) {
+  return new SignJWT({ oid: input.observationSessionId, prd: input.productId, scope: "observe" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${input.ttlSeconds ?? 60 * 60 * 12}s`)
+    .sign(secret());
+}
+
+export async function verifyObservationToken(
+  token: string,
+): Promise<{ observationSessionId: string; productId: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
+    if (
+      payload.scope !== "observe" ||
+      typeof payload.oid !== "string" ||
+      typeof payload.prd !== "string"
+    )
+      return null;
+    return { observationSessionId: payload.oid, productId: payload.prd };
+  } catch {
+    return null;
+  }
+}

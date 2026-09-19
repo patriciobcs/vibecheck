@@ -1,6 +1,6 @@
 import { SessionManifestSchema } from "@vibecheck/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
-import { db, schema } from "@/db/client";
+import { db } from "@/db/client";
 import type { StorageClient } from "@/providers/storage";
 import type { MediaClient } from "@/providers/vonage";
 import { resetDb } from "@/test/db";

@@ -572,15 +572,17 @@ function RecordingPanel(props: {
   );
 }
 
+const BAR_LEVELS = ["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8"] as const;
+
 function MicMeter({ level, heard }: { level: number; heard: boolean }) {
-  const bars = 8;
+  const bars = BAR_LEVELS.length;
   const lit = Math.min(bars, Math.round(Math.sqrt(Math.min(1, level)) * bars));
   return (
     <span className="flex items-center gap-2">
       <span className="flex items-end gap-0.5" aria-hidden>
-        {Array.from({ length: bars }, (_, i) => (
+        {BAR_LEVELS.map((level, i) => (
           <span
-            key={`bar-${bars - i}`}
+            key={level}
             className={`w-1 rounded-sm transition-colors ${i < lit ? "bg-success" : "bg-border"}`}
             style={{ height: `${6 + i * 1.5}px` }}
           />

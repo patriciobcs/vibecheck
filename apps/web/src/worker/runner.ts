@@ -5,8 +5,11 @@ import {
   markDiscoveryRunQueued,
 } from "@/domain/discovery";
 import { completeJob, failJob, heartbeatJob, leaseNextJob } from "@/domain/jobs";
+import { detectorGeneratorFor, generateDetector } from "@/domain/monitoring/detectors";
+import { evaluateJob } from "@/domain/monitoring/evaluate";
+import { scanJourney, sweepIdleJourneys } from "@/domain/monitoring/screening";
 import { env } from "@/lib/env";
-import { mediaClient, sttClient } from "@/providers";
+import { jevClient, mediaClient, sttClient } from "@/providers";
 import { storage } from "@/providers/storage";
 
 /** Runs one job payload. Shared by the worker process and the development drain endpoint. */
@@ -24,6 +27,38 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     }
     case "discovery.run":
       return handleDiscoveryRun((payload as { runId: string }).runId);
+    case "monitoring.scan": {
+      const p = payload as {
+        journeyInstanceId: string;
+        observationSessionId: string;
+        productId: string;
+      };
+      await scanJourney(p);
+      return;
+    }
+    case "monitoring.sweep":
+      await sweepIdleJourneys();
+      return;
+    case "jev.evaluate": {
+      const jev = jevClient();
+      if (!jev) throw new Error("Jev is not configured; cannot evaluate");
+      return evaluateJob(payload as { evaluationId: string }, {
+        jev,
+        priceMicrosPer1k: env().jev?.priceMicrosPer1k ?? null,
+      });
+    }
+    case "detector.generate": {
+      const p = payload as {
+        productId: string;
+        detectorId: string;
+        appBuildRef: string;
+        journeyHint: string;
+        provider: "fixture" | "devin";
+      };
+      const res = await generateDetector(p, detectorGeneratorFor(p.provider));
+      if (!res.ok) throw new Error(`detector_generation_failed: ${res.problems.join("; ")}`);
+      return;
+    }
     default:
       throw new Error(`unknown job type ${type}`);
   }

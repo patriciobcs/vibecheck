@@ -9,8 +9,8 @@ VibeCheck organizes real-human usability research and turns evidence into issues
 | ID | Spec | Responsibility |
 | --- | --- | --- |
 | VC-01 | [Product onboarding and planning](01-product-onboarding-and-test-planning.md) | Connect product/repository, propose challenges, select studies, publish a JSON handoff. |
-| VC-02 | [Test delivery and recording](02-test-delivery-and-recording.md) | Invitations, assignment, consent, tasks, configurable recording and uploads. |
-| VC-03 | [Evidence and GitHub issues](03-evidence-analysis-and-github-issues.md) | Analyze sessions through Devin, deduplicate findings, create/update issues. |
+| VC-02 | [Test delivery and recording](02-test-delivery-and-recording.md) | Passive semantic telemetry, invitations, assignment, consent, configurable recording and uploads. |
+| VC-03 | [Evidence and GitHub issues](03-evidence-analysis-and-github-issues.md) | Trigger Jev screening, propose research candidates, analyze human sessions through Devin, deduplicate findings and issues. |
 | VC-04 | [Prototypes and verification](04-prototypes-and-verification.md) | Isolated changes, independent checks, retries, previews, draft PRs. |
 | VC-05 | [Retesting and validation](05-retesting-and-validation.md) | Invitations, fresh/repeat participants, comparison, commit-bound PR evidence. |
 | VC-06 | [Dashboard and orchestration](06-owner-dashboard-and-orchestration.md) | Owner views, settings, tenancy, durable jobs, audit trail and integrations. |
@@ -22,7 +22,7 @@ VibeCheck organizes real-human usability research and turns evidence into issues
 - The owner selects proposed tasks by default. Optional `auto_launch` can launch bounded studies under preconfigured rules. This supports both owner-directed research and the autonomous demo.
 - Once a study is launched, processing follows its snapshotted automation policy. No repeated owner approval is necessary for authorized issue creation or isolated prototypes.
 - Modes: `issues_only`, `draft_pr`, `prototype_and_retest`. No automatic merge or production deployment in the MVP.
-- Devin is the initial agent provider for planning, analysis, and implementation. Jev is unavailable; Nebius is not required. Provider adapters may be added later.
+- Devin is the initial agent provider for planning, analysis, and implementation. Jev screens bounded telemetry windows for possible friction; Devin generates detector questions and plans research. The Jev adapter and screening loop are implemented and tested with stubbed answers; a real Jev call and accuracy remain unverified until `JEV_API_KEY` is supplied. Nebius is not required.
 - Ordinary application code owns assignments, credit transactions, workflow state, validation execution and access control. Devin does not replace those services.
 - Vonage is the planned media provider; SLNG is the planned STT provider. Verify recording capabilities, access, and supported browser behavior during integration.
 - Branches/worktrees in an authorized repository are the default prototype mechanism. Forks are supported as an alternative, not required per variant.
@@ -79,6 +79,10 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | Entity | Essential fields | Producer → consumers |
 | --- | --- | --- |
 | ProductConfig | URL/origins, repo binding, audience, credential refs, setup adapter, policies | VC-01/06 → all |
+| DetectorDefinition | immutable questions, journey, required signals, app/build binding, policy ref | VC-01 → VC-02/03/06 |
+| ObservationWindow | observation session/journey, event IDs, coverage, goal provenance, build, policy | VC-02/03 → Jev |
+| JevEvaluation | window/detector refs, actual model, answers, usage, status | VC-03 → VC-01/06 |
+| ResearchCandidate | suspected problem, evaluation refs, limitations, unique journey counts, lifecycle | VC-03 → VC-01/06 |
 | StudyPlan | immutable task revision, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
 | Assignment | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
 | SessionManifest | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
@@ -113,6 +117,56 @@ The plan is stored as immutable JSON; events carry its reference. Secrets are ex
 ```
 
 These are example counts and proposed defaults, not powered sample sizes or verified provider limits. Freeze the neutral task and equivalent fixture across retests. Changes to task wording or success definition create a new study revision and affect comparability.
+
+## Continuous discovery contracts
+
+Implemented alongside the opt-in recorder (schemas in `packages/contracts`: `observation.ts`, `monitoring-policy.ts`, `detector.ts`, `jev.ts`; tables in VC-06):
+
+```text
+Code/context → Devin → versioned detector questions + required telemetry
+SDK semantic events → deterministic trigger → bounded window → Jev
+    → suspected friction / insufficient evidence / no signal
+    → research candidate → VC-01 neutral task → selection/authorized auto-launch
+    → existing human-study → finding → issue → optional repair/retest pipeline
+```
+
+A signal alone cannot create a GitHub issue, authorize repair, establish user intent or claim human validation. Passive collection has its own disclosed collection policy and permission state; installing the SDK or consenting to research does not automatically enable it. Passive monitoring never starts screen/audio recording.
+
+New records use the shared envelope and tenant boundaries. Observation sessions are separate from research sessions and need no assignment. Link them only where authorized; retain source event IDs to prevent double-counting. A detector version is immutable and contains `detector_id`, `version`, `journey_id`, `app_build_ref`, `instrumentation_schema_version`, `required_events`, `questions`, `evaluation_policy_ref` and authoring provenance. Questions are Jev-compatible, whereas scheduling and thresholds belong to our service, outside Jev's question schema.
+
+Proposed starting policy, configurable and not validated performance thresholds:
+
+```json
+{
+  "schema_version": "1.0",
+  "policy_id": "monitoring_policy_example",
+  "enabled": false,
+  "batch_delay_ms": 4000,
+  "window_ms": 90000,
+  "cooldown_ms": 30000,
+  "normal_journey_sample_rate": 0.01,
+  "max_evaluations_per_session_hour": 10,
+  "max_evaluations_per_product_day": 1000,
+  "max_input_tokens": 6000,
+  "max_output_tokens_budget": 1000,
+  "daily_spend_cap_usd": 5,
+  "candidate_friction_threshold": 0.85,
+  "candidate_research_threshold": 0.80,
+  "raw_event_retention_days": 7,
+  "derived_retention_days": 30
+}
+```
+
+Token limits are application admission/reservation limits, not assumed provider request parameters. Require a configured pricing estimate before enforcing spend-based admission; reconcile with returned usage and label costs as estimates when needed. Enforce all caps together, including retries. Retention defaults are proposals, independently configurable from study media.
+
+`ObservationWindow` stores `window_id`, `observation_session_id`, `journey_instance_id`, `build_ref`, `detector_ref`, `policy_ref`, start/end times, ordered event refs, gaps, declared/inferred/unknown goal source, coverage and bounded earlier progress summary. Missing build identity or required telemetry prevents use of a detector that requires them. Do not fabricate context to fit a detector.
+
+`JevEvaluation` stores the immutable window, detector and policy references; request hash; requested and returned model versions; raw validated answers; provider request ID where available; timestamps; usage; sampling/trigger reason; and `queued/running/completed/failed/deferred/unknown_outcome` status. An unavailable response is never a negative UX finding.
+
+`ResearchCandidate` stores `candidate_id`, journey/target/category, baseline build, detector version, evaluation refs, supporting event refs, evidence limitations, distinct observation-session/journey counts and `proposed/accepted/dismissed/study_linked` state. Acceptance routes to planning, not repair. Study proposals and published plans may carry optional `source_candidate_refs`; candidate-to-study links survive dismissal or supersession as provenance. No inferred person counts from anonymous sessions.
+
+Compatibility: introduce these as new record/event schemas; preserve existing `SessionManifest` and study recording endpoints. Add optional provenance fields to study contracts with tolerant consumers before producers emit them. Breaking changes require a new schema version. Implement shared runtime schemas before enabling ingestion.
+
 
 ## Cross-cutting requirements
 

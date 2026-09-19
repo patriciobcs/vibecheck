@@ -36,6 +36,8 @@ test("VC-01: connect a product, run fixture discovery, publish one proposal, han
   // Publish the first proposal.
   await publishLinks.first().click();
   await expect(page.getByRole("heading", { name: "Publish study" })).toBeVisible();
+  // Keep this test's study out of the marketplace so other tests keep targeting the sample study.
+  await page.getByLabel("Source").selectOption("direct_link");
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page).toHaveURL(/\/studies\/study_/);
   await expect(page.getByText("study.published event")).toBeVisible();

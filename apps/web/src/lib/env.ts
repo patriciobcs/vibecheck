@@ -39,6 +39,13 @@ const CoreSchema = z.object({
   DEVIN_MAX_ACU: z.coerce.number().positive().default(5),
   ALLOW_LOCAL_TARGETS: z.enum(["true", "false"]).default("false"),
   DEV_API_KEY: optionalSecret,
+  // Jev screening (typesafe.ai)
+  JEV_API_KEY: optionalSecret,
+  JEV_BASE_URL: z.url().default("https://api.typesafe.ai"),
+  JEV_MODEL: z.string().default("jev-latest"),
+  /** USD per 1k tokens; both must be set for the daily spend cap to be enforceable. */
+  JEV_PRICE_PER_1K_INPUT_USD: z.coerce.number().nonnegative().optional(),
+  JEV_PRICE_PER_1K_OUTPUT_USD: z.coerce.number().nonnegative().optional(),
 });
 
 export type VonageConfig = {
@@ -57,12 +64,20 @@ export type DevinConfig = {
   maxAcu: number;
 };
 
+export type JevEnvConfig = {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  priceMicrosPer1k: { input: number; output: number } | null;
+};
+
 export type Env = z.infer<typeof CoreSchema> & {
   appUrl: string;
   webhookBaseUrl: string;
   vonage: VonageConfig | null;
   slng: SlngConfig | null;
   devin: DevinConfig | null;
+  jev: JevEnvConfig | null;
 };
 
 type ReadFile = (path: string) => string;
@@ -117,9 +132,26 @@ export function parseEnv(
       }
     : null;
 
+  const jev: JevEnvConfig | null = core.JEV_API_KEY
+    ? {
+        apiKey: core.JEV_API_KEY,
+        baseUrl: core.JEV_BASE_URL,
+        model: core.JEV_MODEL,
+        priceMicrosPer1k:
+          core.JEV_PRICE_PER_1K_INPUT_USD !== undefined &&
+          core.JEV_PRICE_PER_1K_OUTPUT_USD !== undefined
+            ? {
+                input: Math.round(core.JEV_PRICE_PER_1K_INPUT_USD * 1_000_000),
+                output: Math.round(core.JEV_PRICE_PER_1K_OUTPUT_USD * 1_000_000),
+              }
+            : null,
+      }
+    : null;
+
   return {
     ...core,
     devin,
+    jev,
     appUrl: core.NEXT_PUBLIC_APP_URL,
     webhookBaseUrl: core.PUBLIC_WEBHOOK_BASE_URL ?? core.NEXT_PUBLIC_APP_URL,
     vonage,

@@ -17,6 +17,11 @@ export const EVENT_TYPES = [
   "retest.requested",
   "validation.updated",
   "workflow.blocked",
+  "detector.published",
+  "observation.batch_received",
+  "evaluation.requested",
+  "evaluation.completed",
+  "research_candidate.updated",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

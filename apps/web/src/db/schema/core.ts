@@ -746,3 +746,18 @@ export const evaluationBudgetLedger = pgTable(
   },
   (t) => [uniqueIndex("evaluation_budget_ledger_product_day_uq").on(t.productId, t.day)],
 );
+
+/** One row per reserved evaluation, so per-session caps can be checked before any provider call exists. */
+export const evaluationReservations = pgTable(
+  "evaluation_reservations",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    observationSessionId: text("observation_session_id").notNull(),
+    estimatedCostMicros: integer("estimated_cost_micros").default(0).notNull(),
+    reservedAt: createdAt(),
+  },
+  (t) => [
+    index("evaluation_reservations_session_time_idx").on(t.observationSessionId, t.reservedAt),
+  ],
+);

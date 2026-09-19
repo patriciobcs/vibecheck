@@ -17,7 +17,7 @@ export async function corsHeadersFor(
   const product = await db.query.products.findFirst({
     where: eq(schema.products.publishableKey, publishableKey),
   });
-  if (!product || !product.permittedOrigins.includes(origin)) return null;
+  if (!product?.permittedOrigins.includes(origin)) return null;
   return { "Access-Control-Allow-Origin": origin, ...BASE_HEADERS };
 }
 

@@ -1,4 +1,5 @@
 import { hostname } from "node:os";
+import { enqueueJob } from "@/domain/jobs";
 import { env } from "@/lib/env";
 import { tick } from "./runner";
 
@@ -10,9 +11,25 @@ const workerId = `${hostname()}:${process.pid}`;
 const { WORKER_POLL_INTERVAL_MS: pollMs, WORKER_LEASE_SECONDS: leaseSeconds } = env();
 let stopping = false;
 
+/** Retrospective journey ends are found by a periodic sweep, deduplicated per minute. */
+async function scheduleSweep() {
+  const minute = Math.floor(Date.now() / 60_000);
+  await enqueueJob({
+    type: "monitoring.sweep",
+    payload: {},
+    dedupeKey: `monitoring.sweep:${minute}`,
+    maxAttempts: 1,
+  });
+}
+
 async function loop() {
   console.info(`[worker] ${workerId} started; poll ${pollMs}ms lease ${leaseSeconds}s`);
+  let lastSweep = 0;
   while (!stopping) {
+    if (Date.now() - lastSweep > 60_000) {
+      lastSweep = Date.now();
+      await scheduleSweep().catch((err) => console.error("[worker] sweep scheduling failed", err));
+    }
     let didWork = false;
     try {
       const r = await tick(workerId);

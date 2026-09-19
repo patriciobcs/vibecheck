@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { createJevClient, type JevClient } from "./jev";
 import { createSlngClient, type SttClient } from "./slng";
 import { createVonageClient, type MediaClient } from "./vonage";
 
@@ -13,10 +14,20 @@ export function sttClient(): SttClient | null {
   return cfg ? createSlngClient(cfg) : null;
 }
 
+export function jevClient(): JevClient | null {
+  const cfg = env().jev;
+  return cfg
+    ? createJevClient({ apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model })
+    : null;
+}
+
 export function providerStatus() {
   return {
     vonage: env().vonage !== null,
     slng: env().slng !== null,
     vonageCallbackSecret: env().vonage?.archiveSignatureSecret != null,
+    devin: env().devin !== null,
+    jev: env().jev !== null,
+    jevPriced: env().jev?.priceMicrosPer1k != null,
   };
 }

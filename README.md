@@ -32,13 +32,16 @@ pnpm db:start            # local Supabase (Postgres 54332, API 54331, Studio 543
 cp .env.example apps/web/.env.local   # fill Vonage + SLNG values; local Supabase keys from `supabase status`
 pnpm db:migrate && pnpm db:seed       # applies migrations, seeds a labeled sample study
 pnpm dev                 # http://localhost:3000
-pnpm worker              # archive fetch + transcription jobs (separate terminal)
+pnpm worker              # archive fetch, transcription, monitoring scans, Jev evaluations, Devin jobs (separate terminal; restart after pulling)
 pnpm check && pnpm test  # Biome + typecheck, unit/integration tests (isolated vibecheck_test database)
 pnpm test:e2e            # Playwright; starts its own dev server on :3100
 E2E_BASE_URL=http://localhost:3000 pnpm test:e2e   # or reuse a running `pnpm dev`
 LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2e/live-session.spec.ts
 #   ^ simulated full session against real Vonage + SLNG: fake mic plays e2e/fixtures/speech.wav,
 #     waits for the archive callback (needs `pnpm tunnel`) and asserts the transcript text
+LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2e/live-monitoring.spec.ts
+#   ^ real Jev screening of a help request on the instrumented Excalidraw clone (needs JEV_API_KEY, worker, :3200)
+#     Devin detector authoring: POST /api/owner/products/:id/detectors {"mode":"generate","provider":"devin",...}
 pnpm db:reset-sample     # clears assignments on the sample studies so they recruit again
 ```
 
@@ -62,6 +65,15 @@ Sign in with the seed owner email (`SEED_OWNER_EMAIL`) and open the link from `/
 The Vonage archive callback must reach the dev server from the internet. `pnpm tunnel` (requires `cloudflared`) opens a quick tunnel, writes `PUBLIC_WEBHOOK_BASE_URL` into `.env.local`, and, when `VONAGE_API_KEY`/`VONAGE_API_SECRET` are set, updates the application's archive-status webhook address for you. Enable the signature secret once in the Vonage dashboard and paste it into `VONAGE_ARCHIVE_SIGNATURE_SECRET`; quick-tunnel hostnames change on every restart, but the secret does not.
 
 *VibeCheck is under development.*
+
+## Passive monitoring (VC-02/03 continuous discovery)
+
+Products can enable passive semantic telemetry (off by default) at `/products/:id/monitoring`. The SDK
+collects allowlisted journey events only when the host reports a granted collection permission
+(`data-collection-permission="granted"` on the script tag, or `VibeCheck.setCollectionPermission`), and
+emits them with `VibeCheck.track(type, payload)`. Deterministic triggers build bounded windows that Jev
+screens (`JEV_API_KEY`); results become research candidates the owner can dismiss or turn into neutral
+task proposals through discovery. Run `pnpm worker` for scans, sweeps and evaluations.
 
 ## Specifications
 

@@ -1,4 +1,4 @@
-import { init } from "./index";
+import { init, setCollectionPermission, track } from "./index";
 
 /**
  * Script-tag entry:
@@ -10,9 +10,17 @@ const key = current?.dataset.key;
 if (key) {
   const apiOrigin = current?.dataset.origin ?? new URL(current?.src ?? location.href).origin;
   const quiet = current?.dataset.quietPaths?.split(",").map((p) => new RegExp(p.trim())) ?? [];
-  init({ publishableKey: key, apiOrigin, quietPaths: quiet });
+  const permission = current?.dataset.collectionPermission;
+  init({
+    publishableKey: key,
+    apiOrigin,
+    quietPaths: quiet,
+    buildRef: current?.dataset.buildRef,
+    collectionPermission:
+      permission === "granted" || permission === "denied" ? permission : "unknown",
+  });
 } else {
   console.warn("[vibecheck] missing data-key on the SDK script tag");
 }
 
-export { init };
+export { init, setCollectionPermission, track };

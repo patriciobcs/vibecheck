@@ -2,6 +2,7 @@ import { sql as dsql } from "drizzle-orm";
 import { db } from "@/db/client";
 
 const TABLES = [
+  "evaluation_reservations",
   "candidate_study_links",
   "research_candidates",
   "jev_evaluations",

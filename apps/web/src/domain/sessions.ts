@@ -181,7 +181,7 @@ export async function startArchive(input: {
 }): Promise<{ ok: true } | Fail> {
   const ctx = await db.transaction(async (tx) => {
     const a = await ownedAssignment(tx, input.assignmentId, input.participantId);
-    if (!a || a.state !== "recording") return { fail: "invalid_transition" as const };
+    if (a?.state !== "recording") return { fail: "invalid_transition" as const };
     const session = await tx.query.sessions.findFirst({
       where: eq(schema.sessions.assignmentId, a.id),
     });

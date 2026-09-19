@@ -1,7 +1,10 @@
 import { SAMPLE_STUDY_PLAN, type StudyPlan } from "@vibecheck/contracts";
 import { eq } from "drizzle-orm";
+import { generateDetector } from "@/domain/monitoring/detectors";
+import { currentMonitoringPolicy, setMonitoringPolicy } from "@/domain/monitoring/policy";
 import { hashApiKey } from "@/lib/api-key";
 import { newId, newToken } from "@/lib/ids";
+import { fixtureDetectorGenerator } from "@/providers/detector-generation/fixture";
 import { storage } from "@/providers/storage";
 import { db, schema, sql } from "./client";
 
@@ -217,6 +220,38 @@ async function main() {
   });
 
   await storage().ensureBucket();
+
+  // DEMO ONLY: passive monitoring is disabled by default for real products. The local Excalidraw
+  // target gets an enabled policy and a fixture detector so the screening loop can be exercised.
+  const monitoring = await currentMonitoringPolicy(EXCALIDRAW_PRODUCT_ID);
+  if (monitoring.revision === 0) {
+    await setMonitoringPolicy(
+      EXCALIDRAW_PRODUCT_ID,
+      {
+        enabled: true,
+        allowed_journeys: ["share_drawing"],
+        batch_delay_ms: 4000,
+        cooldown_ms: 30_000,
+        max_evaluations_per_product_day: 200,
+      },
+      null,
+    );
+  }
+  const existingDetector = await db.query.detectorDefinitions.findFirst({
+    where: eq(schema.detectorDefinitions.productId, EXCALIDRAW_PRODUCT_ID),
+  });
+  if (!existingDetector) {
+    const res = await generateDetector(
+      {
+        productId: EXCALIDRAW_PRODUCT_ID,
+        detectorId: "share_drawing_export",
+        appBuildRef: "vibecheck-demo",
+        journeyHint: "share_drawing",
+      },
+      fixtureDetectorGenerator,
+    );
+    if (!res.ok) throw new Error(`fixture detector invalid: ${res.problems.join("; ")}`);
+  }
 
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   console.info(

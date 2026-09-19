@@ -1,10 +1,20 @@
 import { readHandoffFragment } from "@vibecheck/contracts/embed";
+import { Observer } from "./observer";
 import { EventRecorder } from "./recorder";
 
 export type { EventBatch, RecordedEvent, RecorderOptions } from "./recorder";
 export { EventRecorder } from "./recorder";
 
+export type CollectionPermission = "granted" | "denied" | "unknown";
+
 export type VibeCheckConfig = {
+  /** Build identity of the host app, so detectors can be bound to it (e.g. a git SHA or release tag). */
+  buildRef?: string;
+  /**
+   * Passive observation is off unless the host reports a granted collection permission. Installing
+   * the SDK, or a tester consenting to a study, never enables it.
+   */
+  collectionPermission?: CollectionPermission;
   /** Origin-bound publishable key; identifies the product and grants nothing else. */
   publishableKey: string;
   /** VibeCheck app origin, e.g. https://app.vibecheck.dev */
@@ -97,6 +107,7 @@ export function startInstrumentation(
   });
   attachListeners();
   recorder.onNavigation(location.href);
+  observer?.setResearchActive(true);
   return recorder;
 }
 
@@ -106,6 +117,103 @@ export function stopInstrumentation() {
   recorder.stop();
   recorder = null;
   activeSessionId = null;
+  observer?.setResearchActive(false);
+}
+
+/* ---------------- Passive observation (semantic telemetry, VC-02 passive mode) ---------------- */
+
+let observer: Observer | null = null;
+let observerConfig: VibeCheckConfig | null = null;
+let collectionPermission: CollectionPermission = "unknown";
+let observationToken: string | null = null;
+let openingSession: Promise<unknown> | null = null;
+const pendingTracks: [string, Record<string, unknown>][] = [];
+
+async function openObservationSession(cfg: VibeCheckConfig): Promise<boolean> {
+  try {
+    const res = await fetch(`${cfg.apiOrigin}/api/observe/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-VibeCheck-Key": cfg.publishableKey },
+      body: JSON.stringify({
+        publishable_key: cfg.publishableKey,
+        build_ref: cfg.buildRef ?? "unknown",
+        collection_permission: collectionPermission,
+      }),
+    });
+    if (!res.ok) return false;
+    const body = (await res.json()) as {
+      session_id: string;
+      token: string;
+      batch_delay_ms: number;
+    };
+    observationToken = body.token;
+    observer = new Observer({
+      observationSessionId: body.session_id,
+      buildRef: cfg.buildRef ?? "unknown",
+      collectionPolicyRef: "product_policy",
+      clockOriginMs: Date.now(),
+      flushIntervalMs: Math.max(1000, body.batch_delay_ms || 4000),
+      send: async (batch) => {
+        const r = await fetch(`${cfg.apiOrigin}/api/observe/events`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${observationToken}`,
+            "X-VibeCheck-Key": cfg.publishableKey,
+          },
+          body: JSON.stringify(batch),
+        });
+        if (!r.ok) throw new Error(`observe rejected: ${r.status}`);
+      },
+    });
+    observer.setCollectionPermission(true);
+    observer.setResearchActive(recorder !== null);
+    for (const [type, payload] of pendingTracks.splice(0)) observer.track(type, payload);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Host apps report the user's collection permission; unknown or withdrawn stops collection and clears buffers. */
+export function setCollectionPermission(permission: CollectionPermission) {
+  collectionPermission = permission;
+  if (permission !== "granted") {
+    observer?.setCollectionPermission(false);
+    observer?.stop();
+    observer = null;
+    observationToken = null;
+    pendingTracks.length = 0;
+    return;
+  }
+  if (observerConfig && !observer && !openingSession) {
+    openingSession = openObservationSession(observerConfig).finally(() => {
+      openingSession = null;
+    });
+  }
+}
+
+/** Host apps emit allowlisted semantic events: `VibeCheck.track("action_result", { action_ref: "export_image", result: "success" })`. */
+export function track(type: string, payload: Record<string, unknown> = {}) {
+  if (collectionPermission !== "granted") return;
+  if (observer) {
+    observer.track(type, payload);
+  } else if (pendingTracks.length < 50) {
+    pendingTracks.push([type, payload]);
+  }
+}
+
+function watchPassiveNavigation() {
+  const origPush = history.pushState.bind(history);
+  history.pushState = (...args) => {
+    origPush(...args);
+    observer?.onNavigation(location.href);
+  };
+  window.addEventListener("popstate", () => observer?.onNavigation(location.href));
+  document.addEventListener("visibilitychange", () =>
+    observer?.onVisibility(document.visibilityState === "visible"),
+  );
+  window.addEventListener("pagehide", () => void observer?.flush());
 }
 
 /* ---------------- Dialog overlay (iframe on the VibeCheck origin) ---------------- */
@@ -341,6 +449,9 @@ function showToast(cfg: VibeCheckConfig, offer: Offer) {
 /** Entry point: handoff dialog, hosted-recorder handshake, or a polite invitation. */
 export function init(cfg: VibeCheckConfig) {
   if (typeof window === "undefined") return;
+  observerConfig = cfg;
+  watchPassiveNavigation();
+  if (cfg.collectionPermission) setCollectionPermission(cfg.collectionPermission);
   listenToDialog(cfg);
   watchHostFocus(cfg);
   listenForRecorder(cfg);

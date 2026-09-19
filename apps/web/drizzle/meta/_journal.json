@@ -36,6 +36,13 @@
       "when": 1789848553496,
       "tag": "0004_round_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789849638771,
+      "tag": "0005_flashy_madripoor",
+      "breakpoints": true
     }
   ]
 }
