@@ -2,6 +2,19 @@ import { sql as dsql } from "drizzle-orm";
 import { db } from "@/db/client";
 
 const TABLES = [
+  "candidate_study_links",
+  "research_candidates",
+  "jev_evaluations",
+  "observation_windows",
+  "observation_events",
+  "observation_sessions",
+  "monitoring_policy_revisions",
+  "detector_definitions",
+  "evaluation_budget_ledger",
+  "publish_requests",
+  "proposals",
+  "discovery_runs",
+  "api_keys",
   "audit_events",
   "webhook_receipts",
   "event_outbox",

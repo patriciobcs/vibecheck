@@ -66,3 +66,12 @@ The Vonage archive callback must reach the dev server from the internet. `pnpm t
 ## Specifications
 
 See [specs/README.md](specs/README.md) for the workflow specifications, shared contracts, and change policy.
+
+## Discovery (VC-01)
+
+Discovery runs through a provider adapter: `fixture` returns labeled sample proposals for local
+development and tests; `devin` starts a Devin analysis session (`DEVIN_API_KEY`, `DISCOVERY_PROVIDER=devin`).
+A remote agent cannot reach `localhost`, so Devin discovery needs a publicly reachable target URL.
+Set `ALLOW_LOCAL_TARGETS=true` to accept loopback product URLs in development. Programmatic access to
+the product/discovery/study endpoints uses `Authorization: Bearer <api key>` (hashed at rest, seeded
+from `DEV_API_KEY`); the owner UI uses the signed-in session.

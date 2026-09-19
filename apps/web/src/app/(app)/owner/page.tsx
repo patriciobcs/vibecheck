@@ -31,6 +31,7 @@ export default async function OwnerPage() {
       wide
       nav={
         <>
+          <NavLink href="/products">Products</NavLink>
           <NavLink href="/marketplace">Marketplace</NavLink>
           <span className="px-3 text-foreground">{session.user.email}</span>
         </>

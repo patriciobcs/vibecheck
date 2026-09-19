@@ -30,6 +30,15 @@ const CoreSchema = z.object({
   SLNG_BASE_URL: z.url().default("https://api.slng.ai"),
   SLNG_STT_PATH: z.string().default("/v1/stt/slng/deepgram/nova:3-en"),
   SLNG_STT_LANGUAGE: z.string().default("en"),
+  // VC-01 discovery
+  DISCOVERY_PROVIDER: z.enum(["fixture", "devin"]).default("fixture"),
+  DEVIN_API_KEY: optionalSecret,
+  DEVIN_API_BASE: z.url().default("https://api.devin.ai/v1"),
+  DEVIN_POLL_MS: z.coerce.number().int().positive().default(10_000),
+  DEVIN_TIMEOUT_MS: z.coerce.number().int().positive().default(1_200_000),
+  DEVIN_MAX_ACU: z.coerce.number().positive().default(5),
+  ALLOW_LOCAL_TARGETS: z.enum(["true", "false"]).default("false"),
+  DEV_API_KEY: optionalSecret,
 });
 
 export type VonageConfig = {
@@ -40,12 +49,20 @@ export type VonageConfig = {
 };
 
 export type SlngConfig = { apiKey: string; sttUrl: string; language: string };
+export type DevinConfig = {
+  apiKey: string;
+  baseUrl: string;
+  pollMs: number;
+  timeoutMs: number;
+  maxAcu: number;
+};
 
 export type Env = z.infer<typeof CoreSchema> & {
   appUrl: string;
   webhookBaseUrl: string;
   vonage: VonageConfig | null;
   slng: SlngConfig | null;
+  devin: DevinConfig | null;
 };
 
 type ReadFile = (path: string) => string;
@@ -90,8 +107,19 @@ export function parseEnv(
       }
     : null;
 
+  const devin: DevinConfig | null = core.DEVIN_API_KEY
+    ? {
+        apiKey: core.DEVIN_API_KEY,
+        baseUrl: core.DEVIN_API_BASE,
+        pollMs: core.DEVIN_POLL_MS,
+        timeoutMs: core.DEVIN_TIMEOUT_MS,
+        maxAcu: core.DEVIN_MAX_ACU,
+      }
+    : null;
+
   return {
     ...core,
+    devin,
     appUrl: core.NEXT_PUBLIC_APP_URL,
     webhookBaseUrl: core.PUBLIC_WEBHOOK_BASE_URL ?? core.NEXT_PUBLIC_APP_URL,
     vonage,

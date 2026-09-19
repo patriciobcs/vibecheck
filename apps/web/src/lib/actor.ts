@@ -28,7 +28,7 @@ export async function resolveActor(req: Request): Promise<Actor | null> {
     if (device) return { participantId: device.id, via: "device_token" };
     return null;
   }
-  const session = await currentSession();
+  const session = await currentSession().catch(() => null);
   if (!session) return null;
   const participant = await participantForUser(session.user.id);
   return { participantId: participant.id, via: "session" };

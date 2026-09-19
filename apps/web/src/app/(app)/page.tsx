@@ -11,6 +11,7 @@ export default async function Home() {
     <Shell
       nav={
         <>
+          <NavLink href="/products">Products</NavLink>
           <NavLink href="/marketplace">Marketplace</NavLink>
           <NavLink href="/owner">Owner</NavLink>
           {session ? (

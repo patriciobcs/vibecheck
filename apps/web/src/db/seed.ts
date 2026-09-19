@@ -1,10 +1,47 @@
 import { SAMPLE_STUDY_PLAN, type StudyPlan } from "@vibecheck/contracts";
 import { eq } from "drizzle-orm";
+import { hashApiKey } from "@/lib/api-key";
 import { newId, newToken } from "@/lib/ids";
 import { storage } from "@/providers/storage";
 import { db, schema, sql } from "./client";
 
+/** The sample target page lives on this app, so its URL follows the app origin (dev :3000, e2e :3100). */
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
 const EXCALIDRAW_PRODUCT_ID = "product_excalidraw_local";
+
+/** SAMPLE discovery context for the Excalidraw target: release notes from upstream commit subjects, sample complaints. */
+const EXCALIDRAW_RELEASE_NOTES = (
+  [
+    ["release_sticky_notes", "Sticky notes", 12064],
+    ["release_bucket_fill", "Bucket fill", 11849],
+    ["release_eyedropper", "Eyedropper", 11859],
+    ["release_color_top_picks", "Customizable color top picks", 11872],
+    ["release_right_click_pan", "Right-click pan", 12110],
+    ["release_wheel_zoom", "Wheel-button zoom and zoom-with-scroll-wheel preference", 12099],
+    ["release_lasso_selection", "Lasso selection", 11862],
+  ] as const
+).map(([id, text, pr]) => ({
+  id,
+  text,
+  source: `upstream commit subject, PR #${pr}`,
+  isSample: true,
+}));
+const EXCALIDRAW_JOURNEYS = ["capture ideas", "match colors", "navigate board", "share drawing"];
+const EXCALIDRAW_COMPLAINTS = [
+  {
+    id: "complaint_1",
+    text: "Sample complaint: a user could not find a board action.",
+    source: "sample fixture",
+    isSample: true,
+  },
+  {
+    id: "complaint_2",
+    text: "Sample complaint: a user was unsure how to navigate a large board.",
+    source: "sample fixture",
+    isSample: true,
+  },
+];
 const EXCALIDRAW_STUDY_ID = "study_excalidraw_export";
 
 /** Stand-in study for the Excalidraw demo (VC-01 output not implemented). Neutral task, no control named. */
@@ -66,8 +103,8 @@ async function main() {
         id: productId,
         tenantId,
         name: "Sample booking app",
-        url: "http://localhost:3000/demo-target",
-        permittedOrigins: ["http://localhost:3000", "http://127.0.0.1:3000"],
+        url: `${APP_URL}/demo-target`,
+        permittedOrigins: [APP_URL],
         publishableKey: `pk_sample_${newToken(12)}`,
         invitationCooldownDays: 7,
         embedMode: "sdk",
@@ -77,8 +114,8 @@ async function main() {
         target: schema.products.id,
         set: {
           embedMode: "sdk",
-          url: "http://localhost:3000/demo-target",
-          permittedOrigins: ["http://localhost:3000", "http://127.0.0.1:3000"],
+          url: `${APP_URL}/demo-target`,
+          permittedOrigins: [APP_URL],
         },
       });
 
@@ -96,6 +133,14 @@ async function main() {
         invitationCooldownDays: 0,
         embedMode: "sdk",
         sample: false,
+        description: "Local clone of the open-source whiteboard, used as the demo target (VC-07).",
+        language: "en",
+        audience: "whiteboard users",
+        releaseNotes: EXCALIDRAW_RELEASE_NOTES,
+        supportComplaints: EXCALIDRAW_COMPLAINTS,
+        knownJourneys: EXCALIDRAW_JOURNEYS,
+        productEvents: [],
+        status: "ready",
       })
       .onConflictDoUpdate({
         target: schema.products.id,
@@ -103,8 +148,24 @@ async function main() {
           embedMode: "sdk",
           url: "http://localhost:3200/",
           permittedOrigins: ["http://localhost:3200"],
+          releaseNotes: EXCALIDRAW_RELEASE_NOTES,
+          supportComplaints: EXCALIDRAW_COMPLAINTS,
+          knownJourneys: EXCALIDRAW_JOURNEYS,
+          status: "ready",
         },
       });
+
+    // Programmatic API key for the sample tenant (hashed at rest), used by tests and scripts.
+    const devKey = process.env.DEV_API_KEY;
+    if (devKey && !/^REPLACE_WITH_/.test(devKey)) {
+      await tx
+        .insert(schema.apiKeys)
+        .values({ id: "apikey_dev", tenantId, keyHash: hashApiKey(devKey), label: "development" })
+        .onConflictDoUpdate({
+          target: schema.apiKeys.keyHash,
+          set: { tenantId, label: "development" },
+        });
+    }
     await tx
       .insert(schema.studies)
       .values({

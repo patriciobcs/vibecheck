@@ -15,7 +15,7 @@ Use Devin to reproduce supported findings and create working design alternatives
 | draft_pr | Create/update | Devin change, independent checks, draft PR | Retest off; preview optional |
 | prototype_and_retest | Create/update | Devin change, independent checks, draft PR | Deploy checked candidate and assign retest |
 
-MVP default is `issues_only`; the owner can select another mode at product or study level. Study settings snapshot the choice. Raising automation for an existing issue requires a deliberate owner action; lowering it or pausing must gate queued side effects immediately. No mode authorizes automatic merging or production deployment.
+The demo build defaults to `prototype_and_retest` so the whole loop is exercised (see VC-01 configuration); `issues_only` remains the recommended default for real tenants. The owner can select another mode at product or study level. Study settings snapshot the choice. Raising automation for an existing issue requires a deliberate owner action; lowering it or pausing must gate queued side effects immediately. No mode authorizes automatic merging or production deployment.
 
 ## Repository adapter and prerequisites
 
@@ -42,7 +42,7 @@ Required checks are application-specific and must exist before accepting the age
 
 Generic checks: install/build, app readiness, primary journey smoke tests, permitted diff scope, secret scan, and authorization regression checks appropriate to the change. Reject unexplained dependency or environment modifications outside scope rather than quietly expanding it.
 
-Booking example: existing appointment changes to the requested slot, remains associated with the correct customer, and the old slot becomes available; another customer cannot modify it. Include deposit invariants only if the selected demo actually implements deposits. Functional checks alone cannot establish easier usability.
+Whiteboard example: the elements the participant created persist across a reload with their content intact, a color change affects only the intended element, undo restores the previous state, and export still produces a non-empty file. Functional checks alone cannot establish easier usability. See VC-07 for the full check list bound to the selected target.
 
 ## Repair run contract
 
@@ -58,7 +58,7 @@ Booking example: existing appointment changes to the requested slot, remains ass
   "devin_session_ref": "provider_session_example",
   "variant_id": "variant_a",
   "attempt": 1,
-  "validator_version": "booking_acceptance_v1",
+  "validator_version": "excalidraw_acceptance_v1",
   "checks_ref": "checks_example",
   "preview_ref": "preview_example",
   "pull_request_ref": "pr_example",

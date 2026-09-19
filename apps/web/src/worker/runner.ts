@@ -1,4 +1,9 @@
 import { fetchArchiveJob, transcribeAssetJob } from "@/domain/archive-pipeline";
+import {
+  handleDiscoveryRun,
+  markDiscoveryRunFailed,
+  markDiscoveryRunQueued,
+} from "@/domain/discovery";
 import { completeJob, failJob, heartbeatJob, leaseNextJob } from "@/domain/jobs";
 import { env } from "@/lib/env";
 import { mediaClient, sttClient } from "@/providers";
@@ -17,9 +22,24 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
       if (!stt) throw new Error("SLNG is not configured; cannot transcribe");
       return transcribeAssetJob(payload as { assetId: string }, { storage: storage(), stt });
     }
+    case "discovery.run":
+      return handleDiscoveryRun((payload as { runId: string }).runId);
     default:
       throw new Error(`unknown job type ${type}`);
   }
+}
+
+/** Reflect a job failure on the domain object it drives (a retryable failure returns a run to `queued`). */
+async function onJobFailure(
+  job: { type: string; payload: unknown; attempts: number; maxAttempts: number },
+  err: unknown,
+) {
+  if (job.type !== "discovery.run") return;
+  const runId = (job.payload as { runId?: string }).runId;
+  if (!runId) return;
+  const terminal = job.attempts + 1 >= job.maxAttempts;
+  if (terminal) await markDiscoveryRunFailed(runId, err);
+  else await markDiscoveryRunQueued(runId);
 }
 
 /** Leases and runs one job; returns false when nothing was runnable. */
@@ -38,6 +58,7 @@ export async function tick(
     await completeJob(job.id);
     return { ran: true, id: job.id, type: job.type, ok: true };
   } catch (err) {
+    await onJobFailure(job, err);
     await failJob(job.id, err);
     return {
       ran: true,

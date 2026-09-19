@@ -12,6 +12,8 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   fullyParallel: false,
+  // Tests share one database and the seed owner account: run files sequentially.
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {

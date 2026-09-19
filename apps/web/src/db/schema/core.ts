@@ -1,3 +1,4 @@
+import type { SourceItem } from "@vibecheck/contracts";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -62,8 +63,117 @@ export const products = pgTable("products", {
     .notNull(),
   /** Marked when the product is seeded sample data. */
   sample: boolean("sample").default(false).notNull(),
+  /* ---- VC-01 onboarding context (imported material carries provenance + sample flag) ---- */
+  description: text("description").default("").notNull(),
+  language: text("language").default("en").notNull(),
+  audience: text("audience").default("").notNull(),
+  repoBinding: jsonb("repo_binding").$type<Record<string, unknown> | null>(),
+  releaseNotes: jsonb("release_notes").$type<SourceItem[]>().notNull().default(sql`'[]'::jsonb`),
+  supportComplaints: jsonb("support_complaints")
+    .$type<SourceItem[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  knownJourneys: jsonb("known_journeys").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  productEvents: jsonb("product_events").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+  /** VC-01 product lifecycle: draft → connecting → ready, or needs_setup with a reason. */
+  status: text("status", { enum: ["draft", "connecting", "ready", "needs_setup"] })
+    .default("ready")
+    .notNull(),
+  setupError: text("setup_error"),
   createdAt: createdAt(),
 });
+
+/** Programmatic tenant access (`Authorization: Bearer <key>`); only the hash is stored. */
+export const apiKeys = pgTable("api_keys", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  keyHash: text("key_hash").notNull().unique(),
+  label: text("label").notNull(),
+  createdAt: createdAt(),
+});
+
+/* ---------------- VC-01 discovery ---------------- */
+
+export const discoveryRuns = pgTable(
+  "discovery_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["queued", "inspecting", "proposed", "failed", "cancelled"],
+    }).notNull(),
+    provider: text("provider", { enum: ["fixture", "devin"] }).notNull(),
+    providerSessionId: text("provider_session_id"),
+    providerSessionUrl: text("provider_session_url"),
+    /** SHA-256 of the product configuration at run creation; the agent must echo it. */
+    sourceRevision: text("source_revision").notNull(),
+    outcome: text("outcome", { enum: ["proposed", "cannot_assess", "needs_setup"] }),
+    outcomeReason: text("outcome_reason"),
+    /** Raw agent responses, kept for restricted debugging (never shown to participants). */
+    rawResponses: jsonb("raw_responses").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    correctionAttempts: integer("correction_attempts").default(0).notNull(),
+    error: text("error"),
+    /** Optional passive-screening candidates supplied as discovery input. */
+    sourceCandidateRefs: jsonb("source_candidate_refs")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("discovery_runs_product_idx").on(t.productId)],
+);
+
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    discoveryRunId: text("discovery_run_id")
+      .notNull()
+      .references(() => discoveryRuns.id, { onDelete: "cascade" }),
+    taskId: text("task_id").notNull(),
+    researchQuestion: text("research_question").notNull(),
+    participantPrompt: text("participant_prompt").notNull(),
+    rationale: text("rationale").notNull(),
+    evidenceRefs: jsonb("evidence_refs").$type<string[]>().notNull(),
+    evidenceType: text("evidence_type").notNull(),
+    eligibilityRuleRef: text("eligibility_rule_ref").notNull(),
+    successRuleRef: text("success_rule_ref").notNull(),
+    uncertainties: jsonb("uncertainties").$type<string[]>().notNull(),
+    estimatedDurationSeconds: integer("estimated_duration_seconds"),
+    confidence: text("confidence"),
+    sourceCandidateRefs: jsonb("source_candidate_refs")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("proposals_run_task_uq").on(t.discoveryRunId, t.taskId)],
+);
+
+/** Idempotent publish: one study per (tenant, idempotency key); replays return the stored result. */
+export const publishRequests = pgTable(
+  "publish_requests",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    responseHash: text("response_hash").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("publish_requests_tenant_key_uq").on(t.tenantId, t.idempotencyKey)],
+);
 
 /* ---------------- Studies ---------------- */
 
@@ -95,6 +205,11 @@ export const studyRevisions = pgTable(
     plan: jsonb("plan").notNull(),
     /** Provenance: "vc01" for a real handoff, "sample" for seeded data. */
     provenance: text("provenance", { enum: ["vc01", "sample"] }).notNull(),
+    discoveryRunId: text("discovery_run_id"),
+    sourceCandidateRefs: jsonb("source_candidate_refs")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     publishedAt: ts("published_at").notNull(),
   },
   (t) => [uniqueIndex("study_revisions_study_rev_uq").on(t.studyId, t.revision)],
@@ -404,3 +519,230 @@ export const auditEvents = pgTable("audit_events", {
   detail: jsonb("detail"),
   createdAt: createdAt(),
 });
+
+/* ---------------- Continuous discovery (passive observation + Jev screening) ---------------- */
+
+/** Immutable, versioned detector: Jev questions + required telemetry, bound to a build. */
+export const detectorDefinitions = pgTable(
+  "detector_definitions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    detectorId: text("detector_id").notNull(),
+    version: integer("version").notNull(),
+    journeyId: text("journey_id").notNull(),
+    appBuildRef: text("app_build_ref").notNull(),
+    instrumentationSchemaVersion: text("instrumentation_schema_version").notNull(),
+    requiredEvents: jsonb("required_events").$type<string[]>().notNull(),
+    questions: jsonb("questions").notNull(),
+    evaluationPolicyRef: text("evaluation_policy_ref").notNull(),
+    /** manual (hand-authored), devin (generated), fixture. */
+    provenance: text("provenance", { enum: ["manual", "devin", "fixture"] }).notNull(),
+    sourceRefs: jsonb("source_refs").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    status: text("status", {
+      enum: ["draft", "active", "stale", "needs_instrumentation", "disabled"],
+    }).notNull(),
+    statusReason: text("status_reason"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("detector_definitions_product_detector_version_uq").on(
+      t.productId,
+      t.detectorId,
+      t.version,
+    ),
+  ],
+);
+
+/** Owner-configurable monitoring policy; a snapshot is referenced by every window and evaluation. */
+export const monitoringPolicyRevisions = pgTable("monitoring_policy_revisions", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  revision: integer("revision").notNull(),
+  policy: jsonb("policy").notNull(),
+  createdByUserId: text("created_by_user_id"),
+  createdAt: createdAt(),
+});
+
+/** Pseudonymous passive session (no assignment, no person). */
+export const observationSessions = pgTable(
+  "observation_sessions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    buildRef: text("build_ref").notNull(),
+    instrumentationSchemaVersion: text("instrumentation_schema_version").notNull(),
+    collectionPolicyRef: text("collection_policy_ref").notNull(),
+    /** Set while a research assignment is active so passive events are suppressed. */
+    suppressedUntil: ts("suppressed_until"),
+    lastEventAt: ts("last_event_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("observation_sessions_product_idx").on(t.productId, t.lastEventAt)],
+);
+
+export const observationEvents = pgTable(
+  "observation_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    observationSessionId: text("observation_session_id")
+      .notNull()
+      .references(() => observationSessions.id, { onDelete: "cascade" }),
+    journeyInstanceId: text("journey_instance_id").notNull(),
+    journeyId: text("journey_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    tMs: integer("t_ms").notNull(),
+    receivedAt: createdAt(),
+    type: text("type").notNull(),
+    payload: jsonb("payload").notNull(),
+  },
+  (t) => [
+    uniqueIndex("observation_events_session_seq_uq").on(t.observationSessionId, t.sequence),
+    index("observation_events_journey_idx").on(t.journeyInstanceId, t.tMs),
+  ],
+);
+
+export const observationWindows = pgTable(
+  "observation_windows",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    productId: text("product_id").notNull(),
+    observationSessionId: text("observation_session_id").notNull(),
+    journeyInstanceId: text("journey_instance_id").notNull(),
+    journeyId: text("journey_id").notNull(),
+    buildRef: text("build_ref").notNull(),
+    detectorRef: text("detector_ref").notNull(),
+    policyRef: text("policy_ref").notNull(),
+    revision: integer("revision").default(1).notNull(),
+    startMs: integer("start_ms").notNull(),
+    endMs: integer("end_ms").notNull(),
+    eventIds: jsonb("event_ids").$type<string[]>().notNull(),
+    gaps: jsonb("gaps")
+      .$type<{ after_sequence: number; missing: number }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    goalSource: text("goal_source", { enum: ["declared", "inferred", "unknown"] }).notNull(),
+    coverage: jsonb("coverage").notNull(),
+    priorProgressSummary: jsonb("prior_progress_summary"),
+    triggerReason: text("trigger_reason").notNull(),
+    /** Content hash used for evaluation deduplication. */
+    contentHash: text("content_hash").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("observation_windows_hash_detector_uq").on(t.contentHash, t.detectorRef),
+    index("observation_windows_journey_idx").on(t.journeyInstanceId),
+  ],
+);
+
+export const jevEvaluations = pgTable(
+  "jev_evaluations",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    productId: text("product_id").notNull(),
+    windowId: text("window_id")
+      .notNull()
+      .references(() => observationWindows.id, { onDelete: "cascade" }),
+    detectorRef: text("detector_ref").notNull(),
+    policyRef: text("policy_ref").notNull(),
+    requestHash: text("request_hash").notNull(),
+    requestedModel: text("requested_model").notNull(),
+    returnedModel: text("returned_model"),
+    providerRequestId: text("provider_request_id"),
+    triggerReason: text("trigger_reason").notNull(),
+    status: text("status", {
+      enum: ["queued", "running", "completed", "failed", "deferred", "unknown_outcome"],
+    }).notNull(),
+    statusReason: text("status_reason"),
+    answers: jsonb("answers"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    /** Estimated cost in micro-USD when a price is configured; null means unpriced. */
+    estimatedCostMicros: integer("estimated_cost_micros"),
+    requestedAt: createdAt(),
+    completedAt: ts("completed_at"),
+  },
+  (t) => [
+    uniqueIndex("jev_evaluations_request_hash_uq").on(t.requestHash),
+    index("jev_evaluations_product_time_idx").on(t.productId, t.requestedAt),
+  ],
+);
+
+export const researchCandidates = pgTable(
+  "research_candidates",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    journeyId: text("journey_id").notNull(),
+    targetRef: text("target_ref").notNull(),
+    category: text("category").notNull(),
+    baselineBuildRef: text("baseline_build_ref").notNull(),
+    detectorRef: text("detector_ref").notNull(),
+    suspectedProblem: text("suspected_problem").notNull(),
+    evaluationRefs: jsonb("evaluation_refs").$type<string[]>().notNull(),
+    supportingEventRefs: jsonb("supporting_event_refs").$type<string[]>().notNull(),
+    evidenceLimitations: jsonb("evidence_limitations").$type<string[]>().notNull(),
+    distinctObservationSessions: integer("distinct_observation_sessions").notNull(),
+    distinctJourneyInstances: integer("distinct_journey_instances").notNull(),
+    /** Latest friction / research-warranted probabilities from Jev (0..1, stored in permille). */
+    latestFrictionPermille: integer("latest_friction_permille"),
+    latestResearchPermille: integer("latest_research_permille"),
+    state: text("state", { enum: ["proposed", "accepted", "dismissed", "study_linked"] }).notNull(),
+    stateReason: text("state_reason"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("research_candidates_group_uq").on(
+      t.productId,
+      t.journeyId,
+      t.targetRef,
+      t.category,
+      t.baselineBuildRef,
+      t.detectorRef,
+    ),
+  ],
+);
+
+export const candidateStudyLinks = pgTable(
+  "candidate_study_links",
+  {
+    id: text("id").primaryKey(),
+    candidateId: text("candidate_id")
+      .notNull()
+      .references(() => researchCandidates.id, { onDelete: "cascade" }),
+    studyId: text("study_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("candidate_study_links_uq").on(t.candidateId, t.studyId)],
+);
+
+/** Per-product daily budget ledger, reserved transactionally before each provider call. */
+export const evaluationBudgetLedger = pgTable(
+  "evaluation_budget_ledger",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    day: text("day").notNull(),
+    evaluations: integer("evaluations").default(0).notNull(),
+    inputTokens: integer("input_tokens").default(0).notNull(),
+    outputTokens: integer("output_tokens").default(0).notNull(),
+    estimatedCostMicros: integer("estimated_cost_micros").default(0).notNull(),
+  },
+  (t) => [uniqueIndex("evaluation_budget_ledger_product_day_uq").on(t.productId, t.day)],
+);
