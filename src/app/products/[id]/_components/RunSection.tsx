@@ -1,4 +1,4 @@
-import type { DiscoveryRun, Proposal } from "@prisma/client";
+import type { DiscoveryRun, Proposal } from "@/db/schema";
 import { ProposalCard } from "./ProposalCard";
 
 type SourceItem = { id: string; isSample?: boolean };

@@ -36,8 +36,8 @@ See [specs/README.md](specs/README.md) for the workflow specifications, shared c
 docker compose up -d
 cp .env.example .env
 npm install
-npx prisma migrate dev
-npx prisma db seed
+npm run db:migrate
+npm run db:seed
 npm run dev
 npm run worker
 ```

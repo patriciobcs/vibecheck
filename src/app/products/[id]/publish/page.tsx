@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { tenantFromEnvironment } from "@/lib/auth";
+import { db } from "@/db";
+import { discoveryRun, proposal } from "@/db/schema";
 import { PublishForm } from "./PublishForm";
+import { and, eq } from "drizzle-orm";
 
 export default async function PublishPage({
   params,
@@ -14,19 +16,25 @@ export default async function PublishPage({
   const query = await searchParams;
   const tenantId = await tenantFromEnvironment();
   if (!tenantId) notFound();
-  const proposal = await prisma.proposal.findFirst({
-    where: {
-      tenantId,
-      discoveryRun: { productId: id, tenantId },
-      discoveryRunId: query.run,
-      taskId: query.task,
-    },
-  });
-  if (!proposal) notFound();
+  const [result] = await db
+    .select({ proposal })
+    .from(proposal)
+    .innerJoin(discoveryRun, eq(proposal.discoveryRunId, discoveryRun.id))
+    .where(
+      and(
+        eq(proposal.tenantId, tenantId),
+        eq(discoveryRun.tenantId, tenantId),
+        eq(discoveryRun.productId, id),
+        eq(proposal.discoveryRunId, query.run ?? ""),
+        eq(proposal.taskId, query.task ?? ""),
+      ),
+    )
+    .limit(1);
+  if (!result) notFound();
   return (
     <main>
       <h1>Publish study</h1>
-      <PublishForm productId={id} proposal={proposal} />
+      <PublishForm productId={id} proposal={result.proposal} />
     </main>
   );
 }

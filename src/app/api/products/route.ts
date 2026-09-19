@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { tenantFromRequest, apiError } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/db";
+import { product } from "@/db/schema";
 import { createProduct } from "@/services/products";
+import { desc, eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   const tenantId = await tenantFromRequest(request);
@@ -17,6 +19,10 @@ export async function GET(request: NextRequest) {
   const tenantId = await tenantFromRequest(request);
   if (!tenantId) return apiError("authentication required", "unauthorized", 401);
   return Response.json(
-    await prisma.product.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" } }),
+    await db
+      .select()
+      .from(product)
+      .where(eq(product.tenantId, tenantId))
+      .orderBy(desc(product.createdAt)),
   );
 }

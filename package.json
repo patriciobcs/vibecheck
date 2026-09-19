@@ -8,17 +8,17 @@
     "lint": "next lint",
     "worker": "tsx src/worker/index.ts",
     "test": "vitest run",
-    "prisma": "prisma",
-    "seed": "tsx prisma/seed.ts",
-    "format": "prettier --write src prisma/seed.ts fixtures",
-    "format:check": "prettier --check src prisma/seed.ts fixtures"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "format": "prettier --write src drizzle.config.ts drizzle fixtures",
+    "format:check": "prettier --check src drizzle.config.ts drizzle fixtures",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.16.0",
+    "drizzle-orm": "0.45.2",
     "next": "^15.5.0",
+    "postgres": "3.4.9",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.25.0",
@@ -29,11 +29,11 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "0.31.10",
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.5.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.8",
-    "prisma": "^6.16.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",

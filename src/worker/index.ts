@@ -1,6 +1,8 @@
 import os from "node:os";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { and, asc, eq, isNull, lte, lt, or } from "drizzle-orm";
+import { db } from "@/db";
+import { job as jobTable } from "@/db/schema";
 import { handleDiscoveryRun, markDiscoveryRunFailed, markDiscoveryRunQueued } from "./handler";
 
 const workerId = `${os.hostname()}:${process.pid}`;
@@ -9,34 +11,47 @@ const jobPayloadSchema = z.object({ runId: z.string().min(1) });
 let shuttingDown = false;
 
 async function claim() {
-  return prisma.$transaction(async (tx) => {
-    const jobs = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM "Job"
-      WHERE status = 'pending' AND "nextRunAt" <= (NOW() AT TIME ZONE 'UTC')
-        AND ("leaseUntil" IS NULL OR "leaseUntil" < (NOW() AT TIME ZONE 'UTC'))
-      ORDER BY "createdAt" LIMIT 1 FOR UPDATE SKIP LOCKED`;
-    const id = jobs[0]?.id;
-    if (!id) return null;
-    return tx.job.update({
-      where: { id },
-      data: { status: "running", lockedBy: workerId, leaseUntil: new Date(Date.now() + leaseMs) },
-    });
+  return db.transaction(async (tx) => {
+    const now = new Date();
+    const [available] = await tx
+      .select({ id: jobTable.id })
+      .from(jobTable)
+      .where(
+        and(
+          eq(jobTable.status, "pending"),
+          lte(jobTable.nextRunAt, now),
+          or(isNull(jobTable.leaseUntil), lt(jobTable.leaseUntil, now)),
+        ),
+      )
+      .orderBy(asc(jobTable.createdAt))
+      .limit(1)
+      .for("update", { skipLocked: true });
+    if (!available) return null;
+    const [claimed] = await tx
+      .update(jobTable)
+      .set({ status: "running", lockedBy: workerId, leaseUntil: new Date(Date.now() + leaseMs) })
+      .where(eq(jobTable.id, available.id))
+      .returning();
+    return claimed;
   });
 }
 
 async function processJob(job: Awaited<ReturnType<typeof claim>>) {
   if (!job) return false;
   const heartbeat = setInterval(() => {
-    void prisma.job.update({
-      where: { id: job.id },
-      data: { leaseUntil: new Date(Date.now() + leaseMs) },
-    });
+    void db
+      .update(jobTable)
+      .set({ leaseUntil: new Date(Date.now() + leaseMs) })
+      .where(eq(jobTable.id, job.id));
   }, 60_000);
   try {
     if (job.type !== "discovery.run") throw new Error("unknown_job_type");
     const payload = jobPayloadSchema.parse(job.payload);
-    await handleDiscoveryRun(payload.runId);
-    await prisma.job.update({ where: { id: job.id }, data: { status: "done", leaseUntil: null } });
+    await handleDiscoveryRun(payload.runId, undefined, job.tenantId);
+    await db
+      .update(jobTable)
+      .set({ status: "done", leaseUntil: null })
+      .where(eq(jobTable.id, job.id));
   } catch (error) {
     const attempts = job.attempts + 1;
     const payload = jobPayloadSchema.safeParse(job.payload);
@@ -45,21 +60,21 @@ async function processJob(job: Awaited<ReturnType<typeof claim>>) {
       attempts >= job.maxAttempts;
     if (job.type === "discovery.run" && payload.success) {
       if (terminal) {
-        await markDiscoveryRunFailed(payload.data.runId, error);
+        await markDiscoveryRunFailed(payload.data.runId, error, job.tenantId);
       } else {
-        await markDiscoveryRunQueued(payload.data.runId);
+        await markDiscoveryRunQueued(payload.data.runId, job.tenantId);
       }
     }
-    await prisma.job.update({
-      where: { id: job.id },
-      data: {
+    await db
+      .update(jobTable)
+      .set({
         attempts,
         status: terminal ? "failed" : "pending",
         nextRunAt: new Date(Date.now() + 2 ** attempts * 1000),
         lastError: error instanceof Error ? error.message : "job_failed",
         leaseUntil: null,
-      },
-    });
+      })
+      .where(eq(jobTable.id, job.id));
   } finally {
     clearInterval(heartbeat);
   }
@@ -71,7 +86,7 @@ async function main() {
     if (!(await processJob(await claim())))
       await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  await prisma.$disconnect();
+  await db.$client.end();
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

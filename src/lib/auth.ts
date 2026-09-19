@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { prisma } from "./prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { apiKey } from "@/db/schema";
 
 export function hashApiKey(key: string) {
   return createHash("sha256").update(key).digest("hex");
@@ -10,14 +12,22 @@ export async function tenantFromRequest(request: Request) {
   if (!header?.startsWith("Bearer ")) return null;
   const key = header.slice(7);
   if (!key) return null;
-  const found = await prisma.apiKey.findUnique({ where: { keyHash: hashApiKey(key) } });
+  const [found] = await db
+    .select({ tenantId: apiKey.tenantId })
+    .from(apiKey)
+    .where(eq(apiKey.keyHash, hashApiKey(key)))
+    .limit(1);
   return found?.tenantId ?? null;
 }
 
 export async function tenantFromEnvironment() {
   const key = process.env.DEV_API_KEY;
   if (!key) return null;
-  const found = await prisma.apiKey.findUnique({ where: { keyHash: hashApiKey(key) } });
+  const [found] = await db
+    .select({ tenantId: apiKey.tenantId })
+    .from(apiKey)
+    .where(eq(apiKey.keyHash, hashApiKey(key)))
+    .limit(1);
   return found?.tenantId ?? null;
 }
 

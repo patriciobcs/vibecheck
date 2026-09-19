@@ -1,6 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import postgres from "postgres";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  discoveryRun,
+  outboxEvent,
+  product,
+  proposal as proposalTable,
+  publishRequest,
+  study,
+  studyPlanRevision,
+} from "@/db/schema";
 import { publishInputSchema, studyPlanSchema } from "@/contracts/studyPlan";
 
 export const studyPlanDefaults = {
@@ -23,21 +33,53 @@ export const studyPlanDefaults = {
   },
 };
 
+function isUniqueViolation(error: unknown): boolean {
+  if (error instanceof postgres.PostgresError && error.code === "23505") return true;
+  if (!error || typeof error !== "object") return false;
+  if ("code" in error && error.code === "23505") return true;
+  if ("cause" in error) return isUniqueViolation(error.cause);
+  return false;
+}
+
 export async function publishStudy(tenantId: string, idempotencyKey: string, rawInput: unknown) {
   const input = publishInputSchema.parse(rawInput);
-  const product = await prisma.product.findFirst({ where: { id: input.product_id, tenantId } });
-  const run = await prisma.discoveryRun.findFirst({
-    where: { id: input.discovery_run_id, tenantId, productId: input.product_id },
-    include: { proposals: true },
-  });
-  const proposal = run?.proposals.find((item) => item.taskId === input.task_id);
-  if (!product || !run || !proposal) return null;
+  const [productRow] = await db
+    .select()
+    .from(product)
+    .where(and(eq(product.id, input.product_id), eq(product.tenantId, tenantId)))
+    .limit(1);
+  const [run] = await db
+    .select()
+    .from(discoveryRun)
+    .where(
+      and(
+        eq(discoveryRun.id, input.discovery_run_id),
+        eq(discoveryRun.tenantId, tenantId),
+        eq(discoveryRun.productId, input.product_id),
+      ),
+    )
+    .limit(1);
+  const proposals = run
+    ? await db
+        .select()
+        .from(proposalTable)
+        .where(
+          and(
+            eq(proposalTable.discoveryRunId, run.id),
+            eq(proposalTable.tenantId, tenantId),
+            eq(proposalTable.taskId, input.task_id),
+          ),
+        )
+        .limit(1)
+    : [];
+  const proposal = proposals[0];
+  if (!productRow || !run || !proposal) return null;
   const studyId = randomUUID();
   const plan = studyPlanSchema.parse({
     schema_version: "1.0",
     study_id: studyId,
     study_revision: 1,
-    product_id: product.id,
+    product_id: productRow.id,
     task: {
       task_id: proposal.taskId,
       participant_prompt: input.task?.participant_prompt ?? proposal.participantPrompt,
@@ -55,51 +97,80 @@ export async function publishStudy(tenantId: string, idempotencyKey: string, raw
     capture: { ...studyPlanDefaults.capture, ...input.capture },
     automation: { ...studyPlanDefaults.automation, ...input.automation },
   });
-  return prisma
-    .$transaction(async (tx) => {
+
+  try {
+    return await db.transaction(async (tx) => {
       const revisionId = randomUUID();
       const eventId = randomUUID();
       const responseHash = createHash("sha256").update(JSON.stringify(plan)).digest("hex");
-      const study = await tx.study.create({
-        data: { id: studyId, productId: product.id, tenantId, status: "draft", currentRevision: 1 },
+      const [createdStudy] = await tx
+        .insert(study)
+        .values({
+          id: studyId,
+          productId: productRow.id,
+          tenantId,
+          status: "draft",
+          currentRevision: 1,
+        })
+        .returning();
+      await tx.insert(publishRequest).values({ tenantId, idempotencyKey, studyId, responseHash });
+      const [publishedStudy] = await tx
+        .update(study)
+        .set({ status: "published" })
+        .where(eq(study.id, createdStudy.id))
+        .returning();
+      await tx.insert(studyPlanRevision).values({
+        id: revisionId,
+        studyId,
+        revision: 1,
+        plan,
+        publishedAt: new Date(),
       });
-      await tx.publishRequest.create({ data: { tenantId, idempotencyKey, studyId, responseHash } });
-      await tx.study.update({ where: { id: study.id }, data: { status: "published" } });
-      await tx.studyPlanRevision.create({
-        data: { id: revisionId, studyId, revision: 1, plan, publishedAt: new Date() },
-      });
-      const event = await tx.outboxEvent.create({
-        data: {
+      const [event] = await tx
+        .insert(outboxEvent)
+        .values({
           eventId,
           eventType: "study.published",
           idempotencyKey: `${studyId}:revision_1:publish`,
           tenantId,
-          productId: product.id,
+          productId: productRow.id,
           correlationId: studyId,
           payload: { study_id: studyId, study_revision: 1, plan_ref: `studyplan:${revisionId}` },
           occurredAt: new Date(),
-        },
-      });
-      return { status: 201, study: { ...study, status: "published" as const }, plan, event };
-    })
-    .catch(async (error: unknown) => {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002")
-        throw error;
-      const prior = await prisma.publishRequest.findUnique({
-        where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
-        include: { study: { include: { revisions: true } } },
-      });
-      if (!prior) throw error;
-      const revision = prior.study.revisions.find(
-        (item) => item.revision === prior.study.currentRevision,
-      );
-      return {
-        status: 200,
-        study: prior.study,
-        plan: revision?.plan,
-        event: await prisma.outboxEvent.findUnique({
-          where: { idempotencyKey: `${prior.studyId}:revision_1:publish` },
-        }),
-      };
+        })
+        .returning();
+      return { status: 201 as const, study: publishedStudy, plan, event };
     });
+  } catch (error: unknown) {
+    if (!isUniqueViolation(error)) throw error;
+    const [prior] = await db
+      .select()
+      .from(publishRequest)
+      .where(
+        and(
+          eq(publishRequest.tenantId, tenantId),
+          eq(publishRequest.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (!prior) throw error;
+    const [priorStudy] = await db.select().from(study).where(eq(study.id, prior.studyId)).limit(1);
+    if (!priorStudy) throw error;
+    const [revision] = await db
+      .select()
+      .from(studyPlanRevision)
+      .where(
+        and(
+          eq(studyPlanRevision.studyId, priorStudy.id),
+          eq(studyPlanRevision.revision, priorStudy.currentRevision),
+        ),
+      )
+      .limit(1);
+    const [event] = await db
+      .select()
+      .from(outboxEvent)
+      .where(eq(outboxEvent.idempotencyKey, `${prior.studyId}:revision_1:publish`))
+      .limit(1);
+    return { status: 200 as const, study: priorStudy, plan: revision?.plan, event };
+  }
 }

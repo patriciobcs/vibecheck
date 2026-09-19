@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Prisma, type Product } from "@prisma/client";
+import { eq, and } from "drizzle-orm";
 import { productConfigSchema, type ProductConfig } from "@/contracts/productConfig";
 import type { DiscoveryProviderName } from "@/agents/types";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/db";
+import { discoveryRun, job, product } from "@/db/schema";
 import { assertAllowedDestination } from "@/lib/destination";
+import type { Product } from "@/db/schema";
 
 export async function createProduct(tenantId: string, input: unknown) {
   const config = productConfigSchema.parse(input);
@@ -16,8 +18,9 @@ export async function createProduct(tenantId: string, input: unknown) {
     status = "needs_setup";
     setupError = error instanceof Error ? error.message : "destination_not_allowed";
   }
-  return prisma.product.create({
-    data: {
+  const [created] = await db
+    .insert(product)
+    .values({
       tenantId,
       name: config.name,
       description: config.description,
@@ -25,15 +28,16 @@ export async function createProduct(tenantId: string, input: unknown) {
       permittedOrigins: config.permitted_origins,
       language: config.language,
       audience: config.audience,
-      repoBinding: config.repo_binding as Prisma.InputJsonValue | undefined,
-      releaseNotes: config.release_notes as Prisma.InputJsonValue,
-      supportComplaints: config.support_complaints as Prisma.InputJsonValue,
-      knownJourneys: config.known_journeys as Prisma.InputJsonValue,
-      productEvents: config.product_events as Prisma.InputJsonValue,
+      repoBinding: config.repo_binding,
+      releaseNotes: config.release_notes,
+      supportComplaints: config.support_complaints,
+      knownJourneys: config.known_journeys,
+      productEvents: config.product_events,
       status,
       setupError,
-    },
-  });
+    })
+    .returning();
+  return created;
 }
 
 export function sourceRevision(product: ProductConfig) {
@@ -61,21 +65,24 @@ export async function createDiscoveryRun(
   productId: string,
   provider: DiscoveryProviderName,
 ) {
-  const product = await prisma.product.findFirst({ where: { id: productId, tenantId } });
-  if (!product) return null;
-  const config = toProductConfig(product);
-  const run = await prisma.discoveryRun.create({
-    data: {
+  const [found] = await db
+    .select()
+    .from(product)
+    .where(and(eq(product.id, productId), eq(product.tenantId, tenantId)))
+    .limit(1);
+  if (!found) return null;
+  const config = toProductConfig(found);
+  const [run] = await db
+    .insert(discoveryRun)
+    .values({
       tenantId,
       productId,
       status: "queued",
       provider,
       sourceRevision: sourceRevision(config),
       rawResponses: [],
-    },
-  });
-  await prisma.job.create({
-    data: { tenantId, type: "discovery.run", payload: { runId: run.id } },
-  });
+    })
+    .returning();
+  await db.insert(job).values({ tenantId, type: "discovery.run", payload: { runId: run.id } });
   return run;
 }

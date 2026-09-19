@@ -1,5 +1,5 @@
-import type { Proposal } from "@prisma/client";
 import Link from "next/link";
+import type { Proposal } from "@/db/schema";
 
 type SourceItem = { id: string; isSample?: boolean };
 

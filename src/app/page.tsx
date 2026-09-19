@@ -1,11 +1,17 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { tenantFromEnvironment } from "@/lib/auth";
+import { db } from "@/db";
+import { product } from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
 
 export default async function Home() {
   const tenantId = await tenantFromEnvironment();
   const products = tenantId
-    ? await prisma.product.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" } })
+    ? await db
+        .select()
+        .from(product)
+        .where(eq(product.tenantId, tenantId))
+        .orderBy(desc(product.createdAt))
     : [];
   return (
     <main>

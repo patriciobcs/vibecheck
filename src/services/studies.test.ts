@@ -1,17 +1,30 @@
 import { createHash, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { publishStudy } from "./studies";
 import { GET as getProduct } from "@/app/api/products/[id]/route";
-
-const prisma = new PrismaClient();
+import { db } from "@/db";
+import {
+  apiKey,
+  discoveryRun,
+  outboxEvent,
+  product,
+  proposal,
+  study,
+  studyPlanRevision,
+  tenant as tenantTable,
+} from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
 
 async function fixture() {
-  const tenant = await prisma.tenant.create({ data: { name: `publish-${randomUUID()}` } });
-  const product = await prisma.product.create({
-    data: {
-      tenantId: tenant.id,
+  const [tenantRow] = await db
+    .insert(tenantTable)
+    .values({ name: `publish-${randomUUID()}` })
+    .returning();
+  const [productRow] = await db
+    .insert(product)
+    .values({
+      tenantId: tenantRow.id,
       name: "test",
       description: "",
       url: "http://example.com",
@@ -23,22 +36,24 @@ async function fixture() {
       knownJourneys: [],
       productEvents: [],
       status: "ready",
-    },
-  });
-  const run = await prisma.discoveryRun.create({
-    data: {
-      tenantId: tenant.id,
-      productId: product.id,
+    })
+    .returning();
+  const [runRow] = await db
+    .insert(discoveryRun)
+    .values({
+      tenantId: tenantRow.id,
+      productId: productRow.id,
       status: "proposed",
       provider: "fixture",
       sourceRevision: "sha",
       rawResponses: [],
-    },
-  });
-  const proposal = await prisma.proposal.create({
-    data: {
-      discoveryRunId: run.id,
-      tenantId: tenant.id,
+    })
+    .returning();
+  const [proposalRow] = await db
+    .insert(proposal)
+    .values({
+      discoveryRunId: runRow.id,
+      tenantId: tenantRow.id,
       taskId: "task",
       researchQuestion: "question",
       participantPrompt: "prompt",
@@ -48,9 +63,9 @@ async function fixture() {
       eligibilityRuleRef: "eligible",
       successRuleRef: "success",
       uncertainties: [],
-    },
-  });
-  return { tenant, product, run, proposal };
+    })
+    .returning();
+  return { tenant: tenantRow, product: productRow, run: runRow, proposal: proposalRow };
 }
 
 const input = (productId: string, runId: string, taskId: string) => ({
@@ -71,11 +86,17 @@ describe.skipIf(!process.env.DATABASE_URL)("publish service", () => {
       publishStudy(tenant.id, "concurrent", body),
       publishStudy(tenant.id, "concurrent", body),
     ]);
-    const studies = await prisma.study.findMany({ where: { tenantId: tenant.id } });
-    const revisions = await prisma.studyPlanRevision.findMany({
-      where: { study: { tenantId: tenant.id } },
-    });
-    const events = await prisma.outboxEvent.findMany({ where: { tenantId: tenant.id } });
+    const studies = await db.select().from(study).where(eq(study.tenantId, tenant.id));
+    const revisions = await db
+      .select()
+      .from(studyPlanRevision)
+      .where(
+        inArray(
+          studyPlanRevision.studyId,
+          studies.map((item) => item.id),
+        ),
+      );
+    const events = await db.select().from(outboxEvent).where(eq(outboxEvent.tenantId, tenant.id));
     expect({
       first: first?.status,
       second: second?.status,
@@ -102,28 +123,29 @@ describe.skipIf(!process.env.DATABASE_URL)("publish service", () => {
     const differentKey = await publishStudy(tenant.id, "different", body);
     expect({
       status: differentKey?.status,
-      studies: await prisma.study.count({ where: { tenantId: tenant.id } }),
+      studies: (await db.select().from(study).where(eq(study.tenantId, tenant.id))).length,
     }).toEqual({ status: 201, studies: 3 });
-    await prisma.tenant.delete({ where: { id: tenant.id } });
+    await db.delete(tenantTable).where(eq(tenantTable.id, tenant.id));
   });
 
   it("hides a product from another tenant", async () => {
     const { tenant, product } = await fixture();
-    const other = await prisma.tenant.create({ data: { name: `other-${randomUUID()}` } });
+    const [other] = await db
+      .insert(tenantTable)
+      .values({ name: `other-${randomUUID()}` })
+      .returning();
     const key = `other-${randomUUID()}`;
-    await prisma.apiKey.create({
-      data: {
-        tenantId: other.id,
-        keyHash: createHash("sha256").update(key).digest("hex"),
-        label: "test",
-      },
+    await db.insert(apiKey).values({
+      tenantId: other.id,
+      keyHash: createHash("sha256").update(key).digest("hex"),
+      label: "test",
     });
     const response = await getProduct(
       new NextRequest("http://localhost", { headers: { authorization: `Bearer ${key}` } }),
       { params: Promise.resolve({ id: product.id }) },
     );
     expect(response.status).toBe(404);
-    await prisma.tenant.delete({ where: { id: tenant.id } });
-    await prisma.tenant.delete({ where: { id: other.id } });
+    await db.delete(tenantTable).where(eq(tenantTable.id, tenant.id));
+    await db.delete(tenantTable).where(eq(tenantTable.id, other.id));
   });
 });

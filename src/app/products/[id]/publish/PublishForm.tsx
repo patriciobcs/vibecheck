@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Proposal } from "@prisma/client";
+import type { Proposal } from "@/db/schema";
 import { redirect } from "next/navigation";
 import { tenantFromEnvironment } from "@/lib/auth";
 import { publishStudy } from "@/services/studies";
