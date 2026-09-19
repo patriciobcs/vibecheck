@@ -52,9 +52,9 @@ Certainty states: `insufficient_evidence`, `preliminary`, `repeated_observation`
 
 Compute a stable local fingerprint from product, journey, normalized problem type and semantic target; store baseline identity separately so observations can accumulate across versions. Search GitHub for the persisted issue mapping and a hidden VibeCheck finding marker before creating anything. Match close candidates cautiously; do not merge distinct symptoms solely because an agent says they sound similar.
 
-For an existing open issue, append new sanitized evidence or update a managed evidence section. For a closed issue that recurs, preserve history and link a recurrence or reopen only under configured policy. MVP default: create a linked recurrence issue after confirming it is not a duplicate current run.
+For an existing open issue, append new sanitized evidence or update a managed evidence section. If the latest successful publication already has at least the current observed-session count and the same certainty, record an `unchanged` publication without posting a redundant comment or emitting an issue-update event. For a closed issue that recurs, preserve history and link a recurrence or reopen only under configured policy. MVP default: create a linked recurrence issue after confirming it is not a duplicate current run.
 
-Issue content: problem and observed effect, task context, safe reproduction steps, tested version, evidence counts and limits, proposed experiment, functional constraints, private dashboard link, automation mode and provenance. Never publish participant names, email addresses, private recordings, raw transcripts, test credentials, or secret URLs to a public repository.
+Issue content: problem and observed effect, task context, safe reproduction steps, tested version, evidence counts and limits, proposed experiment, functional constraints, a dashboard link only when `APP_BASE_URL` is configured as a public URL, automation mode and provenance. Never publish participant names, email addresses, private recordings, raw transcripts, test credentials, or secret URLs to a public repository.
 
 The orchestrator, not an unconstrained analysis prompt, performs publication
 with an idempotency record. A `local` binding is the no-GitHub path: it records

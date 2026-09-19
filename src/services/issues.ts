@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   finding,
@@ -16,12 +16,13 @@ import type { IssuePublisher } from "@/publishers/types";
 import { githubIssuePublisher } from "@/publishers/github";
 import { hasGithubCredentials } from "@/publishers/githubAuth";
 import { memoryIssuePublisher } from "@/publishers/memory";
+import { isPrivateHostname } from "@/lib/destination";
 
-export function sanitizeForPublic(text: string, dashboardUrl: string) {
+export function sanitizeForPublic(text: string, dashboardUrl: string | null) {
   return text
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted email]")
     .replace(/https?:\/\/[^\s)]+/gi, (url) =>
-      url.startsWith(dashboardUrl) ? url : "[redacted url]",
+      dashboardUrl && url.startsWith(dashboardUrl) ? url : "[redacted url]",
     )
     .replace(/\bsession[_-][A-Za-z0-9_-]+\b/gi, "[redacted session]")
     .replace(
@@ -34,7 +35,7 @@ export function sanitizeForPublic(text: string, dashboardUrl: string) {
 export function renderIssueBody(
   row: Finding,
   plan: StudyPlan,
-  dashboardUrl: string,
+  dashboardUrl: string | null,
   recurrence?: number,
 ) {
   const marker = `<!-- vibecheck:fingerprint=${row.fingerprint} -->`;
@@ -82,8 +83,26 @@ ${sanitizeForPublic(row.suggestedExperiment ?? "No experiment proposed.", dashbo
 
 ### Automation
 - Mode: ${plan.automation.mode}
-- Dashboard: ${dashboardUrl}
+${dashboardUrl ? `- Dashboard: ${dashboardUrl}` : ""}
 `;
+}
+
+export function publicDashboardUrl(): string | null {
+  const configured = process.env.APP_BASE_URL?.trim();
+  if (!configured) return null;
+  try {
+    const parsed = new URL(configured);
+    if (!["http:", "https:"].includes(parsed.protocol) || isPrivateHostname(parsed.hostname)) {
+      return null;
+    }
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function readableCertainty(value: string) {
+  return value.replace(/_/g, " ");
 }
 
 function publisherFor(publisher?: IssuePublisher) {
@@ -167,17 +186,44 @@ export async function publishFinding(
   const repo = { owner: githubBinding.owner, repo: githubBinding.repo };
   const marker = `<!-- vibecheck:fingerprint=${row.fingerprint} -->`;
   const existingIssue = await issuePublisher.findByMarker(repo, marker);
-  const dashboardUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
-  let action: "created" | "updated";
+  const dashboardUrl = publicDashboardUrl();
+  let action: "created" | "updated" | "unchanged";
   let issueNumber: number;
   let issueUrl: string;
   if (existingIssue?.state === "open") {
-    await issuePublisher.comment(
-      repo,
-      existingIssue.number,
-      `Evidence update: ${row.observedSessionCount} observed of ${row.eligibleSessionCount} eligible sessions; certainty is ${row.certainty}.`,
-    );
-    action = "updated";
+    const [latest] = await db
+      .select()
+      .from(issuePublishRequest)
+      .where(
+        and(
+          eq(issuePublishRequest.tenantId, row.tenantId),
+          eq(issuePublishRequest.issueNumber, existingIssue.number),
+          eq(issuePublishRequest.repoOwner, repo.owner),
+          eq(issuePublishRequest.repoName, repo.repo),
+          inArray(issuePublishRequest.action, ["created", "updated"]),
+        ),
+      )
+      .orderBy(desc(issuePublishRequest.createdAt))
+      .limit(1);
+    const unchanged =
+      latest &&
+      latest.observedSessionCount !== null &&
+      latest.observedSessionCount >= row.observedSessionCount &&
+      latest.certainty === row.certainty;
+    if (unchanged) {
+      action = "unchanged";
+    } else {
+      const certaintyUpdate =
+        latest?.certainty && latest.certainty !== row.certainty
+          ? `; certainty raised from *${readableCertainty(latest.certainty)}* to *${readableCertainty(row.certainty)}*`
+          : "";
+      await issuePublisher.comment(
+        repo,
+        existingIssue.number,
+        `**Observed again** — a new session reproduced this finding (now ${row.observedSessionCount} of ${row.eligibleSessionCount} eligible sessions${certaintyUpdate}). Session evidence stays in the VibeCheck dashboard.`,
+      );
+      action = "updated";
+    }
     issueNumber = existingIssue.number;
     issueUrl = existingIssue.url;
   } else {
@@ -202,35 +248,18 @@ export async function publishFinding(
       action,
       issueNumber,
       issueUrl,
+      observedSessionCount: row.observedSessionCount,
+      certainty: row.certainty,
+      repoOwner: repo.owner,
+      repoName: repo.repo,
     });
-    await tx
-      .insert(outboxEvent)
-      .values({
-        eventId: randomUUID(),
-        eventType: action === "created" ? "issue.created" : "issue.updated",
-        idempotencyKey: `${row.id}:issue:${row.observedSessionCount}`,
-        tenantId: row.tenantId,
-        productId: studyRow.productId,
-        correlationId: row.id,
-        payload: {
-          finding_id: row.id,
-          issue_ref: {
-            provider: "github",
-            repo: `${githubBinding.owner}/${githubBinding.repo}`,
-            number: issueNumber,
-            url: issueUrl,
-          },
-        },
-        occurredAt: new Date(),
-      })
-      .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
-    if (planRow.plan.automation.mode !== "issues_only") {
+    if (action !== "unchanged") {
       await tx
         .insert(outboxEvent)
         .values({
           eventId: randomUUID(),
-          eventType: "finding.ready_for_repair",
-          idempotencyKey: `${row.id}:ready_for_repair:${row.observedSessionCount}`,
+          eventType: action === "created" ? "issue.created" : "issue.updated",
+          idempotencyKey: `${row.id}:issue:${row.observedSessionCount}`,
           tenantId: row.tenantId,
           productId: studyRow.productId,
           correlationId: row.id,
@@ -246,6 +275,29 @@ export async function publishFinding(
           occurredAt: new Date(),
         })
         .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
+      if (planRow.plan.automation.mode !== "issues_only") {
+        await tx
+          .insert(outboxEvent)
+          .values({
+            eventId: randomUUID(),
+            eventType: "finding.ready_for_repair",
+            idempotencyKey: `${row.id}:ready_for_repair:${row.observedSessionCount}`,
+            tenantId: row.tenantId,
+            productId: studyRow.productId,
+            correlationId: row.id,
+            payload: {
+              finding_id: row.id,
+              issue_ref: {
+                provider: "github",
+                repo: `${githubBinding.owner}/${githubBinding.repo}`,
+                number: issueNumber,
+                url: issueUrl,
+              },
+            },
+            occurredAt: new Date(),
+          })
+          .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
+      }
     }
   });
   return { action, issueNumber, issueUrl };

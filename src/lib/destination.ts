@@ -37,6 +37,15 @@ function blockedAddress(address: string) {
   return true;
 }
 
+export function isPrivateHostname(hostname: string) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    normalized === "localhost" ||
+    normalized.endsWith(".local") ||
+    (net.isIP(normalized) > 0 && blockedAddress(normalized))
+  );
+}
+
 export async function assertAllowedDestination(value: string, resolver: Resolver = resolveAll) {
   let parsed: URL;
   try {

@@ -196,11 +196,61 @@ describe.skipIf(!process.env.DATABASE_URL)("issue publication", () => {
     expect({
       action: result.action,
       comments: publisher.comments.length,
+      comment: publisher.comments[0],
       event: event?.eventType,
     }).toEqual({
       action: "updated",
       comments: 1,
+      comment:
+        "1:**Observed again** — a new session reproduced this finding (now 2 of 1 eligible sessions). Session evidence stays in the VibeCheck dashboard.",
       event: "issue.updated",
+    });
+    await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+  });
+
+  it("records unchanged without commenting when evidence counts are unchanged", async () => {
+    const data = await fixture({});
+    const publisher = new MemoryIssuePublisher();
+    await publishFinding(data.findingRow.id, publisher);
+    const [secondStudy] = await db
+      .insert(study)
+      .values({
+        tenantId: data.tenantRow.id,
+        productId: data.productRow.id,
+        status: "published",
+        currentRevision: 1,
+      })
+      .returning();
+    await db.insert(studyPlanRevision).values({
+      studyId: secondStudy.id,
+      revision: 1,
+      plan: makePlan(secondStudy.id, data.productRow.id, "issues_only"),
+      publishedAt: new Date(),
+    });
+    const { id, createdAt, updatedAt, issueRepo, issueNumber, issueUrl, ...secondValues } =
+      data.findingRow;
+    const [secondFinding] = await db
+      .insert(finding)
+      .values({ ...secondValues, id: randomUUID(), studyId: secondStudy.id })
+      .returning();
+    const result = await publishFinding(secondFinding.id, publisher);
+    const events = await db
+      .select()
+      .from(outboxEvent)
+      .where(
+        and(
+          eq(outboxEvent.tenantId, data.tenantRow.id),
+          eq(outboxEvent.eventType, "issue.updated"),
+        ),
+      );
+    expect({
+      action: result.action,
+      comments: publisher.comments.length,
+      events: events.length,
+    }).toEqual({
+      action: "unchanged",
+      comments: 0,
+      events: 0,
     });
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });
@@ -237,6 +287,32 @@ describe.skipIf(!process.env.DATABASE_URL)("issue publication", () => {
       hasRedaction: body.includes("[redacted"),
     }).toEqual({ hasTranscript: false, hasEmail: false, hasToken: false, hasRedaction: true });
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+  });
+
+  it("omits private dashboard links and preserves public dashboard links", async () => {
+    const previous = process.env.APP_BASE_URL;
+    try {
+      process.env.APP_BASE_URL = "http://localhost:3000";
+      const localData = await fixture({
+        observation: "Open http://localhost:3000/studies/private while reproducing this issue.",
+      });
+      const localPublisher = new MemoryIssuePublisher();
+      await publishFinding(localData.findingRow.id, localPublisher);
+      expect(localPublisher.issues[0].body).not.toContain("localhost");
+
+      process.env.APP_BASE_URL = "https://vibecheck.example.com";
+      const publicData = await fixture({});
+      const publicPublisher = new MemoryIssuePublisher();
+      await publishFinding(publicData.findingRow.id, publicPublisher);
+      expect(publicPublisher.issues[0].body).toContain(
+        "- Dashboard: https://vibecheck.example.com",
+      );
+      await db.delete(tenant).where(eq(tenant.id, localData.tenantRow.id));
+      await db.delete(tenant).where(eq(tenant.id, publicData.tenantRow.id));
+    } finally {
+      if (previous === undefined) delete process.env.APP_BASE_URL;
+      else process.env.APP_BASE_URL = previous;
+    }
   });
 
   it("emits repair only for automation modes beyond issues_only", async () => {

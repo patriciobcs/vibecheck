@@ -58,7 +58,7 @@ export const findingCertainty = pgEnum("FindingCertainty", [
   "repeated_observation",
   "contradictory",
 ]);
-export const issueAction = pgEnum("IssueAction", ["created", "updated", "skipped"]);
+export const issueAction = pgEnum("IssueAction", ["created", "updated", "unchanged", "skipped"]);
 
 export const tenant = pgTable("Tenant", {
   id: id(),
@@ -321,6 +321,10 @@ export const issuePublishRequest = pgTable(
     skipReason: text("skipReason").$type<"github_disconnected" | "no_token">(),
     issueNumber: integer("issueNumber"),
     issueUrl: text("issueUrl"),
+    observedSessionCount: integer("observedSessionCount"),
+    certainty: text("certainty"),
+    repoOwner: text("repoOwner"),
+    repoName: text("repoName"),
     createdAt: createdAt(),
   },
   (table) => [

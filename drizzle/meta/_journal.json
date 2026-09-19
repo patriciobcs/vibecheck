@@ -22,6 +22,13 @@
       "when": 1789849174413,
       "tag": "0002_free_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789860776893,
+      "tag": "0003_jittery_madame_web",
+      "breakpoints": true
     }
   ]
 }

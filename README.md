@@ -60,10 +60,11 @@ the Devin provider is not told that it watched recordings. GitHub issue
 publication uses a GitHub App installation token when `GITHUB_APP_ID` and
 `GITHUB_APP_PRIVATE_KEY` are configured; the PEM may contain `\n`-escaped
 newlines. `GITHUB_ISSUES_TOKEN` remains a development/test fallback, and
-`APP_BASE_URL` is used for dashboard links. Set `ISSUE_PUBLISHER=memory` for
-local in-process publication tests. Live GitHub publication targets the
-configured GitHub binding. The VC-02 evidence source will replace the fixture
-source when its owner API is available.
+`APP_BASE_URL` is used for dashboard links only when it is a public URL;
+localhost, private hosts and an unset value omit the link. Set
+`ISSUE_PUBLISHER=memory` for local in-process publication tests. Live GitHub
+publication targets the configured GitHub binding. The VC-02 evidence source
+will replace the fixture source when its owner API is available.
 
 The VC-03 demo binds the seeded product to the plain-copy GitHub repository
 `minasrc/excalidraw-demo`, configured by `DEMO_TARGET_REPO_OWNER` and
