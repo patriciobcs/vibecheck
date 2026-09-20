@@ -2,7 +2,7 @@ import { repairOutputJsonSchema } from "@vibecheck/contracts";
 import type { RepairContext } from "./types";
 
 export function buildRepairPrompt(context: RepairContext) {
-  return `You are implementing ONE bounded UX change for VibeCheck repair run ${context.repairRunId}. Echo that id verbatim.
+  return `You are implementing ONE bounded UX change for Seamless UX repair run ${context.repairRunId}. Echo that id verbatim.
 Repository: https://github.com/${context.repo.owner}/${context.repo.repo} at base commit ${context.baseCommitSha}. Work ONLY on a new branch named exactly
 "${context.branchName}" created from that commit, and push it to the same repository. Do not open a pull request, do not merge,
 do not touch other branches.

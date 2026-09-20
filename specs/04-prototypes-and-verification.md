@@ -28,7 +28,7 @@ Use a branch/worktree in an authorized repo by default. A GitHub fork can be con
 ### Preview deployment
 
 The supported real preview provider is Vercel's GitHub integration. The target repository
-builds previews automatically for branch pushes; VibeCheck does not trigger a deployment.
+builds previews automatically for branch pushes; Seamless UX does not trigger a deployment.
 After checks pass, it resolves the newest preview for the candidate SHA through Vercel's
 deployments API, waits up to `VERCEL_DEPLOY_TIMEOUT_MS`, and health-checks the resulting URL.
 `VERCEL_TOKEN` and `VERCEL_PROJECT_ID` are required, `VERCEL_TEAM_ID` is optional, and

@@ -1,6 +1,6 @@
 # Deploying the public demo
 
-Two deployments: the VibeCheck app at `vibecheck.patriciobcs.com` (Vercel, Next.js) and the
+Two deployments: the Seamless UX app at `vibecheck.patriciobcs.com` (Vercel, Next.js) and the
 instrumented Excalidraw clone at `excalidraw.patriciobcs.com` (Vercel, static Vite build). Both are
 plain Vercel projects; nothing here needs a long-running server. Cloudflare Pages/Workers is the
 fallback (notes at the end), but Vercel needs no adapter for Next 16.
@@ -26,7 +26,7 @@ pnpm db:migrate:prod && pnpm db:seed:prod          # prints the Excalidraw publi
 `.env.local` stays your local development config; `.env.production.local` is only read by the two
 `:prod` scripts and never by `pnpm dev`.
 
-## 2. VibeCheck on Vercel
+## 2. Seamless UX on Vercel
 
 Create a Vercel project from this repository with **Root Directory** `apps/web` (keep "Include files
 outside the root directory" on; it is a pnpm workspace). Framework preset: Next.js. Build command

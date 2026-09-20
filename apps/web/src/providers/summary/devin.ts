@@ -16,7 +16,7 @@ export function createDevinSummaryProvider(
         headers,
         body: JSON.stringify({
           prompt: buildSummaryPrompt(input),
-          title: `VibeCheck experiment summary ${run.id}`,
+          title: `Seamless UX experiment summary ${run.id}`,
           tags: ["vibecheck", "summary"],
           structured_output_schema: SummaryNarrativeOutputJsonSchema,
           max_acu_limit: cfg.maxAcu,

@@ -130,7 +130,7 @@ then resolves the Vercel preview created by the target repository's GitHub
 integration. The demo policy allows only `packages/excalidraw/` and
 `excalidraw-app/` and preserves the five required functional invariants. It
 does not trigger deployments; Vercel builds the Devin repair branch and
-VibeCheck resolves the preview by candidate SHA. Real repository modification
+Seamless UX resolves the preview by candidate SHA. Real repository modification
 and Excalidraw acceptance checks remain pending.
 
 ## Demo journey (2026-09-21)

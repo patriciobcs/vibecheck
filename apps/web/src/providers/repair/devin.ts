@@ -38,7 +38,7 @@ export function createDevinRepairProvider(cfg: DevinConfig): RepairProvider {
         headers: { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json" },
         body: JSON.stringify({
           prompt: buildRepairPrompt(context),
-          title: `VibeCheck repair ${context.repairRunId}`,
+          title: `Seamless UX repair ${context.repairRunId}`,
           tags: ["vibecheck", "repair"],
           structured_output_schema: repairOutputJsonSchema,
           max_acu_limit: cfg.maxAcu,
