@@ -17,6 +17,7 @@ import {
   sweepIdleJourneys,
 } from "@/domain/monitoring/screening";
 import { runRepair } from "@/domain/repairs";
+import { generateSummary } from "@/domain/summaries";
 import { env } from "@/lib/env";
 import { jevClient, mediaClient, sttClient } from "@/providers";
 import { storage } from "@/providers/storage";
@@ -42,6 +43,10 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
       return publishFinding((payload as { findingId: string }).findingId);
     case "repair.run":
       return runRepair((payload as { repairRunId: string }).repairRunId);
+    case "summary.generate": {
+      const p = payload as { tenantId: string; studyId: string; studyRevision: number };
+      return generateSummary(p.tenantId, p.studyId, p.studyRevision);
+    }
     case "monitoring.scan": {
       const p = payload as {
         journeyInstanceId: string;

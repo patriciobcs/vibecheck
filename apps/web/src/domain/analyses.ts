@@ -17,6 +17,7 @@ import { emitEvent } from "./events";
 import { type EvidenceSource, persistedEvidenceSource } from "./evidence";
 import { fixtureEvidenceSource } from "./evidence-source";
 import { enqueueJob } from "./jobs";
+import { enqueueSummary } from "./summaries";
 
 type AnalysisDeps = { source?: EvidenceSource; provider?: AnalysisProvider };
 
@@ -299,6 +300,7 @@ export async function handleAnalysisRun(runId: string, deps: AnalysisDeps = {}, 
       .update(schema.analysisRuns)
       .set({ status: "failed", error: "unsupported_citations", updatedAt: new Date() })
       .where(eq(schema.analysisRuns.id, run.id));
+    await enqueueSummary(db, run.tenantId, run.studyId, study.currentRevision);
     return;
   }
   await persistAnalysis(run, study, product, revision, evidence, validated.data);
@@ -408,6 +410,7 @@ async function persistAnalysis(
       idempotencyKey: `${run.id}:analysis_completed`,
       payload: { finding_ids: findingIds },
     });
+    await enqueueSummary(tx, run.tenantId, run.studyId, study.currentRevision);
     if (binding.success && (binding.data.provider === "local" || binding.data.issues_enabled)) {
       for (const findingId of findingIds)
         await enqueueJob(

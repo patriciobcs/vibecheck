@@ -8,6 +8,8 @@ export const EVENT_TYPES = [
   "session.upload_verified",
   "session.analysis_ready",
   "analysis.completed",
+  "participation.recorded",
+  "summary.generated",
   "issue.created",
   "issue.updated",
   "finding.ready_for_repair",

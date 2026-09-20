@@ -7,6 +7,7 @@ import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { db, schema } from "@/db/client";
 import { ownerContext } from "@/domain/owner-products";
 import { RepairSection } from "./_components/RepairSection";
+import { latestSummary } from "@/domain/summaries";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,8 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
         orderBy: schema.previews.createdAt,
       })
     : [];
+  const summaryResult = await latestSummary(study.tenantId, study.id);
+  const summary = summaryResult.latest?.summary;
   const activeAnalysis = analyses.some(
     (run) => run.status === "queued" || run.status === "analysing",
   );
@@ -178,6 +181,127 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
           )}
         </section>
       </div>
+      <section className="surface mt-6 p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Experiment summary
+          </p>
+          {summary ? (
+            <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium capitalize">
+              {summary.status}
+            </span>
+          ) : null}
+          {summary && summary.provenance !== "human_session" ? <SampleBadge /> : null}
+        </div>
+        {!summary || summary.status === "collecting" ? (
+          <p className="mt-4 rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+            Collecting — complete sessions will appear here once they are eligible for analysis.
+          </p>
+        ) : (
+          <>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="pb-2 font-medium">Participation</th>
+                    <th className="pb-2 font-medium">Count</th>
+                    <th className="pb-2 font-medium">Denominator</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(
+                    [
+                      "invited",
+                      "accepted",
+                      "started",
+                      "completed",
+                      "abandoned",
+                      "dismissed",
+                    ] as const
+                  ).map((kind) => (
+                    <tr key={kind} className="border-t">
+                      <td className="py-2 capitalize">{kind}</td>
+                      <td className="py-2">{summary.participation[kind]}</td>
+                      <td className="py-2 text-muted-foreground">
+                        {summary.participation.invited}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <p className="font-medium">Sessions</p>
+                <p className="mt-1 text-muted-foreground">
+                  {summary.sessions.eligible} eligible · {summary.sessions.excluded.length} excluded
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Outcomes</p>
+                <p className="mt-1 text-muted-foreground">
+                  {summary.sessions.outcomes.completed} completed ·{" "}
+                  {summary.sessions.outcomes.stuck} stuck · {summary.sessions.outcomes.gave_up} gave
+                  up · {summary.sessions.outcomes.withdrew} withdrew
+                </p>
+              </div>
+            </div>
+            <div className="mt-5">
+              <p className="font-medium">Themes</p>
+              {summary.themes.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">No recurring themes yet.</p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {summary.themes.map((theme) => (
+                    <article key={theme.finding_id} className="rounded-xl border p-3 text-sm">
+                      <h2 className="font-medium">{theme.title}</h2>
+                      <p className="text-xs text-muted-foreground">
+                        {theme.category} · {theme.certainty} · {theme.observed_session_count}/
+                        {theme.eligible_session_count} eligible sessions
+                      </p>
+                      <p className="mt-2">{theme.observation}</p>
+                      {theme.issue_ref ? (
+                        <a
+                          className="mt-2 inline-block text-sm underline"
+                          href={theme.issue_ref.url}
+                        >
+                          GitHub issue
+                        </a>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+            {summary.narrative.headline ? (
+              <div className="mt-5 border-t pt-5">
+                <p className="font-medium">{summary.narrative.headline}</p>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {summary.narrative.observations.map((observation) => (
+                    <li key={observation.text}>
+                      {observation.text}
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {observation.finding_ids
+                          .map(
+                            (findingId) =>
+                              findings.find((finding) => finding.id === findingId)?.title,
+                          )
+                          .filter(Boolean)
+                          .join(", ")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {summary.narrative.limitations.length ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Limitations: {summary.narrative.limitations.join(" ")}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
     </Shell>
   );
 }

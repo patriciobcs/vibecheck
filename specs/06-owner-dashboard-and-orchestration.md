@@ -61,6 +61,8 @@ Use the shared envelope and schema validation. Initial events:
 - `detector.published`, `observation.batch_received`, `evaluation.requested`, `evaluation.completed`, `research_candidate.updated`
 - `discovery.completed`, `study.published`, `assignment.claimed`
 - `session.upload_verified`, `session.analysis_ready`, `analysis.completed`
+- `participation.recorded`
+- `summary.generated`
 - `issue.created`, `issue.updated`, `finding.ready_for_repair`
 - `repair.candidate_ready`, `repair.draft_pr_ready`, `checks.completed`, `preview.ready`
 - `retest.requested`, `validation.updated`, `workflow.blocked`
