@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { AssignmentView } from "@/domain/assignment-view";
@@ -421,7 +422,7 @@ function Frame({
     <section className="w-[404px] max-w-[100vw] p-5 text-foreground" aria-label={title}>
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-tight text-muted-foreground">
-          <span className="inline-block size-1.5 rounded-full bg-brand" /> VibeCheck
+          <LogoMark className="size-3.5 text-brand" /> VibeCheck
         </span>
         <div className="flex items-center gap-2">
           {idx >= 0 ? (
