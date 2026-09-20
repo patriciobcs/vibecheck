@@ -48,9 +48,10 @@ Environment variables (Production):
 | `SLNG_API_KEY`, `JEV_API_KEY`, `DEVIN_API_KEY` (optional) | from `.env.local` |
 | `EMAIL_MODE` | `test_inbox` (no email provider; demo sign-in never needs one) |
 
-`apps/web/vercel.json` schedules `/api/internal/drain` every minute: it sweeps idle journeys, retries
-deferred evaluations and runs any job the inline path missed. On the Hobby plan crons run at most
-daily; either upgrade or point a free scheduler (cron-job.org) at
+`apps/web/vercel.json` schedules `/api/internal/drain` once a day (the Hobby plan's cron limit): it
+sweeps idle journeys, retries deferred evaluations and runs any job the inline path missed. Inline
+execution handles the demo flow on its own; for a per-minute sweep either use `* * * * *` on the Pro
+plan or point a free scheduler (cron-job.org) at
 `GET https://vibecheck.patriciobcs.com/api/internal/drain` with `Authorization: Bearer <CRON_SECRET>`.
 
 Function limits: inline jobs run inside the request's `after()` window (60 s on Hobby, 300 s on Pro).
