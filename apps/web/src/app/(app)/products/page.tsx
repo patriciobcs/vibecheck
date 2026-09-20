@@ -47,7 +47,7 @@ export default async function ProductsPage() {
           </p>
         </div>
         <Button asChild className="rounded-full px-5">
-          <Link href="/products/new">Connect product</Link>
+          <Link href="/products/new">Add project</Link>
         </Button>
       </div>
       {products.length === 0 ? (

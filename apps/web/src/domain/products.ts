@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { type ProductConfig, ProductConfigSchema } from "@vibecheck/contracts";
 import { and, eq } from "drizzle-orm";
-import { db, schema } from "@/db/client";
+import { db, schema, type Tx } from "@/db/client";
 import { assertAllowedDestination } from "@/lib/destination";
 import { newId, newToken } from "@/lib/ids";
 import type { DiscoveryProviderName } from "@/providers/discovery/types";
@@ -18,6 +18,7 @@ export async function createProduct(
   tenantId: string,
   input: unknown,
   resolver?: Resolver,
+  database: typeof db | Tx = db,
 ): Promise<ProductRow> {
   const config = ProductConfigSchema.parse(input);
   let status: "ready" | "needs_setup" = "ready";
@@ -29,7 +30,7 @@ export async function createProduct(
     status = "needs_setup";
     setupError = err instanceof Error ? err.message : "destination_not_allowed";
   }
-  const [created] = await db
+  const [created] = await database
     .insert(schema.products)
     .values({
       id: newId("product"),

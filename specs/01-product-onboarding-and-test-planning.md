@@ -10,22 +10,24 @@ Let an owner describe and connect a product, have an agent identify useful UX ch
 
 ## Owner experience
 
-1. Create a product with name, description, URL, supported language and intended audience.
-2. Connect GitHub through an installation scoped to selected repositories. The shared `repo_binding`
+1. From the landing page, choose **Add your project**. Sign in once with email; the return path leads to `/products/new`. Require only a project name and an HTTP(S) app URL. A deployed preview is sufficient. A description, audience, language, origin override, release notes, complaints and journeys live in a collapsed optional section; sample labeling remains alongside imported context. English is the default language, and the app URL's origin (without path/query) is the default SDK allowlist. No repository, credentials, company profile or technical setup is required to save the project.
+2. A signed-in user with no memberships gets a private workspace and owner membership when the first project is saved, in the same transaction. Concurrent submissions reuse that workspace. Existing owners/admins/researchers use their authorized workspace; multiple writable workspaces require an explicit choice. Viewers cannot create projects or acquire elevated access. Account email is not collected again in the project form.
+3. Run discovery from the saved project and choose a proposed study. With no release notes, discovery inspects available app context and proposes exploratory tasks, or reports `cannot_assess` / `needs_setup` honestly. Project creation does not install the SDK, enable monitoring, run an agent or publish a study automatically.
+4. When GitHub issues or repairs are needed, connect GitHub through an installation scoped to selected repositories. The shared `repo_binding`
    is validated as either `{ provider: "github", owner, repo, default_branch?, baseline_commit_sha? }`
    or `{ provider: "local", path, baseline_commit_sha? }`. A URL-only research setup remains usable,
    but repair modes are disabled until repository setup passes.
-3. Identify the base branch, preview/build workflow, startup and test commands, test data reset command, supported origins and credentials via secret references.
-4. Supply optional release notes, support complaints, known journeys and product events. Mark imported/sample material and its provenance.
-5. Run discovery. Show progress and actionable connection errors.
+5. For repair setup, identify the base branch, preview/build workflow, startup and test commands, test data reset command, supported origins and credentials via secret references.
 6. Display proposed tasks as cards: neutral participant task, optional agent-designed scenario, research question, rationale, supporting candidates, eligibility, estimated duration and confidence/uncertainty.
 7. Owner edits/selects cards and chooses delivery, capture, recruitment and automation settings. Publish selected studies. Default to one task per study in the MVP.
+
+The optional section preserves richer onboarding without requiring founders to understand research inputs before saving. The HTTP API's `ProductConfig` shape and defaults are unchanged; origin derivation is specific to the onboarding form and does not widen explicit API allowlists or migrate existing products. No schema migration is required. The form validates on the server, retains submitted values on errors and disables resubmission while saving.
 
 ## Agent behavior
 
 Discovery runs through a provider adapter. Two providers exist: `devin` uses a Devin analysis session with a structured-output schema; `fixture` returns deterministic, sample-labeled proposals for local development and tests and is never presented as agent inference. Use a Devin analysis session to inspect authorized product/repository context. This stage is read-only with respect to the target product: no issue creation or code mutation. Prioritize changed journeys, observed friction and high-value actions with weak evidence. A repository scan alone cannot establish that users struggle.
 
-Return structured proposed tasks with evidence references, a rationale and an optional neutral scenario. Distinguish a passive candidate from a hypothesis, and observed data from model inference. If there are no events, propose exploratory studies and label them accordingly. Do not invent traffic, complaints or observed failures.
+Return structured proposed tasks with evidence references, a rationale and an optional neutral scenario. Distinguish a passive candidate from a hypothesis, and observed data from model inference. Prioritize supplied release notes when present; their absence must not restrict discovery to an empty feature list. Use the app URL and any description, audience or journeys for exploratory planning. If there are no events, propose exploratory studies and label them accordingly. Do not invent traffic, complaints or observed failures. If no registered success/eligibility rules fit, return `cannot_assess` with the missing setup rather than assigning an unrelated demo rule.
 
 Task prompts describe realistic goals without naming the control to click or suspected problem. Do not ask participants to be negative, design a solution, or prove a predefined hypothesis. Keep researcher-only expected outcomes and validator rules out of the participant prompt.
 
@@ -134,6 +136,11 @@ Additional acceptance criteria:
 ## Acceptance criteria
 
 - An owner can connect a product, inspect proposed tasks and publish only selected tasks.
+- A first-time signed-in founder can save a project with only name and URL, receives a private owner workspace, and lands on the saved project with discovery as the next action.
+- The default form shows two project inputs; optional context is keyboard-accessible through a disclosure. Multiple existing workspaces add a required authorized workspace choice.
+- The app origin is derived correctly for URLs containing paths, queries or ports; an explicit origin override is preserved and destination checks still apply.
+- Invalid input preserves the form values and creates no workspace/product. Concurrent first submissions create only one owner workspace. Existing viewer and cross-tenant restrictions remain enforced.
+- Minimal context reaches exploratory discovery without fabricated release notes; no matching registered rules remains an explicit limitation.
 - A second tenant cannot read or modify that product or its source context.
 - Sample complaint data is labeled in the task rationale and dashboard.
 - The agent can return no useful proposal without causing downstream work.
@@ -150,6 +157,8 @@ wizard UX, `launch_policy` / `auto_launch` and automatic limits, editing proposa
 publication (only `participant_prompt` and `time_limit_seconds` are overridable), study revisions
 after the first, and the `recruiting` transition, which belongs to VC-02. The product binding shape
 is validated at persistence boundaries and consumed by VC-03 publication.
+
+Live sign-in email delivery is not implemented: the current adapter writes magic links to the development test inbox. Saving arbitrary projects is supported, but registered success/eligibility rules remain demo-specific; a useful publishable study for an arbitrary app is not guaranteed by completing this form. Product context editing after creation is not yet implemented.
 
 ## Open decisions / future changes
 
