@@ -121,6 +121,15 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 
 Update this record with measured facts during implementation; do not infer completion from the presence of this spec.
 
+## VC-04 demo policy
+
+The first repair slice uses deterministic fixture repair, validation and preview
+adapters. The demo policy allows only `packages/excalidraw/` and
+`excalidraw-app/` and preserves the five required functional invariants. It
+does not create branches, PRs or deployments in the demo repository. Real
+repository modification, Excalidraw acceptance checks and Vercel deployment
+remain pending.
+
 ## Demo journey (2026-09-21)
 
 The recorded demo shows a real Excalidraw friction: a user who wants an image of their drawing tries the top-right "Share" button (which opens live collaboration), closes it, tries again, asks for help, and only then finds "Export image…" in the main menu. The fork (`excalidraw-app/vibecheck.ts`) reports this as `navigation` (`/dialog/share`, `/canvas`, `/menu/main`), `action_attempt`/`action_result` (`share_button` cancelled, `export_image` success), `help_request`, `progress` and `completion`; a completed journey only restarts when a new element is drawn. The fixture detector (version 2) asks Jev, in addition to the base questions, whether the export dialog was reached, whether a wrong path was taken, whether the goal was reached, whether the user recovered after help, and which confusion source fits (share mistaken for export, export hidden in menu, export dialog unclear, none). Verified live: `jev-1.13.0` answered friction 0.95, research 0.81, evidence sufficient, wrong path 0.97, recovered after help 0.97, source `share_mistaken_for_export`, and a research candidate was created. `pnpm demo:record` replays the journey twice: passively (screening) and as an audio-only study (transcript).

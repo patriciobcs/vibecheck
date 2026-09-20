@@ -16,6 +16,7 @@ import {
   scanJourney,
   sweepIdleJourneys,
 } from "@/domain/monitoring/screening";
+import { runRepair } from "@/domain/repairs";
 import { env } from "@/lib/env";
 import { jevClient, mediaClient, sttClient } from "@/providers";
 import { storage } from "@/providers/storage";
@@ -39,6 +40,8 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
       return handleAnalysisRun((payload as { analysisRunId: string }).analysisRunId);
     case "issue.publish":
       return publishFinding((payload as { findingId: string }).findingId);
+    case "repair.run":
+      return runRepair((payload as { repairRunId: string }).repairRunId);
     case "monitoring.scan": {
       const p = payload as {
         journeyInstanceId: string;

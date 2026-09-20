@@ -1,6 +1,6 @@
-import type { ExistingIssue, IssuePublisher, IssueRepository, PublishedIssue } from "./types";
+import type { ExistingIssue, IssueRepository, PublishedIssue, RepoPublisher } from "./types";
 
-export class MemoryIssuePublisher implements IssuePublisher {
+export class MemoryIssuePublisher implements RepoPublisher {
   readonly issues: ExistingIssue[] = [];
   readonly comments: string[] = [];
   createCalls = 0;
@@ -26,6 +26,21 @@ export class MemoryIssuePublisher implements IssuePublisher {
   }
   async getDefaultBranch() {
     return "master";
+  }
+  async getBranchSha(_repo: IssueRepository, branch: string) {
+    return branch ? "candidate-sha" : null;
+  }
+  async getCommit() {
+    return true;
+  }
+  async compareFiles() {
+    return ["packages/excalidraw/components/Toolbar.tsx"];
+  }
+  async createDraftPullRequest(
+    _repo: IssueRepository,
+    _input: { title: string; head: string; base: string; body: string },
+  ) {
+    return { number: 1, url: "https://github.com/example/repo/pull/1" };
   }
 }
 

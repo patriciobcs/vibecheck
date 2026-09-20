@@ -9,6 +9,7 @@ import { githubIssuePublisher } from "@/providers/github/github";
 import { memoryIssuePublisher } from "@/providers/github/memory";
 import type { IssuePublisher } from "@/providers/github/types";
 import { emitEvent } from "./events";
+import { enqueueRepair } from "./repairs";
 
 export function sanitizeForPublic(text: string, dashboardUrl: string | null) {
   return text
@@ -157,6 +158,7 @@ export async function publishFinding(
   if (found?.state === "open") {
     const latest = await db.query.issuePublishRequests.findFirst({
       where: and(
+        eq(schema.issuePublishRequests.tenantId, row.tenantId),
         eq(schema.issuePublishRequests.issueNumber, found.number),
         eq(schema.issuePublishRequests.repoOwner, repo.owner),
         eq(schema.issuePublishRequests.repoName, repo.repo),
@@ -234,7 +236,8 @@ export async function publishFinding(
           },
         },
       });
-      if (StudyPlanSchema.parse(revision.plan).automation.mode !== "issues_only")
+      const plan = StudyPlanSchema.parse(revision.plan);
+      if (plan.automation.mode !== "issues_only") {
         await emitEvent(tx, {
           type: "finding.ready_for_repair",
           tenantId: row.tenantId,
@@ -251,6 +254,17 @@ export async function publishFinding(
             },
           },
         });
+        await enqueueRepair(
+          tx,
+          row,
+          {
+            repo: `${repo.owner}/${repo.repo}`,
+            number: issueNumber,
+            url: issueUrl,
+          },
+          plan,
+        );
+      }
     }
   });
   return { action, issueNumber, issueUrl };

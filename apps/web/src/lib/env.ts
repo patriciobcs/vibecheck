@@ -34,6 +34,9 @@ const CoreSchema = z.object({
   // VC-01 discovery
   DISCOVERY_PROVIDER: z.enum(["fixture", "devin"]).default("fixture"),
   ANALYSIS_PROVIDER: z.enum(["fixture", "devin"]).optional(),
+  REPAIR_PROVIDER: z.enum(["fixture", "devin"]).default("fixture"),
+  VALIDATOR: z.enum(["fixture"]).default("fixture"),
+  PREVIEW_PROVIDER: z.enum(["fixture"]).default("fixture"),
   DEVIN_API_KEY: optionalSecret,
   DEVIN_API_BASE: z.url().default("https://api.devin.ai/v1"),
   DEVIN_POLL_MS: z.coerce.number().int().positive().default(10_000),
