@@ -13,6 +13,8 @@ Give owners a coherent view of research and implementation progress, configurabl
 
 The landing page's primary **Add your project** CTA leads to `/products/new`, preserving that destination through sign-in. Workspace/demo navigation and participant entry remain available. The initial form requires project name and app URL; optional research and technical fields are disclosed on demand (VC-01). Email belongs to sign-in, not project setup.
 
+The landing page includes a static, numbered flow chart showing the connected toolchain: SDK events → Jev friction screening → a consented study recorded through Vonage → SLNG transcription → Devin analysis and evidence-backed insights → checked code changes and a GitHub draft PR → a Vercel preview. Jev screens app events before research; it is not shown as consuming recordings or transcripts. The chart explains configured integrations rather than reporting a live run, states the repository/code-change prerequisites, and labels deployment as a preview for review. It reads left to right on wide screens and top to bottom on smaller screens, with semantic text and decorative arrows.
+
 A user without memberships receives a private owner workspace only when submitting a valid first project. Creation locks the user row and commits the tenant, owner membership and product together; concurrent submissions reuse the membership. Existing roles are preserved, viewers cannot add projects, and owners with several writable workspaces must choose one explicitly. Saving a project does not activate monitoring, issue publication or repair. Live email delivery and post-creation product configuration editing remain unimplemented.
 
 ### Product overview
@@ -127,6 +129,7 @@ Additional acceptance criteria:
 
 ## Acceptance criteria
 
+- The public landing flow chart names each integration's role in order, remains readable on narrow screens, and distinguishes preview deployment from production release.
 - Owner can move from product setup to evidence to issue/preview without losing context.
 - A new founder can move from the landing CTA through sign-in to saving a project without a pre-seeded tenant or duplicate email/company details; workspace creation and role checks are enforced on the server.
 - Each automation mode has a correct terminal state and clear UI label.
