@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
 import { resetDb } from "@/test/db";
-import { completeJob, enqueueJob, failJob, leaseNextJob } from "./jobs";
+import { completeJob, enqueueJob, failJob, leaseNextJob, nextDueAt } from "./jobs";
 
 beforeEach(resetDb);
 
@@ -82,6 +82,18 @@ describe("job queue", () => {
     const onlyB = await leaseNextJob({ workerId: "w", leaseSeconds: 60, types: ["b"] });
     expect(onlyB?.type).toBe("b");
     expect(await leaseNextJob({ workerId: "w", leaseSeconds: 60, types: ["b"] })).toBeNull();
+  });
+
+  it("reports when the next queued job is due, ignoring running and finished ones", async () => {
+    expect(await nextDueAt()).toBeNull();
+    const soon = new Date(Date.now() + 5_000);
+    await enqueueJob({ type: "t", payload: {}, runAt: new Date(Date.now() + 60_000) });
+    await enqueueJob({ type: "t", payload: {}, runAt: soon });
+    expect((await nextDueAt())?.getTime()).toBe(soon.getTime());
+    await enqueueJob({ type: "t", payload: {} });
+    const leased = await leaseNextJob({ workerId: "w", leaseSeconds: 30 });
+    expect(leased).not.toBeNull();
+    expect((await nextDueAt())?.getTime()).toBe(soon.getTime());
   });
 
   it("marks a job done", async () => {

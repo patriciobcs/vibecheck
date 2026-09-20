@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, or } from "drizzle-orm";
 import { type Db, db, schema, type Tx } from "@/db/client";
 import { newId } from "@/lib/ids";
 
@@ -43,25 +43,57 @@ export async function enqueueJob(
   return existing;
 }
 
+/** How long an inline drain keeps following the queue after its request (must fit the function limit). */
+const INLINE_DRAIN_BUDGET_MS = 50_000;
+/** A queued job due within this horizon is waited for; anything later is left to the next request or cron. */
+const INLINE_DRAIN_HORIZON_MS = 10_000;
+
 /**
  * Serverless deployments have no worker process. With INLINE_JOBS=true, a request that enqueues a
  * job also runs the queue after its response is sent (Next's `after`), waiting out short batch
- * delays. Outside a request (worker, tests) this is a no-op; a cron drain catches stragglers.
+ * delays and following jobs that requeue themselves (archive reconciliation) for a bounded time.
+ * Outside a request (worker, tests) this is a no-op; a cron drain catches stragglers.
  */
 function scheduleInlineDrain(runAt: Date) {
   if (process.env.INLINE_JOBS !== "true") return;
-  const delay = Math.min(8000, Math.max(0, runAt.getTime() - Date.now()));
+  const delay = Math.min(INLINE_DRAIN_HORIZON_MS, Math.max(0, runAt.getTime() - Date.now()));
   import("next/server")
     .then(({ after }) => {
-      after(async () => {
-        if (delay > 0) await new Promise((r) => setTimeout(r, delay + 200));
-        const { drain } = await import("@/worker/runner");
-        await drain("inline", 10);
-      });
+      after(() => inlineDrainLoop(delay));
     })
     .catch(() => {
       /* not inside a request: the cron drain will pick it up */
     });
+}
+
+/** Any request may nudge the queue (the live board polls while a study finishes). */
+export function kickInlineDrain() {
+  scheduleInlineDrain(new Date());
+}
+
+async function inlineDrainLoop(firstDelayMs: number) {
+  const { drain } = await import("@/worker/runner");
+  const deadline = Date.now() + INLINE_DRAIN_BUDGET_MS;
+  let wait = firstDelayMs;
+  while (Date.now() + wait < deadline) {
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait + 200));
+    await drain("inline", 10);
+    const due = await nextDueAt();
+    if (!due) return;
+    wait = Math.max(0, due.getTime() - Date.now());
+    if (wait > INLINE_DRAIN_HORIZON_MS) return;
+  }
+}
+
+/** When the earliest queued job may run, or null when nothing is queued. */
+export async function nextDueAt(): Promise<Date | null> {
+  const [row] = await db
+    .select({ nextRunAt: schema.jobs.nextRunAt })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.status, "queued"))
+    .orderBy(asc(schema.jobs.nextRunAt))
+    .limit(1);
+  return row?.nextRunAt ?? null;
 }
 
 /** Atomically leases the next runnable job (queued and due, or running with an expired lease). */

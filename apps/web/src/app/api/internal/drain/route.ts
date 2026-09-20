@@ -1,7 +1,7 @@
 import { retryDeferredEvaluations, sweepIdleJourneys } from "@/domain/monitoring/screening";
 import { fail, json, route } from "@/lib/api";
 import { env } from "@/lib/env";
-import { drain } from "@/worker/runner";
+import { drain, sweepArchives } from "@/worker/runner";
 
 export const maxDuration = 60;
 
@@ -16,8 +16,14 @@ async function handle(req: Request) {
   if (!secret || bearer !== secret) return fail(401, "unauthorized");
   const swept = await sweepIdleJourneys();
   const retried = await retryDeferredEvaluations();
+  const archives = await sweepArchives();
   const ran = await drain("cron", 25);
-  return json({ swept: swept.length, retried: retried.length, ran: ran.length });
+  return json({
+    swept: swept.length,
+    retried: retried.length,
+    archives: archives.length,
+    ran: ran.length,
+  });
 }
 
 export const GET = route(handle);

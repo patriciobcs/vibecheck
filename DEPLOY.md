@@ -54,6 +54,11 @@ execution handles the demo flow on its own; for a per-minute sweep either use `*
 plan or point a free scheduler (cron-job.org) at
 `GET https://vibecheck.patriciobcs.com/api/internal/drain` with `Authorization: Bearer <CRON_SECRET>`.
 
+Archive callbacks are optional: after a recording stops, an `archive.reconcile` job asks Vonage for
+the archive's status every few seconds (inside the same `after()` window) and queues the download as
+soon as it is available; the live board's polling and the drain endpoint also nudge the queue. The
+Vonage callback still works when it arrives (same dedupe key), it is just not required.
+
 Function limits: inline jobs run inside the request's `after()` window (60 s on Hobby, 300 s on Pro).
 Archive download + transcription of a short demo recording fits; a Devin discovery run does not and
 stays for `pnpm worker` locally (the fixture provider is instant and is the demo default).

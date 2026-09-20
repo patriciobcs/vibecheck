@@ -1,4 +1,9 @@
-import { fetchArchiveJob, transcribeAssetJob } from "@/domain/archive-pipeline";
+import {
+  fetchArchiveJob,
+  reconcileArchiveJob,
+  reconcileStaleArchives,
+  transcribeAssetJob,
+} from "@/domain/archive-pipeline";
 import {
   handleDiscoveryRun,
   markDiscoveryRunFailed,
@@ -24,6 +29,12 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
       if (!media) throw new Error("Vonage is not configured; cannot fetch archive");
       return fetchArchiveJob(payload as { archiveId: string }, { media, storage: storage() });
     }
+    case "archive.reconcile": {
+      const media = mediaClient();
+      if (!media) throw new Error("Vonage is not configured; cannot reconcile archive");
+      await reconcileArchiveJob(payload as { archiveId: string; attempt?: number }, { media });
+      return;
+    }
     case "asset.transcribe": {
       const stt = sttClient();
       if (!stt) throw new Error("SLNG is not configured; cannot transcribe");
@@ -43,6 +54,7 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     case "monitoring.sweep":
       await sweepIdleJourneys();
       await retryDeferredEvaluations();
+      await sweepArchives();
       return;
     case "jev.evaluate": {
       const jev = jevClient();
@@ -67,6 +79,13 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     default:
       throw new Error(`unknown job type ${type}`);
   }
+}
+
+/** Provider check for uploaded assets whose callback never came; a no-op without Vonage. */
+export async function sweepArchives() {
+  const media = mediaClient();
+  if (!media) return [];
+  return reconcileStaleArchives({ media });
 }
 
 /** Reflect a job failure on the domain object it drives (a retryable failure returns a run to `queued`). */
