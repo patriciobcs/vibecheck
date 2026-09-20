@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { agentOutputJsonSchema, agentOutputSchema } from "./agentOutput";
 import { studyPlanSchema } from "./studyPlan";
-import { analysisOutputSchema } from "./analysisOutput";
+import { analysisOutputSchema, titleSchema } from "./analysisOutput";
 import { sessionManifestSchema } from "./session";
 import { repoBindingSchema } from "./repoBinding";
 
@@ -89,6 +89,21 @@ describe("contracts", () => {
     const output = await import("../../fixtures/analysis/sample_session_capture_ideas.json");
     expect(sessionManifestSchema.parse(manifest.default).provenance).toBe("fixture");
     expect(analysisOutputSchema.parse(output.default).findings).toHaveLength(1);
+  });
+  it("accepts and rejects finding title formats", () => {
+    expect(titleSchema.safeParse("Toolbar: sticky note tool is hard to discover").success).toBe(
+      true,
+    );
+    for (const title of [
+      "Toolbar: sticky note tool is hard to discover.",
+      "sticky note tool is hard to discover",
+      "TOOLBAR: STICKY NOTE TOOL IS HARD TO DISCOVER",
+      ": sticky note tool is hard to discover",
+      "Toolbar: ",
+      "Toolbar: this title is intentionally much longer than seventy-two characters and fails",
+    ]) {
+      expect(titleSchema.safeParse(title).success).toBe(false);
+    }
   });
   it("rejects findings for a no-finding outcome", () => {
     expect(

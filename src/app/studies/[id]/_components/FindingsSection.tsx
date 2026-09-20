@@ -8,9 +8,10 @@ export function FindingsSection({ findings }: { findings: Finding[] }) {
       <div className="grid">
         {findings.map((finding) => (
           <article key={finding.id}>
-            <h3>
+            <h3>{finding.title}</h3>
+            <p>
               {finding.category} · {finding.semanticTarget}
-            </h3>
+            </p>
             <p>
               {finding.certainty} · {finding.observedSessionCount}/{finding.eligibleSessionCount}{" "}
               sessions · {finding.impact}

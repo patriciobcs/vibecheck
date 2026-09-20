@@ -19,6 +19,39 @@ export const FINDING_IMPACTS = [
   "positive",
 ] as const;
 export const MAX_FINDINGS = 5;
+export const FINDING_TITLE_MAX = 72;
+
+export const titleSchema = z
+  .string()
+  .min(8)
+  .max(FINDING_TITLE_MAX)
+  .refine((title) => !title.endsWith("."), {
+    message: "title must not end with a period",
+  })
+  .refine((title) => /[a-z]/.test(title), {
+    message: "title must not be all caps",
+  })
+  .refine((title) => title.match(/: /g)?.length === 1, {
+    message: "title must contain exactly one ': ' separator",
+  })
+  .refine(
+    (title) => {
+      const area = title.split(": ", 1)[0]?.trim() ?? "";
+      return Boolean(area) && area.split(/\s+/).length >= 1 && area.split(/\s+/).length <= 3;
+    },
+    {
+      message: "title area must contain 1 to 3 words",
+    },
+  )
+  .refine(
+    (title) => {
+      const [, problem] = title.split(": ");
+      return Boolean(problem?.trim());
+    },
+    {
+      message: "title problem must not be empty",
+    },
+  );
 
 export const analysisEvidenceSchema = z
   .object({
@@ -37,6 +70,7 @@ export const analysisEvidenceSchema = z
   });
 
 export const analysisFindingSchema = z.object({
+  title: titleSchema,
   category: z.enum(FINDING_CATEGORIES),
   semantic_target: z.string().min(1).max(80),
   observation: z.string().min(1),

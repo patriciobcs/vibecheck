@@ -112,6 +112,7 @@ async function fixture(options: {
       studyRevision: 1,
       baselineCommitSha: "baseline",
       fingerprint: randomUUID(),
+      title: "Toolbar: sticky note tool is hard to discover",
       category: "discoverability",
       semanticTarget: "toolbar.sticky_note",
       observation:
@@ -158,8 +159,15 @@ describe.skipIf(!process.env.DATABASE_URL)("issue publication", () => {
       action: result.action,
       issueNumber: result.issueNumber,
       mappedNumber: stored?.issueNumber,
+      issueTitle: publisher.issues[0]?.body.split("\n")[0],
       eventType: event?.eventType,
-    }).toEqual({ action: "created", issueNumber: 1, mappedNumber: 1, eventType: "issue.created" });
+    }).toEqual({
+      action: "created",
+      issueNumber: 1,
+      mappedNumber: 1,
+      issueTitle: "Toolbar: sticky note tool is hard to discover",
+      eventType: "issue.created",
+    });
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });
 

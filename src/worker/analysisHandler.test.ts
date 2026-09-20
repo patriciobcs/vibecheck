@@ -115,6 +115,7 @@ function outputFor(evidence: EvidencePackage): AnalysisOutput {
     outcome: "findings",
     findings: [
       {
+        title: "Toolbar: sticky note tool is hard to discover",
         category: "discoverability",
         semantic_target: "toolbar.sticky_note",
         observation: "The participant searched for a note tool.",
@@ -197,9 +198,18 @@ describe.skipIf(!process.env.DATABASE_URL)("analysis worker handler", () => {
     };
     await handleAnalysisRun(data.run.id, { provider });
     const [run] = await db.select().from(analysisRun).where(eq(analysisRun.id, data.run.id));
-    expect({ status: run?.status, responses: run?.rawResponses.length }).toEqual({
+    const [storedFinding] = await db
+      .select()
+      .from(finding)
+      .where(eq(finding.studyId, data.studyRow.id));
+    expect({
+      status: run?.status,
+      responses: run?.rawResponses.length,
+      title: storedFinding?.title,
+    }).toEqual({
       status: "completed",
       responses: 2,
+      title: "Toolbar: sticky note tool is hard to discover",
     });
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });

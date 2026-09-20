@@ -267,6 +267,7 @@ async function persistAnalysis(
             studyId: run.studyId,
             studyRevision: studyRow.currentRevision,
             baselineCommitSha: packageData.baseline_commit_sha,
+            title: item.title,
             fingerprint: itemFingerprint,
             category: item.category,
             semanticTarget: item.semantic_target,

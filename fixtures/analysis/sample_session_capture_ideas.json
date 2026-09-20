@@ -5,6 +5,7 @@
   "outcome": "findings",
   "findings": [
     {
+      "title": "Toolbar: sticky note tool is hard to discover",
       "category": "discoverability",
       "semantic_target": "toolbar.sticky_note",
       "observation": "The participant searched the toolbar and drew a rectangle before typing the idea inside it.",

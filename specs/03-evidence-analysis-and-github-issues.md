@@ -31,6 +31,7 @@ useful stopping point.
   "study_id": "study_example",
   "study_revision": 1,
   "baseline_commit_sha": "REPLACE_WITH_REAL_SHA",
+  "title": "Toolbar: sticky note tool is hard to discover",
   "category": "discoverability",
   "observation": "The participant drew a rectangle and typed inside it instead of using the tool intended for capturing an idea.",
   "hypothesis": "The intended tool may be difficult to discover in the toolbar.",
@@ -45,6 +46,11 @@ useful stopping point.
   "issue_ref": null
 }
 ```
+
+Finding titles are required to use sentence case and present tense in the
+format `<Area>: <problem>`, with a 1–3 word area, no trailing period, and no
+participant-specific content. Titles are bounded to 72 characters and state
+the problem rather than the proposed fix.
 
 Certainty states: `insufficient_evidence`, `preliminary`, `repeated_observation`, `contradictory`. They describe evidence, not statistical significance. Severity considers task/business impact separately from certainty. Set repair eligibility only when the change scope and supported finding justify an experiment.
 

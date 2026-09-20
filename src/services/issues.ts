@@ -228,7 +228,7 @@ export async function publishFinding(
     issueUrl = existingIssue.url;
   } else {
     const created = await issuePublisher.create(repo, {
-      title: `UX finding: ${sanitizeForPublic(row.semanticTarget, dashboardUrl)}`,
+      title: sanitizeForPublic(row.title, dashboardUrl),
       body: renderIssueBody(row, planRow.plan, dashboardUrl, existingIssue?.number),
       labels: ["vibecheck", "ux-finding"],
     });

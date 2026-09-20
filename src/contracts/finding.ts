@@ -27,6 +27,7 @@ export const findingSchema = z.object({
   study_id: z.string().min(1),
   study_revision: z.number().int().positive(),
   baseline_commit_sha: z.string().min(1),
+  title: z.string().min(1),
   category: z.string().min(1),
   semantic_target: z.string().min(1),
   observation: z.string().min(1),

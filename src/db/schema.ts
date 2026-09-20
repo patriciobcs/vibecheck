@@ -281,6 +281,7 @@ export const finding = pgTable(
       .references(() => study.id, { onDelete: "cascade" }),
     studyRevision: integer("studyRevision").notNull(),
     baselineCommitSha: text("baselineCommitSha").notNull(),
+    title: text("title").notNull(),
     fingerprint: text("fingerprint").notNull(),
     category: text("category").notNull(),
     semanticTarget: text("semanticTarget").notNull(),
