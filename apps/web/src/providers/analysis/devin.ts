@@ -43,7 +43,7 @@ export function createDevinAnalysisProvider(
         headers,
         body: JSON.stringify({
           prompt: buildAnalysisPrompt(evidence),
-          title: `VibeCheck analysis ${run.id}`,
+          title: `Seamless UX analysis ${run.id}`,
           tags: ["vibecheck", "analysis"],
           structured_output_schema: AnalysisOutputJsonSchema,
           max_acu_limit: cfg.maxAcu,

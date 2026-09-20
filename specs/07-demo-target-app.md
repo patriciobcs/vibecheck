@@ -30,7 +30,7 @@ Trade-off accepted: success is observed from persisted client scene state rather
 
 The demo automation default is `draft_pr`; preview and retest remain deferred. The Excalidraw clone is an SDK-instrumented demo modification, labeled as such rather than presented as an upstream behavior.
 
-Treat the demo as continuous research on a product VibeCheck already monitors, so discovery covers only recently merged editor features rather than the whole editor. Scope for the first study, taken from the commit range ending at the pinned SHA:
+Treat the demo as continuous research on a product Seamless UX already monitors, so discovery covers only recently merged editor features rather than the whole editor. Scope for the first study, taken from the commit range ending at the pinned SHA:
 
 | Feature | Upstream PR | Reachability verified |
 | --- | --- | --- |
@@ -73,11 +73,11 @@ There is no payment, mail or calendar surface in this target, so deposit, notifi
 6. The reset command restores the fixture byte-for-byte in terms of element IDs and app state fields.
 7. No collaboration or telemetry network calls occur in demo mode.
 
-Host acceptance checks in the VibeCheck-controlled runner, outside Devin's editable scope. Verify the baseline's unrelated regression checks before demonstrating repair. A deliberately seeded functional regression may demonstrate a retry if clearly disclosed; do not claim it happened spontaneously.
+Host acceptance checks in the Seamless UX-controlled runner, outside Devin's editable scope. Verify the baseline's unrelated regression checks before demonstrating repair. A deliberately seeded functional regression may demonstrate a retry if clearly disclosed; do not claim it happened spontaneously.
 
 ## Hackathon eligibility and provenance
 
-The supplied event brief says no previous projects. Confirm whether an attributed third-party demo target is acceptable before relying on the fork for the submission. The VibeCheck platform must be built during the event. If organizers disallow the fork, use a newly built fixture app and record that choice.
+The supplied event brief says no previous projects. Confirm whether an attributed third-party demo target is acceptable before relying on the fork for the submission. The Seamless UX platform must be built during the event. If organizers disallow the fork, use a newly built fixture app and record that choice.
 
 Use a team-owned fork for modifications, issues and PRs. MIT permits this; preserve upstream copyright and license notices. Record the pinned upstream SHA and every demo-specific modification. Do not submit deliberately introduced demo defects to upstream or portray them as flaws independently discovered in the original project.
 
@@ -130,7 +130,7 @@ then resolves the Vercel preview created by the target repository's GitHub
 integration. The demo policy allows only `packages/excalidraw/` and
 `excalidraw-app/` and preserves the five required functional invariants. It
 does not trigger deployments; Vercel builds the Devin repair branch and
-VibeCheck resolves the preview by candidate SHA. Real repository modification
+Seamless UX resolves the preview by candidate SHA. Real repository modification
 and Excalidraw acceptance checks remain pending.
 
 ## Demo journey (2026-09-21)

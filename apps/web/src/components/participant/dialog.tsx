@@ -446,7 +446,7 @@ function Frame({
     <section className="w-[404px] max-w-[100vw] p-5 text-foreground" aria-label={title}>
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-tight text-muted-foreground">
-          <LogoMark className="size-3.5 text-brand" /> VibeCheck
+          <LogoMark className="size-3.5 text-brand" /> Seamless UX
         </span>
         <div className="flex items-center gap-2">
           {idx >= 0 ? (

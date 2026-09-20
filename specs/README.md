@@ -1,8 +1,8 @@
-# VibeCheck specifications
+# Seamless UX specifications
 
 Status: Core VC-01/02/03/04/05/06 flows are implemented in the monorepo; provider credentials, production deployment and human-evidence claims remain environment-dependent.
 
-VibeCheck organizes real-human usability research and turns evidence into issues, working code alternatives, and human retests. The embedded library and research engine are the core product. Shareable links and a marketplace supply participants when existing users are unavailable or should not be interrupted.
+Seamless UX organizes real-human usability research and turns evidence into issues, working code alternatives, and human retests. The embedded library and research engine are the core product. Shareable links and a marketplace supply participants when existing users are unavailable or should not be interrupted.
 
 ## Spec map
 

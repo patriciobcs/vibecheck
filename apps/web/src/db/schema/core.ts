@@ -67,7 +67,7 @@ export const products = pgTable("products", {
   /** Origin-bound publishable key: identifies the app, grants nothing else. */
   publishableKey: text("publishable_key").notNull().unique(),
   invitationCooldownDays: integer("invitation_cooldown_days").default(7).notNull(),
-  /** sdk: the product loads the embedded script and hosts the participant dialog; hosted: VibeCheck page + new window (video-only). */
+  /** sdk: the product loads the embedded script and hosts the participant dialog; hosted: Seamless UX page + new window (video-only). */
   embedMode: text("embed_mode", { enum: ["sdk", "hosted"] })
     .default("hosted")
     .notNull(),

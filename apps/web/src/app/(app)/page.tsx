@@ -36,7 +36,7 @@ export default async function Home() {
             Your users are already telling you what is broken.
           </h1>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-foreground/80">
-            VibeCheck listens to the shape of a journey, never its content. Jev reads where people
+            Seamless UX listens to the shape of a journey, never its content. Jev reads where people
             struggle, and the strongest signals become short studies with real people.
           </p>
           <p className="mt-2 text-lg">

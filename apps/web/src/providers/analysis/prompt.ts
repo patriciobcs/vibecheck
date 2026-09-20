@@ -2,7 +2,7 @@ import type { EvidencePackage } from "@vibecheck/contracts";
 import { AnalysisOutputJsonSchema, MAX_FINDINGS } from "@vibecheck/contracts";
 
 export function buildAnalysisPrompt(evidence: EvidencePackage) {
-  return `You are analysing ONE recorded usability session for VibeCheck. Evidence package id: ${evidence.evidence_package_id}. Session id: ${evidence.session_id}.
+  return `You are analysing ONE recorded usability session for Seamless UX. Evidence package id: ${evidence.evidence_package_id}. Session id: ${evidence.session_id}.
 Echo both ids verbatim. You are given a neutral task, outcomes, bounded semantic events, transcript segments with ids,
 and media references you cannot watch. Never claim to have seen video. Cite only actual event and segment ids and ranges.
 Each finding title must use sentence case and present tense in the format <Area>: <problem>, with an area of 1 to 3 words.

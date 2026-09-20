@@ -10,7 +10,7 @@ export function Wordmark({ className }: { className?: string }) {
       className={cn("inline-flex items-center gap-1.5 font-semibold tracking-tight", className)}
     >
       <LogoMark className="size-5 text-brand" />
-      VibeCheck
+      Seamless UX
     </Link>
   );
 }

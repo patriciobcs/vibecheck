@@ -74,7 +74,7 @@ const findingTitle = "Toolbar: sticky note tool is hard to discover";
 describe("VC-03 issue rendering", () => {
   it("renders the finding title and redacts non-dashboard URLs", () => {
     const body = renderIssueBody(finding, plan, null);
-    expect(body).toContain("## VibeCheck finding");
+    expect(body).toContain("## Seamless UX finding");
     expect(sanitizeForPublic(findingTitle, null)).toBe(findingTitle);
     expect(body).toContain("[redacted url]");
     expect(body).not.toContain("private.example");

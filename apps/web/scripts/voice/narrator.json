@@ -1,7 +1,7 @@
 [
   {
     "id": "intro",
-    "text": "A visitor opens Excalidraw. The VibeCheck SDK reports semantic events only: no text, no screenshots, no recording."
+    "text": "A visitor opens Excalidraw. The Seamless UX SDK reports semantic events only: no text, no screenshots, no recording."
   },
   {
     "id": "detour",

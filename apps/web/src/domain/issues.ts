@@ -45,7 +45,7 @@ export function renderIssueBody(
       ? "human session"
       : "simulated/fixture session, not human evidence";
   return `${marker}
-## VibeCheck finding
+## Seamless UX finding
 
 ${
   recurrence
@@ -180,7 +180,7 @@ export async function publishFinding(
       await issuePublisher.comment(
         repo,
         found.number,
-        `**Observed again** — a new session reproduced this finding (now ${row.observedSessionCount} of ${row.eligibleSessionCount} eligible sessions${certaintyUpdate}). Session evidence stays in the VibeCheck dashboard.`,
+        `**Observed again** — a new session reproduced this finding (now ${row.observedSessionCount} of ${row.eligibleSessionCount} eligible sessions${certaintyUpdate}). Session evidence stays in the Seamless UX dashboard.`,
       );
       action = "updated";
     }

@@ -15,10 +15,10 @@ The SDK invitation popup, participant dialog, scenario rendering, screen/voice r
 
 | Direction | Contract | Owner |
 | --- | --- | --- |
-| VibeCheck → SDK | `study.published` event and `GET /api/studies/:id` (immutable plan with the participant-facing scenario) | VC-01 |
-| SDK → VibeCheck | `POST /api/studies/:id/participation` (external-channel-only participation additions) | VC-05 (this spec) |
-| SDK → VibeCheck | `SessionManifest` + events/transcript (`session.upload_verified`) | VC-02 → VC-03 |
-| Jev → VibeCheck | persisted `research_candidates` and `jev_evaluations` | VC-03/06 monitoring and summary context |
+| Seamless UX → SDK | `study.published` event and `GET /api/studies/:id` (immutable plan with the participant-facing scenario) | VC-01 |
+| SDK → Seamless UX | `POST /api/studies/:id/participation` (external-channel-only participation additions) | VC-05 (this spec) |
+| SDK → Seamless UX | `SessionManifest` + events/transcript (`session.upload_verified`) | VC-02 → VC-03 |
+| Jev → Seamless UX | persisted `research_candidates` and `jev_evaluations` | VC-03/06 monitoring and summary context |
 
 ## Participation events
 

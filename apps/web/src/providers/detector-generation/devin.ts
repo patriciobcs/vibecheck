@@ -8,7 +8,7 @@ import type {
 } from "./types";
 
 export function buildDetectorPrompt(ctx: DetectorGenerationContext): string {
-  return `You are authoring a continuous UX detector for VibeCheck. Read only authorized product context; do not modify anything.
+  return `You are authoring a continuous UX detector for Seamless UX. Read only authorized product context; do not modify anything.
 Journey to cover: ${ctx.journeyHint}. App build: ${ctx.appBuildRef}.
 Map the journey to observable progress, success, failures and help requests using ONLY these semantic event types:
 journey_start, progress, action_attempt, action_result, validation_error, navigation, help_request, completion, exit, visibility.
@@ -60,7 +60,7 @@ export function createDevinDetectorGenerator(
         headers,
         body: JSON.stringify({
           prompt: buildDetectorPrompt(ctx),
-          title: `VibeCheck detector ${ctx.journeyHint} ${ctx.appBuildRef}`,
+          title: `Seamless UX detector ${ctx.journeyHint} ${ctx.appBuildRef}`,
           tags: ["vibecheck", "detector"],
           unlisted: true,
           structured_output_schema: generatedDetectorJsonSchema,

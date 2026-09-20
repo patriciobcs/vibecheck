@@ -2,7 +2,7 @@ import { SummaryNarrativeOutputJsonSchema } from "@vibecheck/contracts";
 import type { SummaryProviderInput } from "./types";
 
 export function buildSummaryPrompt(input: SummaryProviderInput) {
-  return `You are summarizing one VibeCheck experiment. Return only JSON matching this schema:
+  return `You are summarizing one Seamless UX experiment. Return only JSON matching this schema:
 ${JSON.stringify(SummaryNarrativeOutputJsonSchema)}
 The deterministic counts are authoritative. Write a concise headline, 3 to 5 observations,
 and limitations. Every observation must cite one or more finding_id values from the themes.

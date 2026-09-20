@@ -12,7 +12,7 @@ const limiter = createRateLimiter({ max: 20, windowMs: 60_000 });
 
 /**
  * Issues an anonymous device participant for the embedded dialog. Called from the dialog iframe
- * (VibeCheck origin), so the token stays in VibeCheck-origin storage and never reaches the host page.
+ * (Seamless UX origin), so the token stays in Seamless UX-origin storage and never reaches the host page.
  */
 export const POST = route(async (req) => {
   const body = await parseBody(req, Body);

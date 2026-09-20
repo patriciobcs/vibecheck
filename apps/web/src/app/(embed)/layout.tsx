@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = { title: "VibeCheck", robots: { index: false } };
+export const metadata: Metadata = { title: "Seamless UX", robots: { index: false } };
 
 /**
  * Root layout for the dialog iframe: transparent page so only the card is visible over the
