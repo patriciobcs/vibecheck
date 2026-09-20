@@ -1,6 +1,9 @@
+import { RepoBindingSchema } from "@vibecheck/contracts";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { db, schema } from "@/db/client";
-import { fail, json, route } from "@/lib/api";
+import { setProductRepoBinding } from "@/domain/repo-binding";
+import { fail, json, parseBody, route } from "@/lib/api";
 import { requireTenantActor } from "@/lib/tenant-access";
 
 export const GET = route(async (req, ctx: RouteContext<"/api/products/[id]">) => {
@@ -29,4 +32,14 @@ export const GET = route(async (req, ctx: RouteContext<"/api/products/[id]">) =>
       proposals: proposals.filter((p) => p.discoveryRunId === run.id),
     })),
   });
+});
+
+const Patch = z.object({ repo_binding: RepoBindingSchema });
+
+export const PATCH = route(async (req, ctx: RouteContext<"/api/products/[id]">) => {
+  const actor = await requireTenantActor(req);
+  const { id } = await ctx.params;
+  const body = await parseBody(req, Patch);
+  const repo_binding = await setProductRepoBinding(actor.tenantIds, id, body.repo_binding);
+  return json({ repo_binding });
 });

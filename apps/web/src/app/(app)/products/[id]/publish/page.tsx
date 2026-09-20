@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { RepoBindingSchema } from "@vibecheck/contracts";
 import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
@@ -78,6 +79,11 @@ export default async function PublishPage({
     where: and(eq(schema.proposals.discoveryRunId, runId), eq(schema.proposals.taskId, taskId)),
   });
   if (!proposal) notFound();
+  const binding = RepoBindingSchema.safeParse(product.repoBinding);
+  const defaultCommitSha =
+    binding.success && binding.data.provider === "github" && binding.data.baseline_commit_sha
+      ? binding.data.baseline_commit_sha
+      : "0000000000000000000000000000000000000000";
 
   return (
     <Shell
@@ -121,11 +127,7 @@ export default async function PublishPage({
               type="number"
               defaultValue={proposal.estimatedDurationSeconds ?? 300}
             />
-            <F
-              label="Baseline commit"
-              name="commitSha"
-              defaultValue="0000000000000000000000000000000000000000"
-            />
+            <F label="Baseline commit" name="commitSha" defaultValue={defaultCommitSha} />
             <F label="Environment ref" name="environmentRef" defaultValue="baseline_preview" />
           </div>
           <F label="Fixture ref" name="fixtureRef" defaultValue="excalidraw_blank_v1" />

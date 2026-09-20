@@ -88,6 +88,20 @@ export function ProductForm({
             hint="Defaults to your app's origin. Override with a comma-separated list if needed."
             defaultValue={values.origins}
           />
+          <Field
+            label="GitHub repository"
+            name="repository"
+            placeholder="owner/repo"
+            hint="Optional. Needed only for GitHub issues and code changes. Accepts owner/repo or a github.com URL."
+            defaultValue={values.repository}
+          />
+          <Field
+            label="Baseline commit"
+            name="baseline_commit"
+            placeholder="Defaults to the head of the default branch"
+            className="font-mono"
+            defaultValue={values.baseline_commit}
+          />
           <Area
             label="Release notes"
             name="release_notes"
@@ -126,8 +140,8 @@ export function ProductForm({
         {pending ? "Adding project…" : "Add project"}
       </Button>
       <p className="text-xs text-muted-foreground">
-        Next: run discovery and choose a study. Connecting a repository is only needed for GitHub
-        issues and code changes.
+        Next: run discovery and choose a study. A repository is only needed for GitHub issues and
+        code changes; you can add it later from the project page.
       </p>
     </form>
   );

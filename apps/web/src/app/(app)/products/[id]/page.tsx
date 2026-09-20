@@ -5,9 +5,12 @@ import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
 import { db, schema } from "@/db/client";
 import { currentMonitoringPolicy } from "@/domain/monitoring/policy";
+import { parseGithubRepository } from "@/domain/onboarding";
 import { productOverview } from "@/domain/overview";
 import { ownerContext, ownerProduct, productDiscovery } from "@/domain/owner-products";
 import { createDiscoveryRun } from "@/domain/products";
+import { setProductRepoBinding } from "@/domain/repo-binding";
+import { ApiError } from "@/lib/api";
 import { env } from "@/lib/env";
 import { productPath, withSearchParams } from "@/lib/product-path";
 import { AutoRefresh } from "./auto-refresh";
@@ -48,9 +51,43 @@ async function runDiscovery(formData: FormData) {
   redirect(productPath(product ?? { id: productId, slug: null }));
 }
 
+async function connectRepository(formData: FormData) {
+  "use server";
+  const ctx = await ownerContext();
+  const productId = String(formData.get("productId") ?? "");
+  if (!ctx) redirect(`/sign-in?next=/products/${productId}`);
+  let errorMessage: string | null = null;
+  try {
+    const repository = parseGithubRepository(String(formData.get("repository") ?? ""));
+    if (!repository)
+      throw new ApiError(
+        422,
+        "repo_not_found",
+        "Enter a repository as owner/repo or a github.com URL.",
+      );
+    const baseline = String(formData.get("baseline_commit") ?? "").trim();
+    await setProductRepoBinding(ctx.writableTenantIds, productId, {
+      provider: "github",
+      ...repository,
+      ...(baseline ? { baseline_commit_sha: baseline } : {}),
+      issues_enabled: true,
+    });
+  } catch (error) {
+    errorMessage =
+      error instanceof ApiError
+        ? error.message
+        : "We couldn't connect that repository. Please try again.";
+  }
+  const product = await ownerProduct(ctx.tenantIds, productId);
+  const path = productPath(product ?? { id: productId, slug: null });
+  redirect(errorMessage ? `${path}?repo_error=${encodeURIComponent(errorMessage)}` : path);
+}
+
 export default async function ProductPage({ params, searchParams }: PageProps<"/products/[id]">) {
   const ctx = await ownerContext();
   const { id } = await params;
+  const query = await searchParams;
+  const repoError = typeof query.repo_error === "string" ? query.repo_error : null;
   if (!ctx) redirect(`/sign-in?next=/products/${id}`);
   const product = await ownerProduct(ctx.tenantIds, id);
   if (!product) notFound();
@@ -326,6 +363,42 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
                     not connected — connect a GitHub repository to enable draft PRs
                   </span>
                 )}
+                {overview?.product.setup_error ? (
+                  <p className="mt-1 text-destructive">{overview.product.setup_error}</p>
+                ) : null}
+                {repoError ? <p className="mt-1 text-destructive">{repoError}</p> : null}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-brand hover:underline">
+                    {repo?.kind === "github" ? "Change" : "Connect repository"}
+                  </summary>
+                  <form action={connectRepository} className="mt-2 space-y-2">
+                    <input type="hidden" name="productId" value={product.id} />
+                    <label className="block font-medium" htmlFor="repository">
+                      GitHub repository
+                    </label>
+                    <input
+                      id="repository"
+                      name="repository"
+                      defaultValue={repo?.kind === "github" ? repo.repo : ""}
+                      placeholder="owner/repo"
+                      className="h-8 w-full rounded-md border border-border bg-card px-2 text-xs"
+                      required
+                    />
+                    <label className="block font-medium" htmlFor="baseline_commit">
+                      Baseline commit
+                    </label>
+                    <input
+                      id="baseline_commit"
+                      name="baseline_commit"
+                      defaultValue={repo?.kind === "github" ? (repo.baseline_commit_sha ?? "") : ""}
+                      placeholder="Defaults to the default branch head"
+                      className="h-8 w-full rounded-md border border-border bg-card px-2 font-mono text-xs"
+                    />
+                    <Button type="submit" size="sm" className="rounded-full">
+                      Connect repository
+                    </Button>
+                  </form>
+                </details>
               </dd>
               <dt className="text-muted-foreground">Last SDK activity</dt>
               <dd>{lastSdkActivity ? ago(lastSdkActivity) : "No SDK activity yet"}</dd>
