@@ -22,7 +22,23 @@ describe("createProduct", () => {
     expect(p.status).toBe("ready");
     expect(p.publishableKey).toMatch(/^pk_/);
     expect(p.embedMode).toBe("hosted");
+    expect(p.slug).toBe("acme");
     expect(toProductConfig(p).name).toBe("Acme");
+  });
+
+  it("derives a tenant-unique slug from the name and suffixes collisions", async () => {
+    const first = await createProduct(
+      "tenant_t",
+      { name: "Acme App", url: "https://acme.example" },
+      publicResolver,
+    );
+    const second = await createProduct(
+      "tenant_t",
+      { name: "Acme App!", url: "https://acme-two.example" },
+      publicResolver,
+    );
+    expect(first.slug).toBe("acme-app");
+    expect(second.slug).toBe("acme-app-2");
   });
 
   it("does not reject a private destination but records needs_setup with the reason", async () => {

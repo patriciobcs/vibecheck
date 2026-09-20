@@ -18,6 +18,7 @@ export async function seedStudy(overrides: Partial<StudyPlan> = {}) {
     id: productId,
     tenantId,
     name: "Test product",
+    slug: "test-product",
     url: "https://app.example.test",
     permittedOrigins: ["https://app.example.test"],
     publishableKey: `pk_test_${newToken(8)}`,

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { NavLink, Shell } from "@/components/layout/shell";
 import { monitoringOverview } from "@/domain/monitoring/overview";
 import { ownerContext, ownerProduct } from "@/domain/owner-products";
+import { productPath, withSearchParams } from "@/lib/product-path";
 import { CandidateActions } from "./candidate-actions";
 import { PolicyForm } from "./policy-form";
 
@@ -11,12 +12,17 @@ export const dynamic = "force-dynamic";
 const fmtCost = (micros: number | null) =>
   micros === null ? "unpriced" : `$${(micros / 1_000_000).toFixed(4)}`;
 
-export default async function MonitoringPage({ params }: PageProps<"/products/[id]/monitoring">) {
+export default async function MonitoringPage({
+  params,
+  searchParams,
+}: PageProps<"/products/[id]/monitoring">) {
   const ctx = await ownerContext();
   const { id } = await params;
   if (!ctx) redirect(`/sign-in?next=/products/${id}/monitoring`);
   const product = await ownerProduct(ctx.tenantIds, id);
   if (!product) notFound();
+  if (product.slug !== id)
+    permanentRedirect(withSearchParams(productPath(product, "/monitoring"), await searchParams));
   const o = await monitoringOverview(product.id);
   const activeDetectors = o.detectors.filter((d) => d.status === "active");
 
@@ -34,7 +40,7 @@ export default async function MonitoringPage({ params }: PageProps<"/products/[i
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <div>
           <Link
-            href={`/products/${product.id}`}
+            href={productPath(product)}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             ← {product.name}
@@ -47,7 +53,7 @@ export default async function MonitoringPage({ params }: PageProps<"/products/[i
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Link
-            href={`/products/${product.id}/monitoring/live`}
+            href={productPath(product, "/monitoring/live")}
             className="rounded-full bg-foreground px-3 py-1.5 font-medium text-background transition-opacity hover:opacity-90"
           >
             Live analysis

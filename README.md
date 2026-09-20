@@ -105,7 +105,7 @@ LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2
 #     Devin detector authoring: POST /api/owner/products/:id/detectors {"mode":"generate","provider":"devin",...}
 ```
 
-Live demo: open `/products/product_excalidraw_local/monitoring/live` in a second window; it polls persisted state every second (waiting state → session tabs → signals, screening, Jev, candidates).
+Live demo: open `/products/excalidraw/monitoring/live` in a second window; it polls persisted state every second (waiting state → session tabs → signals, screening, Jev, candidates).
 
 CI (`.github/workflows/ci.yml`) runs `pnpm check`, `pnpm test`, and a production build without provider secrets on every push to `main` and every pull request.
 

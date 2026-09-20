@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { assertAllowedDestination } from "@/lib/destination";
 import { newId, newToken } from "@/lib/ids";
+import { slugify } from "@/lib/slug";
 import type { DiscoveryProviderName } from "@/providers/discovery/types";
 import { enqueueJob } from "./jobs";
 
@@ -29,29 +30,48 @@ export async function createProduct(
     status = "needs_setup";
     setupError = err instanceof Error ? err.message : "destination_not_allowed";
   }
-  const [created] = await db
-    .insert(schema.products)
-    .values({
-      id: newId("product"),
-      tenantId,
-      name: config.name,
-      url: config.url,
-      permittedOrigins: config.permitted_origins,
-      publishableKey: `pk_${newToken(12)}`,
-      description: config.description,
-      language: config.language,
-      audience: config.audience,
-      repoBinding: config.repo_binding ?? null,
-      releaseNotes: config.release_notes,
-      supportComplaints: config.support_complaints,
-      knownJourneys: config.known_journeys,
-      productEvents: config.product_events,
-      status,
-      setupError,
-    })
-    .returning();
-  if (!created) throw new Error("product insert failed");
-  return created;
+  const baseSlug = slugify(config.name);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
+    try {
+      const [created] = await db
+        .insert(schema.products)
+        .values({
+          id: newId("product"),
+          tenantId,
+          name: config.name,
+          slug,
+          url: config.url,
+          permittedOrigins: config.permitted_origins,
+          publishableKey: `pk_${newToken(12)}`,
+          description: config.description,
+          language: config.language,
+          audience: config.audience,
+          repoBinding: config.repo_binding ?? null,
+          releaseNotes: config.release_notes,
+          supportComplaints: config.support_complaints,
+          knownJourneys: config.known_journeys,
+          productEvents: config.product_events,
+          status,
+          setupError,
+        })
+        .returning();
+      if (!created) throw new Error("product insert failed");
+      return created;
+    } catch (err) {
+      // drizzle wraps the PostgresError; the violation details sit on `cause`.
+      const e = err as {
+        code?: string;
+        constraint_name?: string;
+        cause?: { code?: string; constraint_name?: string };
+      };
+      const code = e.code ?? e.cause?.code;
+      const constraint = e.constraint_name ?? e.cause?.constraint_name;
+      if (code === "23505" && constraint === "products_tenant_slug_uq") continue;
+      throw err;
+    }
+  }
+  throw new Error(`could not allocate a slug for product "${config.name}"`);
 }
 
 export function toProductConfig(p: ProductRow): ProductConfig {

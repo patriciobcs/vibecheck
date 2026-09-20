@@ -9,6 +9,7 @@ import { db, schema } from "@/db/client";
 import { ownerContext } from "@/domain/owner-products";
 import { latestSummary } from "@/domain/summaries";
 import { studyTimeline } from "@/domain/timeline";
+import { productPath } from "@/lib/product-path";
 import { RepairSection } from "./_components/RepairSection";
 import { TimelineSection } from "./timeline-section";
 
@@ -85,7 +86,7 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
       }
     >
       <Link
-        href={`/products/${study.productId}`}
+        href={product ? productPath(product) : `/products/${study.productId}`}
         className="text-xs text-muted-foreground hover:text-foreground"
       >
         ← {product?.name ?? "Product"}

@@ -65,12 +65,15 @@ export function LiveBoard({
   productId,
   productName,
   productUrl,
+  productHref,
   ownerEmail,
   initial = null,
 }: {
   productId: string;
   productName: string;
   productUrl: string;
+  /** Breadcrumb target (slug URL of the monitoring page); API calls keep `productId`. */
+  productHref: string;
   ownerEmail: string;
   /** `?session=study:<id>` pins one session from the start (demo links, screenshots). */
   initial?: LiveSessionRef | null;
@@ -127,10 +130,7 @@ export function LiveBoard({
       <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border/70 bg-card/80 px-3 text-xs backdrop-blur">
         <Wordmark className="text-sm" />
         <span className="text-border">/</span>
-        <Link
-          href={`/products/${productId}/monitoring`}
-          className="text-muted-foreground hover:text-foreground"
-        >
+        <Link href={productHref} className="text-muted-foreground hover:text-foreground">
           {productName}
         </Link>
         <span className="text-border">/</span>

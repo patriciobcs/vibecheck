@@ -1,6 +1,7 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import type { LiveSessionRef } from "@/domain/monitoring/live";
 import { ownerContext, ownerProduct } from "@/domain/owner-products";
+import { productPath, withSearchParams } from "@/lib/product-path";
 import { LiveBoard } from "./live-board";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,10 @@ export default async function LiveMonitoringPage({
   if (!ctx) redirect(`/sign-in?next=/products/${id}/monitoring/live`);
   const product = await ownerProduct(ctx.tenantIds, id);
   if (!product) notFound();
-  const raw = (await searchParams).session;
+  const sp = await searchParams;
+  if (product.slug !== id)
+    permanentRedirect(withSearchParams(productPath(product, "/monitoring/live"), sp));
+  const raw = sp.session;
   const [kind, sessionId] = (typeof raw === "string" ? raw : "").split(":");
   let initial: LiveSessionRef | null = null;
   if (sessionId && (kind === "observation" || kind === "study")) initial = { kind, id: sessionId };
@@ -28,6 +32,7 @@ export default async function LiveMonitoringPage({
       productId={product.id}
       productName={product.name}
       productUrl={product.url}
+      productHref={productPath(product, "/monitoring")}
       ownerEmail={ctx.email}
       initial={initial}
     />

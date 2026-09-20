@@ -52,46 +52,52 @@ export const memberships = pgTable(
   (t) => [uniqueIndex("memberships_tenant_user_uq").on(t.tenantId, t.userId)],
 );
 
-export const products = pgTable("products", {
-  id: text("id").primaryKey(),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  url: text("url").notNull(),
-  /** Explicit web origins allowed to load the embedded SDK. */
-  permittedOrigins: jsonb("permitted_origins")
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  /** Origin-bound publishable key: identifies the app, grants nothing else. */
-  publishableKey: text("publishable_key").notNull().unique(),
-  invitationCooldownDays: integer("invitation_cooldown_days").default(7).notNull(),
-  /** sdk: the product loads the embedded script and hosts the participant dialog; hosted: Seamless UX page + new window (video-only). */
-  embedMode: text("embed_mode", { enum: ["sdk", "hosted"] })
-    .default("hosted")
-    .notNull(),
-  /** Marked when the product is seeded sample data. */
-  sample: boolean("sample").default(false).notNull(),
-  /* ---- VC-01 onboarding context (imported material carries provenance + sample flag) ---- */
-  description: text("description").default("").notNull(),
-  language: text("language").default("en").notNull(),
-  audience: text("audience").default("").notNull(),
-  repoBinding: jsonb("repo_binding").$type<Record<string, unknown> | null>(),
-  releaseNotes: jsonb("release_notes").$type<SourceItem[]>().notNull().default(sql`'[]'::jsonb`),
-  supportComplaints: jsonb("support_complaints")
-    .$type<SourceItem[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  knownJourneys: jsonb("known_journeys").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
-  productEvents: jsonb("product_events").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
-  /** VC-01 product lifecycle: draft → connecting → ready, or needs_setup with a reason. */
-  status: text("status", { enum: ["draft", "connecting", "ready", "needs_setup"] })
-    .default("ready")
-    .notNull(),
-  setupError: text("setup_error"),
-  createdAt: createdAt(),
-});
+export const products = pgTable(
+  "products",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Tenant-unique URL slug, derived from the name; `/products/:slug` is the canonical URL. */
+    slug: text("slug").notNull(),
+    url: text("url").notNull(),
+    /** Explicit web origins allowed to load the embedded SDK. */
+    permittedOrigins: jsonb("permitted_origins")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    /** Origin-bound publishable key: identifies the app, grants nothing else. */
+    publishableKey: text("publishable_key").notNull().unique(),
+    invitationCooldownDays: integer("invitation_cooldown_days").default(7).notNull(),
+    /** sdk: the product loads the embedded script and hosts the participant dialog; hosted: Seamless UX page + new window (video-only). */
+    embedMode: text("embed_mode", { enum: ["sdk", "hosted"] })
+      .default("hosted")
+      .notNull(),
+    /** Marked when the product is seeded sample data. */
+    sample: boolean("sample").default(false).notNull(),
+    /* ---- VC-01 onboarding context (imported material carries provenance + sample flag) ---- */
+    description: text("description").default("").notNull(),
+    language: text("language").default("en").notNull(),
+    audience: text("audience").default("").notNull(),
+    repoBinding: jsonb("repo_binding").$type<Record<string, unknown> | null>(),
+    releaseNotes: jsonb("release_notes").$type<SourceItem[]>().notNull().default(sql`'[]'::jsonb`),
+    supportComplaints: jsonb("support_complaints")
+      .$type<SourceItem[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    knownJourneys: jsonb("known_journeys").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    productEvents: jsonb("product_events").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    /** VC-01 product lifecycle: draft → connecting → ready, or needs_setup with a reason. */
+    status: text("status", { enum: ["draft", "connecting", "ready", "needs_setup"] })
+      .default("ready")
+      .notNull(),
+    setupError: text("setup_error"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("products_tenant_slug_uq").on(t.tenantId, t.slug)],
+);
 
 /** Programmatic tenant access (`Authorization: Bearer <key>`); only the hash is stored. */
 export const apiKeys = pgTable("api_keys", {

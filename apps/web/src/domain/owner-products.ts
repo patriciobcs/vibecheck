@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { currentSession } from "@/auth/current-user";
 import { db, schema } from "@/db/client";
 import { membershipsForUser } from "./participants";
@@ -22,10 +22,14 @@ export async function ownerContext() {
   };
 }
 
-export async function ownerProduct(tenantIds: string[], productId: string) {
+/** Resolves a product by id or by tenant-unique slug (`/products/:slug` is the canonical URL). */
+export async function ownerProduct(tenantIds: string[], key: string) {
   if (tenantIds.length === 0) return null;
   return db.query.products.findFirst({
-    where: and(eq(schema.products.id, productId), inArray(schema.products.tenantId, tenantIds)),
+    where: and(
+      or(eq(schema.products.id, key), eq(schema.products.slug, key)),
+      inArray(schema.products.tenantId, tenantIds),
+    ),
   });
 }
 

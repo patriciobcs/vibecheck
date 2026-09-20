@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type Candidate = {
   id: string;
   category: string;
@@ -7,26 +9,28 @@ type Candidate = {
   created_at: string;
 };
 
+const words = (s: string) => s.replace(/_/g, " ");
+
 /** Passive candidates are corroboration hints, not findings, human evidence, issues or repairs. */
 export function CandidatesPanel({
   candidates,
-  productId,
+  monitoringHref,
 }: {
   candidates: Candidate[];
-  productId: string;
+  monitoringHref: string;
 }) {
   return (
     <section className="surface p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Jev passive signal — not human evidence
-        </p>
-        <a
-          href={`/products/${productId}/monitoring`}
-          className="text-xs text-brand hover:underline"
-        >
+        <div>
+          <h2 className="text-sm font-semibold">Passive signals</h2>
+          <p className="text-xs text-muted-foreground">
+            from telemetry screened by Jev · not human evidence
+          </p>
+        </div>
+        <Link href={monitoringHref} className="text-xs text-brand hover:underline">
           Monitoring
-        </a>
+        </Link>
       </div>
       {candidates.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">No research candidates yet.</p>
@@ -40,7 +44,7 @@ export function CandidatesPanel({
                   {candidate.target_ref}
                 </span>
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px]">
-                  {candidate.state}
+                  {words(candidate.state)}
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">

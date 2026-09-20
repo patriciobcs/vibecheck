@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ownerContext } from "@/domain/owner-products";
 import { createProduct } from "@/domain/products";
+import { productPath } from "@/lib/product-path";
 
 /** Reads env and the database at request time; never prerendered at build. */
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ async function submit(formData: FormData) {
     known_journeys: lines("journeys"),
     product_events: [],
   });
-  redirect(`/products/${product.id}`);
+  redirect(productPath(product));
 }
 
 export default async function NewProductPage() {
