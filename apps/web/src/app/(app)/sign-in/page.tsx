@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { env } from "@/lib/env";
 import { SignInForm } from "./sign-in-form";
 
+/** Reads env and the database at request time; never prerendered at build. */
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Sign in" };
 
 export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
