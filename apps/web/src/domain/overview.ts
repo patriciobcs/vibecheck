@@ -6,7 +6,7 @@ import { type RepairSource, studyStages } from "./timeline";
 
 /**
  * VC-06 product overview: everything derived from persisted rows — repo binding and credential
- * health, studies with their stage strip, finding/issue counts and signal severity counts.
+ * health, studies with their stage strip, finding/issue counts and research candidates.
  */
 export async function productOverview(tenantIds: string[], productId: string) {
   if (tenantIds.length === 0) return null;
@@ -26,7 +26,7 @@ export async function productOverview(tenantIds: string[], productId: string) {
     orderBy: desc(schema.studies.createdAt),
   });
   const studyIds = studies.map((s) => s.id);
-  const [revisions, assignments, analysisRuns, findings, summaries, repairs, signals, tenant] =
+  const [revisions, assignments, analysisRuns, findings, summaries, repairs, candidates, tenant] =
     await Promise.all([
       studyIds.length
         ? db.query.studyRevisions.findMany({
@@ -75,12 +75,12 @@ export async function productOverview(tenantIds: string[], productId: string) {
             columns: { status: true, blockedReason: true, studyId: true, findingId: true },
           })
         : [],
-      db.query.signals.findMany({
+      db.query.researchCandidates.findMany({
         where: and(
-          eq(schema.signals.productId, product.id),
-          eq(schema.signals.tenantId, product.tenantId),
+          eq(schema.researchCandidates.productId, product.id),
+          eq(schema.researchCandidates.tenantId, product.tenantId),
         ),
-        columns: { severity: true },
+        orderBy: desc(schema.researchCandidates.updatedAt),
       }),
       db.query.tenants.findFirst({
         where: eq(schema.tenants.id, product.tenantId),
@@ -186,11 +186,20 @@ export async function productOverview(tenantIds: string[], productId: string) {
         }
       : null,
     repairs_by_status: repairsByStatus,
-    signals_by_severity: {
-      low: signals.filter((s) => s.severity === "low").length,
-      medium: signals.filter((s) => s.severity === "medium").length,
-      high: signals.filter((s) => s.severity === "high").length,
+    candidates_by_state: {
+      proposed: candidates.filter((c) => c.state === "proposed").length,
+      accepted: candidates.filter((c) => c.state === "accepted").length,
+      dismissed: candidates.filter((c) => c.state === "dismissed").length,
+      study_linked: candidates.filter((c) => c.state === "study_linked").length,
     },
+    latest_candidates: candidates.slice(0, 10).map((candidate) => ({
+      id: candidate.id,
+      category: candidate.category,
+      target_ref: candidate.targetRef,
+      distinct_observation_sessions: candidate.distinctObservationSessions,
+      state: candidate.state,
+      created_at: candidate.createdAt.toISOString(),
+    })),
     paused,
   };
 }

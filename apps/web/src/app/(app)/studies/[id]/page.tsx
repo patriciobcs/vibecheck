@@ -256,6 +256,25 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
                 </p>
               </div>
             </div>
+            {summary.jev_screening ? (
+              <div className="mt-5 rounded-xl border border-dashed p-4 text-sm">
+                <p className="font-medium">Jev passive signals</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {summary.jev_screening.label} — passive context, not human evidence.
+                </p>
+                {summary.jev_screening.related_candidates.length ? (
+                  <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                    {summary.jev_screening.related_candidates.map((candidate) => (
+                      <li key={candidate.candidate_id}>
+                        {candidate.category} · {candidate.target_ref} ·{" "}
+                        {candidate.distinct_observation_sessions} observation sessions ·{" "}
+                        {candidate.state}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
             <div className="mt-5">
               <p className="font-medium">Themes</p>
               {summary.themes.length === 0 ? (

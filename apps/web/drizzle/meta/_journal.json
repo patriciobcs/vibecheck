@@ -78,6 +78,13 @@
       "when": 1789890253187,
       "tag": "0010_white_the_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789891721030,
+      "tag": "0011_giant_zuras",
+      "breakpoints": true
     }
   ]
 }

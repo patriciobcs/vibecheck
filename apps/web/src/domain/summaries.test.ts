@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
 import type { SummaryProvider } from "@/providers/summary/types";
 import { resetDb } from "@/test/db";
-import { seedStudy } from "@/test/fixtures";
+import { seedParticipant, seedStudy } from "@/test/fixtures";
 import { runJob } from "@/worker/runner";
 import { recordParticipation } from "./participation";
 import { computeDeterministic, generateSummary, latestSummary } from "./summaries";
@@ -134,8 +134,55 @@ describe("VC-05 experiment summaries", () => {
     });
   });
 
+  it("derives the participation funnel from VC-02 assignment and session rows", async () => {
+    const { tenantId, productId, studyId } = await seedStudy();
+    const { participantId } = await seedParticipant();
+    await db.insert(schema.assignments).values({
+      id: "assignment-funnel",
+      tenantId,
+      productId,
+      studyId,
+      studyRevision: 1,
+      participantId,
+      channel: "embedded",
+      cohort: "fresh",
+      testedCommitSha: "a".repeat(40),
+      environmentRef: "test",
+      fixtureRef: "fixture",
+      state: "complete",
+      consentVersion: "consent_v1",
+      consentedAt: new Date("2026-01-01T00:00:00.000Z"),
+      capturePolicy: {},
+      expiresAt: new Date("2026-01-02T00:00:00.000Z"),
+    });
+    await db.insert(schema.sessions).values({
+      id: "session-funnel",
+      tenantId,
+      assignmentId: "assignment-funnel",
+      startedAt: new Date("2026-01-01T00:01:00.000Z"),
+      endedAt: new Date("2026-01-01T00:02:00.000Z"),
+      completeness: "complete",
+      instrumentation: "sdk",
+      participantReportedOutcome: "completed",
+      instrumentedOutcome: "completed",
+    });
+    const first = await computeDeterministic(tenantId, studyId, 1);
+    await db
+      .update(schema.sessions)
+      .set({ participantReportedOutcome: "gave_up" })
+      .where(eq(schema.sessions.id, "session-funnel"));
+    const second = await computeDeterministic(tenantId, studyId, 1);
+    expect(first.summary.participation).toMatchObject({
+      invited: 1,
+      accepted: 1,
+      started: 1,
+      completed: 1,
+    });
+    expect(second.inputsHash).not.toBe(first.inputsHash);
+  });
+
   it("generates fixture narrative and reuses unchanged input", async () => {
-    const { tenantId, studyId } = await seedStudy();
+    const { tenantId, productId, studyId } = await seedStudy();
     await db.insert(schema.analysisRuns).values({
       id: "run-narrative",
       tenantId,
@@ -167,6 +214,23 @@ describe("VC-05 experiment summaries", () => {
       eligibleSessionCount: 1,
       provenance: "fixture",
     });
+    await db.insert(schema.researchCandidates).values({
+      id: "candidate-summary",
+      tenantId,
+      productId,
+      journeyId: "journey-summary",
+      targetRef: "toolbar",
+      category: "discoverability",
+      baselineBuildRef: "build-1",
+      detectorRef: "detector-1",
+      suspectedProblem: "The toolbar target may be hard to discover.",
+      evaluationRefs: [],
+      supportingEventRefs: [],
+      evidenceLimitations: ["Passive signal only."],
+      distinctObservationSessions: 3,
+      distinctJourneyInstances: 3,
+      state: "proposed",
+    });
     const first = await generateSummary(tenantId, studyId, 1);
     const second = await generateSummary(tenantId, studyId, 1);
     await recordParticipation(tenantId, studyId, {
@@ -180,6 +244,7 @@ describe("VC-05 experiment summaries", () => {
       status: first.status,
       headline: first.summary.narrative.headline,
       provenance: first.summary.provenance,
+      jevCandidate: first.summary.jev_screening?.related_candidates[0],
       revisions: (await latestSummary(tenantId, studyId)).revisions.length,
     }).toEqual({
       same: true,
@@ -187,6 +252,13 @@ describe("VC-05 experiment summaries", () => {
       status: "summarized",
       headline: "Toolbar: sticky note tool is hard to discover was observed across sessions",
       provenance: "fixture",
+      jevCandidate: {
+        candidate_id: "candidate-summary",
+        category: "discoverability",
+        target_ref: "toolbar",
+        distinct_observation_sessions: 3,
+        state: "proposed",
+      },
       revisions: 2,
     });
   });

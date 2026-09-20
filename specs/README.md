@@ -1,6 +1,6 @@
 # VibeCheck specifications
 
-Status: Draft product specification; implementation has not been verified.
+Status: Core VC-01/02/03/04/05/06 flows are implemented in the monorepo; provider credentials, production deployment and human-evidence claims remain environment-dependent.
 
 VibeCheck organizes real-human usability research and turns evidence into issues, working code alternatives, and human retests. The embedded library and research engine are the core product. Shareable links and a marketplace supply participants when existing users are unavailable or should not be interrupted.
 
@@ -27,7 +27,6 @@ VibeCheck organizes real-human usability research and turns evidence into issues
   Fixture adapters are labeled simulation and do not establish human evidence
   or real deployment validation.
 - Devin is the initial agent provider for planning, analysis, and implementation. Jev screens bounded telemetry windows for possible friction; Devin generates detector questions and plans research. The Jev adapter and screening loop are implemented and tested with stubbed answers; a real Jev call and accuracy remain unverified until `JEV_API_KEY` is supplied. Nebius is not required.
-- Devin is the initial agent provider for planning, analysis, implementation and summaries. Jev screens bounded telemetry windows for possible friction; Devin generates detector questions and plans research. The Jev adapter and screening loop are implemented and tested with stubbed answers; a real Jev call and accuracy remain unverified until `JEV_API_KEY` is supplied. Nebius is not required.
 - Ordinary application code owns assignments, credit transactions, workflow state, validation execution and access control. Devin does not replace those services.
 - Vonage is the planned media provider; SLNG is the planned STT provider. Verify recording capabilities, access, and supported browser behavior during integration.
 - Branches/worktrees in an authorized repository are the default prototype mechanism. Forks are supported as an alternative, not required per variant.
@@ -42,17 +41,14 @@ Defer payments, complex reputation, generalized automatic setup of arbitrary rep
 ## Workflow
 
 ```text
-Product configuration → discovery run → proposed tasks → selection/auto-launch
-    → immutable study plan → assignment → consent → session → uploaded evidence
-    → analysis → supported finding → deduplicate → GitHub issue
-       ├─ issues_only: stop
-       ├─ draft_pr: implement → validate → draft PR, no human retest
-       └─ prototype_and_retest: implement → validate → preview → draft PR
-            → (deferred) retest invitation → human session → comparison
-    every analysed session → experiment summary for the product team (VC-05)
+Product updates → discovery (optionally from Jev candidates)
+    → experiment with agent scenario
+    → SDK popup/interview/recording
+    → analysis → findings → summary → issue → draft_pr
+    ; retest deferred
 ```
 
-The invitation popup, interview delivery, recording and continuous activity tracking (Jev) are built by the spec-2 team; VibeCheck consumes them through the contracts in VC-02 and VC-05.
+The invitation popup, interview delivery, recording, upload and continuous activity tracking (Jev) are implemented in-repo under VC-02 and the monitoring domain.
 
 No finding is a valid result. No participant, missing media, setup failure, exhausted agent budget, or inconclusive retesting must remain visible outcomes; none is silently converted to success.
 
@@ -91,16 +87,15 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | ObservationWindow | observation session/journey, event IDs, coverage, goal provenance, build, policy | VC-02/03 → Jev |
 | JevEvaluation | window/detector refs, actual model, answers, usage, status | VC-03 → VC-01/06 |
 | ResearchCandidate | suspected problem, evaluation refs, limitations, unique journey counts, lifecycle | VC-03 → VC-01/06 |
-| StudyPlan | immutable task revision, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
+| StudyPlan | immutable task revision, optional agent scenario, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
 | Assignment | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
 | SessionManifest | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
 | Finding | title, observation, hypothesis, evidence refs, uncertainty, fingerprint, provenance | VC-03 → VC-04/06 |
 | RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version | VC-04 → VC-05/06 |
 | Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
 | ParticipationEvent | study revision, opaque participant ref, kind, session id | VC-02 (SDK) → VC-05 |
-| ExperimentSummary | study revision, participation funnel, session outcomes, themes with repair status, narrative with finding citations, provenance, inputs hash including repair runs | VC-05 → VC-06 |
+| ExperimentSummary | study revision, participation funnel, session outcomes, themes with repair status, optional `jev_screening` passive context, narrative with finding citations, provenance, inputs hash including repair runs and candidates | VC-05 → VC-06 |
 | ValidationSummary (deferred) | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
-| Signal | product, source (`jev`), title, severity, semantic target, observed window, opaque evidence ref | spec-2 pipeline → VC-06 |
 
 ### Study plan handoff
 
@@ -118,12 +113,13 @@ The plan is stored as immutable JSON; events carry its reference. Secrets are ex
     "research_question": "Can a user capture several short ideas on an existing board?",
     "time_limit_seconds": 300,
     "success_rule_ref": "stickynote_capture_v1",
-    "fixture_ref": "excalidraw_fixture_v1"
+    "fixture_ref": "excalidraw_fixture_v1",
+    "scenario": {"intro": "Help add the ideas to the board.", "steps": [{"order": 1, "instruction": "Review the ideas."}, {"order": 2, "instruction": "Add each idea to the board."}], "think_aloud_cues": ["What are you looking for?"], "estimated_minutes": 5}
   },
   "baseline": {"commit_sha": "REPLACE_WITH_REAL_SHA", "environment_ref": "baseline_preview"},
   "recruitment": {"source": "marketplace", "target_count": 2, "cohort": "fresh", "eligibility_rule_ref": "eligible_whiteboard_users_v1"},
   "capture": {"screen": "required", "microphone": "required", "webcam": "off", "pointer": "on", "keyboard": "semantic_only", "text_values": "off", "retention_days": 30},
-  "automation": {"mode": "prototype_and_retest", "max_variants": 1, "max_repair_attempts": 2, "agent_budget_ref": "demo_budget", "retest_target_count": 2}
+  "automation": {"mode": "draft_pr", "max_variants": 1, "max_repair_attempts": 2, "agent_budget_ref": "demo_budget", "retest_target_count": 2}
 }
 ```
 
@@ -141,7 +137,7 @@ SDK semantic events → deterministic trigger → bounded window → Jev
     → existing human-study → finding → issue → optional repair/retest pipeline
 ```
 
-A signal alone cannot create a GitHub issue, authorize repair, establish user intent or claim human validation. Passive collection has its own disclosed collection policy and permission state; installing the SDK or consenting to research does not automatically enable it. Passive monitoring never starts screen/audio recording.
+A passive research candidate alone cannot create a GitHub issue, authorize repair, establish user intent or claim human validation. Passive collection has its own disclosed collection policy and permission state; installing the SDK or consenting to research does not automatically enable it. Passive monitoring never starts screen/audio recording.
 
 New records use the shared envelope and tenant boundaries. Observation sessions are separate from research sessions and need no assignment. Link them only where authorized; retain source event IDs to prevent double-counting. A detector version is immutable and contains `detector_id`, `version`, `journey_id`, `app_build_ref`, `instrumentation_schema_version`, `required_events`, `questions`, `evaluation_policy_ref` and authoring provenance. Questions are Jev-compatible, whereas scheduling and thresholds belong to our service, outside Jev's question schema.
 
@@ -206,6 +202,8 @@ Specs describe the current intended behavior. Replace obsolete requirements and 
 Add unresolved proposals under Open decisions until resolved. JSON schema versions and runtime study revisions still matter: update them when contracts or immutable study plans change. Record source verification dates when a decision relies on live documentation; these are evidence provenance, not document revision metadata.
 
 ## Open decisions
+
+- [ ] Per-study-session Jev evaluation of instrumentation logs needs a journey/detector mapping for study events; not implemented.
 
 - [x] Durable worker: a separate process leasing rows from a Postgres `jobs` table (`apps/web/src/worker`). Preview provider still open.
 - [ ] Verify Devin account/API capabilities, budgets and artifact retrieval with a real call.

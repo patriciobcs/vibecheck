@@ -1,6 +1,20 @@
 import { z } from "zod";
 
 export const MAX_PROPOSALS = 3;
+const ScenarioSchema = z.object({
+  intro: z.string().min(1).max(400),
+  steps: z
+    .array(
+      z.object({
+        order: z.number().int().positive(),
+        instruction: z.string().min(1).max(300),
+      }),
+    )
+    .min(1)
+    .max(7),
+  think_aloud_cues: z.array(z.string().min(1).max(200)).max(5),
+  estimated_minutes: z.number().int().positive().max(60),
+});
 
 export const ProposalSchema = z.object({
   task_id: z.string().min(1),
@@ -16,6 +30,7 @@ export const ProposalSchema = z.object({
   confidence: z.string().optional(),
   /** Optional provenance when a proposal was derived from passive-screening candidates. */
   source_candidate_refs: z.array(z.string()).optional(),
+  scenario: ScenarioSchema.optional(),
 });
 
 /** Discovery agent output (VC-01). Proposals must be empty unless the outcome is `proposed`. */

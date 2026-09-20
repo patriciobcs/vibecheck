@@ -28,6 +28,8 @@ and raw responses are retained in restricted database fields, while only bounded
 citations reach the provider. Requests with `source: fixture` use the labeled fixture evidence source
 and are refused in production; persisted session requests use `source: persisted`.
 
+Experiment summaries may include matching research candidates as `jev_screening` passive signal context, never as human evidence or finding support.
+
 ## Finding model
 
 ```json
