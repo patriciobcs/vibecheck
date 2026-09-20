@@ -87,7 +87,7 @@ pnpm dev                 # http://localhost:3000
 pnpm worker              # archive fetch, transcription, monitoring scans, Jev evaluations, Devin jobs (separate terminal; restart after pulling)
 ```
 
-`pnpm db:reset-sample` clears assignments on the sample studies so they recruit again.
+`pnpm db:reset-sample` clears assignments on the sample studies so they recruit again. `pnpm demo:reset` (`demo:reset:prod` against `.env.production.local`) empties the Excalidraw demo product's live console: its sessions, media, passive observations and candidates, nothing else.
 
 ## Testing
 
@@ -105,7 +105,7 @@ LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2
 #     Devin detector authoring: POST /api/owner/products/:id/detectors {"mode":"generate","provider":"devin",...}
 ```
 
-Live demo: open `/products/product_excalidraw_local/monitoring/live` in a second window; it polls persisted state every second (waiting state → session tabs → signals, screening, Jev, candidates).
+Live demo: open `/products/excalidraw/monitoring/live` in a second window; it polls persisted state every second (waiting state → session tabs → signals, screening, Jev, candidates).
 
 CI (`.github/workflows/ci.yml`) runs `pnpm check`, `pnpm test`, and a production build without provider secrets on every push to `main` and every pull request.
 

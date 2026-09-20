@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { NavLink, Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { db, schema } from "@/db/client";
 import { ownerContext, ownerProduct } from "@/domain/owner-products";
 import { publishStudy } from "@/domain/publish";
+import { productPath, withSearchParams } from "@/lib/product-path";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export default async function PublishPage({
   if (!ctx) redirect(`/sign-in?next=/products/${id}`);
   const product = await ownerProduct(ctx.tenantIds, id);
   if (!product) notFound();
+  if (product.slug !== id) permanentRedirect(withSearchParams(productPath(product, "/publish"), q));
   const runId = typeof q.run === "string" ? q.run : "";
   const taskId = typeof q.task === "string" ? q.task : "";
   const proposal = await db.query.proposals.findFirst({
@@ -88,7 +90,7 @@ export default async function PublishPage({
     >
       <div className="mx-auto max-w-2xl">
         <Link
-          href={`/products/${product.id}`}
+          href={productPath(product)}
           className="text-xs text-muted-foreground hover:text-foreground"
         >
           ← {product.name}

@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { type ProductConfig, ProductConfigSchema } from "@vibecheck/contracts";
-import { and, eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db/client";
 import { assertAllowedDestination } from "@/lib/destination";
 import { newId, newToken } from "@/lib/ids";
+import { slugify } from "@/lib/slug";
 import type { DiscoveryProviderName } from "@/providers/discovery/types";
 import { enqueueJob } from "./jobs";
 
@@ -30,12 +31,14 @@ export async function createProduct(
     status = "needs_setup";
     setupError = err instanceof Error ? err.message : "destination_not_allowed";
   }
+  const slug = await freeSlug(database, tenantId, slugify(config.name));
   const [created] = await database
     .insert(schema.products)
     .values({
       id: newId("product"),
       tenantId,
       name: config.name,
+      slug,
       url: config.url,
       permittedOrigins: config.permitted_origins,
       publishableKey: `pk_${newToken(12)}`,
@@ -53,6 +56,25 @@ export async function createProduct(
     .returning();
   if (!created) throw new Error("product insert failed");
   return created;
+}
+
+/**
+ * First unused slug among `base`, `base-2`, `base-3`, … within the tenant. Chosen before the insert
+ * (not by catching the unique violation) because callers may run inside a transaction, where a
+ * failed statement aborts everything.
+ */
+async function freeSlug(database: typeof db | Tx, tenantId: string, base: string) {
+  const taken = new Set(
+    (
+      await database
+        .select({ slug: schema.products.slug })
+        .from(schema.products)
+        .where(and(eq(schema.products.tenantId, tenantId), like(schema.products.slug, `${base}%`)))
+    ).map((r) => r.slug),
+  );
+  if (!taken.has(base)) return base;
+  for (let n = 2; n < 1000; n += 1) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
+  throw new Error(`could not allocate a slug for "${base}"`);
 }
 
 export function toProductConfig(p: ProductRow): ProductConfig {

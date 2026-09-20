@@ -19,6 +19,8 @@
     "db:reset-sample": "tsx --env-file-if-exists=.env.local src/db/reset-sample.ts",
     "tunnel": "tsx --env-file-if-exists=.env.local scripts/tunnel.ts",
     "demo:record": "tsx --env-file-if-exists=.env.local scripts/record-demo.ts",
+    "demo:reset": "tsx --env-file-if-exists=.env.local scripts/demo-reset.ts",
+    "demo:reset:prod": "tsx --env-file=.env.production.local scripts/demo-reset.ts",
     "vonage:callback": "tsx --env-file-if-exists=.env.local scripts/vonage-callback.ts"
   },
   "dependencies": {

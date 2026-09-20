@@ -159,6 +159,9 @@ export async function productOverview(tenantIds: string[], productId: string) {
         id: study.id,
         status: study.status,
         mode: plan?.automation.mode ?? null,
+        title: plan?.task.research_question ?? null,
+        task_prompt: plan?.task.participant_prompt ?? null,
+        sessions: sessionsByStudy.get(study.id) ?? 0,
         stages: plan
           ? studyStages(study, plan, {
               sessions: sessionsByStudy.get(study.id) ?? 0,

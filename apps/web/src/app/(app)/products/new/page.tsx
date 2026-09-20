@@ -5,6 +5,7 @@ import { db, schema } from "@/db/client";
 import { createOwnerProduct, parseOnboardingForm } from "@/domain/onboarding";
 import { ownerContext } from "@/domain/owner-products";
 import { ApiError } from "@/lib/api";
+import { productPath } from "@/lib/product-path";
 import { type FormState, ProductForm } from "./product-form";
 
 /** Reads env and the database at request time; never prerendered at build. */
@@ -26,19 +27,14 @@ async function submit(_previous: FormState, formData: FormData): Promise<FormSta
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Please check your details.", values };
   }
-  let productId: string;
+  let product: { id: string; slug: string | null };
   try {
-    const product = await createOwnerProduct(
-      ctx.userId,
-      parsed.data,
-      values.tenant_id || undefined,
-    );
-    productId = product.id;
+    product = await createOwnerProduct(ctx.userId, parsed.data, values.tenant_id || undefined);
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, values };
     return { error: "We couldn't save your project. Please try again.", values };
   }
-  redirect(`/products/${productId}`);
+  redirect(productPath(product));
 }
 
 export default async function NewProductPage() {

@@ -18,7 +18,8 @@ test("VC-01: connect a product, run fixture discovery, publish one proposal, han
   await page.getByLabel("Support complaints").fill("Sample complaint: could not find export");
   await page.getByLabel("Mark imported items as sample data").click();
   await page.getByRole("button", { name: "Add project", exact: true }).click();
-  await expect(page).toHaveURL(/\/products\/product_/);
+  // The product page lives at a slug URL; an id in the address bar redirects to it.
+  await expect(page).toHaveURL(/\/products\/(?!new$)[^/]+$/);
   await expect(page.getByRole("heading", { name: /E2E Product/ })).toBeVisible();
   await expect(page.getByText("Needs setup")).toHaveCount(0);
   const productUrl = page.url();

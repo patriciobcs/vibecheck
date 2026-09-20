@@ -5,6 +5,7 @@ import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
 import { db, schema } from "@/db/client";
 import { ownerContext } from "@/domain/owner-products";
+import { productPath } from "@/lib/product-path";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Products" };
@@ -60,7 +61,7 @@ export default async function ProductsPage() {
         {products.map((p) => (
           <li key={p.id}>
             <Link
-              href={`/products/${p.id}`}
+              href={productPath(p)}
               className="surface block p-6 transition-shadow hover:shadow-[var(--shadow-float)]"
             >
               <div className="flex items-center justify-between gap-3">
