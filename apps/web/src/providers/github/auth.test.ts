@@ -42,11 +42,11 @@ describe("GitHub App authentication", () => {
         );
       }),
     );
-    await expect(getGithubToken({ owner: "minasrc", repo: "excalidraw-demo" })).resolves.toBe(
-      "ghs_test",
-    );
+    await expect(
+      getGithubToken({ owner: "seamlessux", repo: "excalidraw-seamlessux" }),
+    ).resolves.toBe("ghs_test");
     expect(calls.map((request) => request.url)).toEqual([
-      "https://api.github.com/repos/minasrc/excalidraw-demo/installation",
+      "https://api.github.com/repos/seamlessux/excalidraw-seamlessux/installation",
       "https://api.github.com/app/installations/99/access_tokens",
     ]);
   });

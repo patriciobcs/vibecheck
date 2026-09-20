@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { type ProductConfig, ProductConfigSchema } from "@vibecheck/contracts";
-import { and, eq } from "drizzle-orm";
-import { db, schema } from "@/db/client";
+import { and, eq, like } from "drizzle-orm";
+import { db, schema, type Tx } from "@/db/client";
 import { assertAllowedDestination } from "@/lib/destination";
 import { newId, newToken } from "@/lib/ids";
 import { slugify } from "@/lib/slug";
@@ -19,6 +19,7 @@ export async function createProduct(
   tenantId: string,
   input: unknown,
   resolver?: Resolver,
+  database: typeof db | Tx = db,
 ): Promise<ProductRow> {
   const config = ProductConfigSchema.parse(input);
   let status: "ready" | "needs_setup" = "ready";
@@ -30,48 +31,50 @@ export async function createProduct(
     status = "needs_setup";
     setupError = err instanceof Error ? err.message : "destination_not_allowed";
   }
-  const baseSlug = slugify(config.name);
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
-    try {
-      const [created] = await db
-        .insert(schema.products)
-        .values({
-          id: newId("product"),
-          tenantId,
-          name: config.name,
-          slug,
-          url: config.url,
-          permittedOrigins: config.permitted_origins,
-          publishableKey: `pk_${newToken(12)}`,
-          description: config.description,
-          language: config.language,
-          audience: config.audience,
-          repoBinding: config.repo_binding ?? null,
-          releaseNotes: config.release_notes,
-          supportComplaints: config.support_complaints,
-          knownJourneys: config.known_journeys,
-          productEvents: config.product_events,
-          status,
-          setupError,
-        })
-        .returning();
-      if (!created) throw new Error("product insert failed");
-      return created;
-    } catch (err) {
-      // drizzle wraps the PostgresError; the violation details sit on `cause`.
-      const e = err as {
-        code?: string;
-        constraint_name?: string;
-        cause?: { code?: string; constraint_name?: string };
-      };
-      const code = e.code ?? e.cause?.code;
-      const constraint = e.constraint_name ?? e.cause?.constraint_name;
-      if (code === "23505" && constraint === "products_tenant_slug_uq") continue;
-      throw err;
-    }
-  }
-  throw new Error(`could not allocate a slug for product "${config.name}"`);
+  const slug = await freeSlug(database, tenantId, slugify(config.name));
+  const [created] = await database
+    .insert(schema.products)
+    .values({
+      id: newId("product"),
+      tenantId,
+      name: config.name,
+      slug,
+      url: config.url,
+      permittedOrigins: config.permitted_origins,
+      publishableKey: `pk_${newToken(12)}`,
+      description: config.description,
+      language: config.language,
+      audience: config.audience,
+      repoBinding: config.repo_binding ?? null,
+      releaseNotes: config.release_notes,
+      supportComplaints: config.support_complaints,
+      knownJourneys: config.known_journeys,
+      productEvents: config.product_events,
+      status,
+      setupError,
+    })
+    .returning();
+  if (!created) throw new Error("product insert failed");
+  return created;
+}
+
+/**
+ * First unused slug among `base`, `base-2`, `base-3`, … within the tenant. Chosen before the insert
+ * (not by catching the unique violation) because callers may run inside a transaction, where a
+ * failed statement aborts everything.
+ */
+async function freeSlug(database: typeof db | Tx, tenantId: string, base: string) {
+  const taken = new Set(
+    (
+      await database
+        .select({ slug: schema.products.slug })
+        .from(schema.products)
+        .where(and(eq(schema.products.tenantId, tenantId), like(schema.products.slug, `${base}%`)))
+    ).map((r) => r.slug),
+  );
+  if (!taken.has(base)) return base;
+  for (let n = 2; n < 1000; n += 1) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
+  throw new Error(`could not allocate a slug for "${base}"`);
 }
 
 export function toProductConfig(p: ProductRow): ProductConfig {

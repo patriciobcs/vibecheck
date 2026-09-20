@@ -1,3 +1,4 @@
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { currentSession } from "@/auth/current-user";
 import { NavLink, Shell } from "@/components/layout/shell";
@@ -7,7 +8,6 @@ import { HowItWorks, JourneyFigure } from "./landing-parts";
 
 export const dynamic = "force-dynamic";
 
-/** Lean landing: one headline, one call to action, one real journey; then how it works. */
 export default async function Home() {
   const session = await currentSession().catch(() => null);
   const demo = env().demo;
@@ -45,13 +45,16 @@ export default async function Home() {
             </Link>
           </p>
           <Button asChild size="lg" className="mt-8 rounded-full px-7">
-            <Link href={enter}>
-              {session ? "Open workspace" : demo ? "Open the demo" : "Sign in"}
-            </Link>
+            <Link href="/products/new">Add your project</Link>
           </Button>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Start with your project name and app URL.
+          </p>
         </div>
         <JourneyFigure />
       </section>
+
+      <WorkflowChart />
 
       <section className="border-t border-border/70 py-20 md:py-28">
         <HowItWorks />
@@ -66,11 +69,93 @@ export default async function Home() {
           verified recording. Model estimates are labeled as estimates, sample data as sample.
         </p>
         <Button asChild size="lg" className="mt-8 rounded-full px-7">
-          <Link href={enter}>
-            {session ? "Open workspace" : demo ? "Open the demo" : "Sign in"}
-          </Link>
+          <Link href="/products/new">Add your project</Link>
         </Button>
       </section>
     </Shell>
+  );
+}
+
+const WORKFLOW = [
+  {
+    tool: "SDK + Jev",
+    title: "Spot friction",
+    description: "App events help Jev flag journeys worth exploring in a study.",
+  },
+  {
+    tool: "Vonage",
+    title: "Record a study",
+    description: "People try a task. Vonage records their audio and optional screen, with consent.",
+  },
+  {
+    tool: "SLNG",
+    title: "Transcribe",
+    description: "SLNG turns the session audio into a transcript with timestamps.",
+  },
+  {
+    tool: "Devin",
+    title: "Find insights",
+    description: "Devin analyzes transcripts and app events to produce findings with evidence.",
+  },
+  {
+    tool: "Devin + GitHub",
+    title: "Create a PR",
+    description: "Devin proposes a code change. Checks run before a draft pull request opens.",
+  },
+  {
+    tool: "Vercel",
+    title: "Deploy a preview",
+    description: "Vercel builds the candidate commit into a preview you can try and review.",
+  },
+];
+
+function WorkflowChart() {
+  return (
+    <section
+      aria-labelledby="workflow-heading"
+      className="border-t border-border/70 py-20 md:py-28"
+    >
+      <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+        The tools behind the flow
+      </p>
+      <h2 id="workflow-heading" className="mt-3 text-3xl font-medium tracking-tight md:text-4xl">
+        From user friction to a working preview.
+      </h2>
+      <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+        See how the connected tools turn a research question into recorded evidence, useful
+        insights, and a proposed improvement.
+      </p>
+      <figure className="mt-10">
+        <ol className="grid gap-7 xl:grid-cols-6" aria-label="Research and improvement workflow">
+          {WORKFLOW.map((step, index) => (
+            <li key={step.title} className="relative min-w-0">
+              <div className="flex h-full gap-4 rounded-2xl border border-border/70 bg-card p-5 xl:block">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand/10 font-mono text-xs text-foreground xl:mb-5">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">{step.tool}</p>
+                  <h3 className="mt-2 text-lg font-medium tracking-tight">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {step.description}
+                  </p>
+                </div>
+              </div>
+              {index < WORKFLOW.length - 1 ? (
+                <ArrowRight
+                  aria-hidden="true"
+                  className="absolute -bottom-6 left-1/2 size-5 -translate-x-1/2 rotate-90 text-muted-foreground xl:-right-6 xl:bottom-auto xl:left-auto xl:top-1/2 xl:-translate-y-1/2 xl:translate-x-0 xl:rotate-0"
+                />
+              ) : null}
+            </li>
+          ))}
+        </ol>
+        <figcaption className="mt-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          Flow overview with integrations configured. Jev guides research from app events;
+          recordings and transcripts support the findings. PRs require a connected repository and
+          enabled code changes. Deployments are previews for review.
+        </figcaption>
+      </figure>
+    </section>
   );
 }

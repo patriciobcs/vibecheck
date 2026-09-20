@@ -19,6 +19,7 @@ Seamless UX organizes real-human usability research and turns evidence into issu
 ## Product decisions
 
 - Initial platform: web applications. Research can work against a URL; code changes additionally require repository access and a reproducible environment.
+- Founder onboarding requires only project name and app URL after email sign-in. Optional research context is disclosed on demand, the form derives the SDK origin, and first-project submission creates a private owner workspace when needed. `ProductConfig` and API defaults remain compatible; saving alone does not enable collection or automation. See VC-01 for current email delivery and demo-rule limitations.
 - The owner selects proposed tasks by default. Optional `auto_launch` can launch bounded studies under preconfigured rules. This supports both owner-directed research and the autonomous demo.
 - Once a study is launched, processing follows its snapshotted automation policy. No repeated owner approval is necessary for authorized issue creation or isolated prototypes.
 - Modes: `issues_only`, `draft_pr`, `prototype_and_retest`. No automatic merge or production deployment in the MVP.
