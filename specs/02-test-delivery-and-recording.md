@@ -17,7 +17,7 @@ Deliver the same study through a link or an embedded invitation, capture declare
 
 ## Recording configuration
 
-| Signal | MVP default | Boundaries |
+| Capture surface | MVP default | Boundaries |
 | --- | --- | --- |
 | Screen | Required for recorded studies | Explicit browser screen-share choice; encourage the application tab. |
 | Microphone | Required for think-aloud studies | Permission and clear recording indicator; missing permission gives retry or exit. |
@@ -43,6 +43,8 @@ Pixel-level screen recordings can reveal information beyond masked DOM events. U
 `invited → eligible → assigned → consent → device_check → recording → submitting → complete`
 
 The participant may pause, resume, mark themselves stuck, finish early or withdraw. A neutral reminder such as "What are you looking for?" may be used sparingly; log its timestamp because moderation can affect behavior. Never coach toward a specific control or show an engagement/roast score during testing.
+
+When the published plan includes an agent-designed scenario, the participant dialog renders its introduction, numbered steps and think-aloud cues. When no scenario exists, it renders the existing `participant_prompt` unchanged.
 
 At completion ask for perceived difficulty and optional comments. Capture declared completion separately from instrumented completion. Store missing evidence as missing, not as zero time or failure.
 
@@ -205,4 +207,3 @@ Additional acceptance criteria:
 - [ ] Device participants are per browser profile (Safari partitions iframe storage per top site), so cooldowns are per device+site, not per person; credits for anonymous participants have no payout path yet.
 - [ ] Define participant-facing withdrawal and partial-session credit policy.
 - [ ] Accessibility alternatives for participants who cannot provide think-aloud audio.
-

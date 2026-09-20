@@ -31,6 +31,12 @@ async function proposedRun() {
         eligibility_rule_ref: "eligible_whiteboard_users_v1",
         success_rule_ref: "stickynote_capture_v1",
         uncertainties: [],
+        scenario: {
+          intro: "Complete the task.",
+          steps: [{ order: 1, instruction: "Add the item." }],
+          think_aloud_cues: ["What are you looking for?"],
+          estimated_minutes: 5,
+        },
       },
     ],
   };
@@ -60,6 +66,7 @@ describe("publishStudy", () => {
     expect(res?.status).toBe(201);
     expect(res?.plan.task.task_id).toBe("task");
     expect(res?.plan.recruitment.eligibility_rule_ref).toBe("eligible_whiteboard_users_v1");
+    expect(res?.plan.task.scenario?.intro).toBe("Complete the task.");
     const revisions = await db.query.studyRevisions.findMany();
     expect(revisions).toHaveLength(1);
     expect(revisions[0]?.provenance).toBe("vc01");

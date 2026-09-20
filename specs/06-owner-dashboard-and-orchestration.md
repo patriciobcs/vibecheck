@@ -11,29 +11,11 @@ Give owners a coherent view of research and implementation progress, configurabl
 
 ### Product overview
 
-Show product URL, repository binding and connection health, experiments (studies) by stage, findings needing attention, open issues and draft PRs, the latest experiment summary and a Signals panel. Empty states give one clear next action: connect product, run discovery or publish an experiment. Avoid fabricated ROI, participation counts or generic honesty/UX scores; numbers come from persisted rows with denominators.
+Show product URL, repository binding and connection health, experiments (studies) by stage, findings needing attention, open issues and draft PRs, the latest experiment summary and a Signals (research candidates) panel. Empty states give one clear next action: connect product, run discovery or publish an experiment. Avoid fabricated ROI, participation counts or generic honesty/UX scores; numbers come from persisted rows with denominators.
 
-### Signals
+### Signals (research candidates)
 
-Continuous activity tracking and its analysis by Jev are built by the spec-2 team. The dashboard receives their flags through `POST /api/products/:id/signals` (contract `Signal` in `packages/contracts/src/signal.ts`), stores them as `signals` rows and lists them per product with source, severity, semantic target and time. A signal is a hint, not a finding: it has no session evidence and is never published as an issue or fed to repair. "Propose an experiment from this signal" (feeding VC-01 discovery with the signal as a labeled input) is an open decision.
-
-```json
-{
-  "schema_version": "1.0",
-  "signal_id": "signal_example",
-  "source": "jev",
-  "title": "Toolbar: repeated hover without selection",
-  "description": "Users hover the shape tools for more than 5s before selecting anything.",
-  "severity": "medium",
-  "semantic_target": "toolbar.shapes",
-  "observed_sessions": ["observation_session_1", "observation_session_2"],
-  "window_start": "2026-09-19T00:00:00Z",
-  "window_end": "2026-09-19T12:00:00Z",
-  "evidence_ref": null
-}
-```
-
-`severity` ∈ `low`, `medium`, `high`; `observed_sessions` is optional and displayed with the window as its denominator; `evidence_ref` is an opaque reference resolved through the sender (it may point at an observation window or `jev_evaluations` row), never a URL rendered in the UI. Replays with the same `signal_id` and the same or an earlier `window_end` are ignored; a later `window_end` updates the row. A `Signal` is an externally submitted hint keyed by the caller's `signal_id`; it is not a duplicate of `jev_evaluations`, which records internal screening.
+The dashboard reads tenant- and product-scoped `research_candidates` and related monitoring rows populated by the in-repo Jev pipeline. Candidates show category, target reference, distinct observation-session and journey denominators, evidence limitations and lifecycle state (`proposed`, `accepted`, `dismissed`, `study_linked`). They are passive signal context, not findings, human evidence, GitHub issues or repairs. Discovery may receive candidate references as labeled provenance for neutral task planning.
 
 ### Proposed tests
 
@@ -87,10 +69,10 @@ Use the shared envelope and schema validation. Initial events:
 - `summary.generated`
 - `issue.created`, `issue.updated`, `finding.ready_for_repair`
 - `repair.candidate_ready`, `repair.draft_pr_ready`, `checks.completed`, `preview.ready`
-- `signal.flagged` (inbound from the Jev/spec-2 pipeline), `tenant.paused`, `tenant.resumed`
+- `research_candidate.updated`, `tenant.paused`, `tenant.resumed`
 - `retest.requested`, `validation.updated`, `workflow.blocked`
 
-`study.published` is written to `event_outbox` in the publish transaction with idempotency key `<study_id>:revision_<n>:publish`; `signal.flagged` uses `signal:<product_id>:<signal_id>:<window_end>` so replays emit once; tenant-level events (`tenant.paused`, `tenant.resumed`) carry the tenant id in `product_id` because the shared envelope requires one. `discovery.completed` is not yet emitted (run completion is read from `DiscoveryRun.status`). Use transactions plus an outbox for jobs and notifications. Each transition checks current state/revision and permissions. Consumers deduplicate; scheduled reconciliation resolves lost webhooks. Progress subscriptions via SSE or polling read the persisted state, not simulated timers.
+`study.published` is written to `event_outbox` in the publish transaction with idempotency key `<study_id>:revision_<n>:publish`; `research_candidate.updated` is emitted when internal monitoring changes candidate state; tenant-level events (`tenant.paused`, `tenant.resumed`) carry the tenant id in `product_id` because the shared envelope requires one. `discovery.completed` is not yet emitted (run completion is read from `DiscoveryRun.status`). Use transactions plus an outbox for jobs and notifications. Each transition checks current state/revision and permissions. Consumers deduplicate; scheduled reconciliation resolves lost webhooks. Progress subscriptions via SSE or polling read the persisted state, not simulated timers.
 
 VC-04 adds a durable `repair.run` job. Fixture adapters are deterministic
 local implementations; the worker stores provider session IDs before polling,
@@ -116,7 +98,7 @@ Deletion jobs remove scoped media/transcripts and dependent content, invalidate 
 
 ## Continuous monitoring controls and views
 
-Implemented as `/products/:id/monitoring` (2026-09-19): collection health, detectors with status and required events, evaluations with trigger/sample reason, requested and returned model, tokens and cost (labeled unpriced without a configured price), candidates with distinct-session denominators, evidence limitations and actions, and the policy form (each save is a new revision). Original intent: add a Monitoring view with collection health, active/stale detectors, known event coverage, last evaluated build, suspected friction and research candidates. Label these as signals, separate from findings supported by human studies. Show source events, window bounds, gaps, trigger versus random-sample reason, actual model version and detector version. Avoid an overall honesty or UX score.
+Implemented as `/products/:id/monitoring` (2026-09-19): collection health, detectors with status and required events, evaluations with trigger/sample reason, requested and returned model, tokens and cost (labeled unpriced without a configured price), research candidates with distinct-session denominators, evidence limitations and actions, and the policy form (each save is a new revision). Original intent: add a Monitoring view with collection health, active/stale detectors, known event coverage, last evaluated build, suspected friction and research candidates. Label candidates as passive signals, separate from findings supported by human studies. Show source events, window bounds, gaps, trigger versus random-sample reason, actual model version and detector version. Avoid an overall honesty or UX score.
 
 Candidate actions: inspect, dismiss with reason, request task proposal or open linked study. Default task publication remains owner-selected; show when saved auto-launch rules performed it. Display counts of distinct observation sessions, evaluated journeys and sampled journeys with explicit denominators. Trigger-selected data is not an unbiased estimate of all-user friction. Show unknown/unavailable outcomes separately from clean journeys.
 
@@ -131,7 +113,7 @@ Metrics: actual calls/tokens/estimated or actual cost, queue time, provider late
 Additional acceptance criteria:
 
 - Cross-tenant observation reads, candidate actions and detector edits are rejected.
-- Owner can trace a signal through its detector/window to a neutral task and later human evidence.
+- Owner can trace a research candidate through its detector/window to a neutral task and later human evidence.
 - Restart/concurrency tests demonstrate bounded provider calls and unique candidate/study mappings.
 - Collection off, global pause, deletion and budget exhaustion appear as actual persisted states.
 - Passive monitoring does not change participation credits or imply recording permission.
@@ -143,7 +125,7 @@ Additional acceptance criteria:
 - Each automation mode has a correct terminal state and clear UI label.
 - The dashboard reflects actual persisted progress and recovers after reload/restart.
 - Restarting workers or replaying callbacks does not duplicate issues, credits, assignments, summaries or PRs.
-- Signals are displayed as hints with source and window; they never create issues or repairs by themselves.
+- Research candidates are displayed as passive hints with source and window; they never create issues or repairs by themselves.
 - Cross-tenant reads/writes and participant access to owner artifacts are denied.
 - Global pause blocks new external work while preserving audit and resumable state.
 - All current-human-validation labels match the exact current PR SHA.
@@ -157,8 +139,7 @@ Additional acceptance criteria:
 - [ ] Marketplace ranking, paid credits and participant quality appeals after MVP.
 - [ ] Team invitation and SSO requirements from actual customers.
 - [ ] Additional observability, retention export and provider-deletion guarantees.
-- [ ] Authentication of inbound `signal.flagged` posts from the SDK/Jev pipeline (currently the tenant API key or session).
-- [ ] "Propose an experiment from a signal": feeding VC-01 discovery with signals as labeled inputs.
+- [ ] Per-study-session Jev evaluation of instrumentation logs needs a journey/detector mapping for study events; not implemented.
 
 ### Live analysis view (implemented 2026-09-20)
 

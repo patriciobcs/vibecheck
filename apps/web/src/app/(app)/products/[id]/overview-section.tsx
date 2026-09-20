@@ -54,17 +54,16 @@ export function OverviewSection({ overview }: { overview: Overview }) {
         </div>
         <div className="surface p-5 text-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Signals
+            Passive candidates
           </p>
           <p className="mt-2 font-medium">
-            {overview.signals_by_severity.low +
-              overview.signals_by_severity.medium +
-              overview.signals_by_severity.high}{" "}
-            hints
+            {Object.values(overview.candidates_by_state).reduce((sum, count) => sum + count, 0)}{" "}
+            candidates
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {overview.signals_by_severity.high} high · {overview.signals_by_severity.medium} medium
-            · {overview.signals_by_severity.low} low
+            {overview.candidates_by_state.proposed} proposed ·{" "}
+            {overview.candidates_by_state.accepted} accepted ·{" "}
+            {overview.candidates_by_state.study_linked} linked
           </p>
         </div>
         <div className="surface p-5 text-sm">

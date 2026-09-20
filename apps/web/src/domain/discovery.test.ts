@@ -21,6 +21,12 @@ const valid = {
       eligibility_rule_ref: "eligible_whiteboard_users_v1",
       success_rule_ref: "stickynote_capture_v1",
       uncertainties: [],
+      scenario: {
+        intro: "Complete the task.",
+        steps: [{ order: 1, instruction: "Add the item." }],
+        think_aloud_cues: ["What are you looking for?"],
+        estimated_minutes: 5,
+      },
     },
   ],
 };

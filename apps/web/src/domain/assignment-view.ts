@@ -44,6 +44,7 @@ export async function assignmentViewForParticipant(participantId: string, assign
     task: {
       participantPrompt: plan.task.participant_prompt,
       timeLimitSeconds: plan.task.time_limit_seconds,
+      scenario: plan.task.scenario ?? null,
     },
     product: {
       name: product.name,

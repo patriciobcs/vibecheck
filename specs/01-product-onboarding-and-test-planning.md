@@ -18,16 +18,18 @@ Let an owner describe and connect a product, have an agent identify useful UX ch
 3. Identify the base branch, preview/build workflow, startup and test commands, test data reset command, supported origins and credentials via secret references.
 4. Supply optional release notes, support complaints, known journeys and product events. Mark imported/sample material and its provenance.
 5. Run discovery. Show progress and actionable connection errors.
-6. Display proposed tasks as cards: neutral participant task, research question, rationale, supporting signals, eligibility, estimated duration and confidence/uncertainty.
+6. Display proposed tasks as cards: neutral participant task, optional agent-designed scenario, research question, rationale, supporting candidates, eligibility, estimated duration and confidence/uncertainty.
 7. Owner edits/selects cards and chooses delivery, capture, recruitment and automation settings. Publish selected studies. Default to one task per study in the MVP.
 
 ## Agent behavior
 
 Discovery runs through a provider adapter. Two providers exist: `devin` uses a Devin analysis session with a structured-output schema; `fixture` returns deterministic, sample-labeled proposals for local development and tests and is never presented as agent inference. Use a Devin analysis session to inspect authorized product/repository context. This stage is read-only with respect to the target product: no issue creation or code mutation. Prioritize changed journeys, observed friction and high-value actions with weak evidence. A repository scan alone cannot establish that users struggle.
 
-Return structured proposed tasks with evidence references and a rationale. Distinguish a signal from a hypothesis, and observed data from model inference. If there are no events, propose exploratory studies and label them accordingly. Do not invent traffic, complaints or observed failures.
+Return structured proposed tasks with evidence references, a rationale and an optional neutral scenario. Distinguish a passive candidate from a hypothesis, and observed data from model inference. If there are no events, propose exploratory studies and label them accordingly. Do not invent traffic, complaints or observed failures.
 
 Task prompts describe realistic goals without naming the control to click or suspected problem. Do not ask participants to be negative, design a solution, or prove a predefined hypothesis. Keep researcher-only expected outcomes and validator rules out of the participant prompt.
+
+Scenarios contain a short introduction, one to seven present-tense imperative steps, optional think-aloud cues and an estimated duration. Scenario wording must not name controls or leak the suspected problem. Fixture scenarios are sample data and are labeled as such. Publishing snapshots the optional scenario into the immutable `StudyPlan`.
 
 Provide `cannot_assess` and `needs_setup` outcomes. Validate agent JSON; make a bounded correction request on malformed output and preserve the raw response for restricted debugging. Never interpret malformed output as permission to publish.
 
@@ -40,7 +42,7 @@ A remote agent cannot reach an owner's laptop: a `localhost` target produces `ne
 | Field | Default / behavior |
 | --- | --- |
 | launch_policy | `owner_selects`; optional `auto_launch` under saved limits |
-| automation.mode | `prototype_and_retest` for the demo target so the full loop is exercised; production tenants should default to `issues_only`. `draft_pr` and `prototype_and_retest` require repository setup before repair jobs run |
+| automation.mode | `draft_pr` for the demo target; production tenants may choose `issues_only`. `draft_pr` and `prototype_and_retest` require repository setup before repair jobs run |
 | audience | Owner-defined product-relevant criteria, not inferred sensitive traits |
 | recruitment.source | `direct_link`, `embedded`, or `marketplace` |
 | permitted_origins | Explicit web origins; editable by admins |

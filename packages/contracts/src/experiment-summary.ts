@@ -47,6 +47,20 @@ export const ExperimentThemeSchema = z.object({
   repair_status: repairStatusSchema.nullable(),
 });
 
+const JevScreeningSchema = z.object({
+  label: z.literal("passive_signal"),
+  source_candidate_refs: z.array(z.string()),
+  related_candidates: z.array(
+    z.object({
+      candidate_id: z.string(),
+      category: z.string(),
+      target_ref: z.string(),
+      distinct_observation_sessions: z.number().int(),
+      state: z.string(),
+    }),
+  ),
+});
+
 export const ExperimentSummarySchema = z.object({
   schema_version: z.literal("1.0"),
   summary_id: z.string().min(1),
@@ -81,6 +95,7 @@ export const ExperimentSummarySchema = z.object({
     }),
   }),
   themes: z.array(ExperimentThemeSchema),
+  jev_screening: JevScreeningSchema.nullable().optional(),
   narrative: z.object({
     headline: z.string(),
     observations: z.array(

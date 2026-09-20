@@ -1,37 +1,49 @@
-import { SAMPLE_STUDY_PLAN, SignalSchema } from "@vibecheck/contracts";
+import { SAMPLE_STUDY_PLAN } from "@vibecheck/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
 import { resetDb } from "@/test/db";
 import { seedStudy } from "@/test/fixtures";
 import { productOverview } from "./overview";
-import { ingestSignal } from "./signals";
 
 beforeEach(resetDb);
 
 describe("productOverview", () => {
-  it("summarizes studies, findings and signals for an owned product", async () => {
+  it("summarizes studies and research candidates for an owned product", async () => {
     const { tenantId, productId, studyId } = await seedStudy();
-    await ingestSignal({
-      tenantIds: [tenantId],
+    await db.insert(schema.researchCandidates).values({
+      id: "candidate-overview",
+      tenantId,
       productId,
-      signal: SignalSchema.parse({
-        schema_version: "1.0",
-        signal_id: "s1",
-        source: "jev",
-        title: "Toolbar hesitation",
-        description: "Hesitation observed.",
-        severity: "high",
-        semantic_target: "toolbar",
-        window_start: "2025-01-01T00:00:00Z",
-        window_end: "2025-01-02T00:00:00Z",
-        evidence_ref: null,
-      }),
-      actorUserId: null,
+      journeyId: "journey-overview",
+      targetRef: "toolbar",
+      category: "discoverability",
+      baselineBuildRef: "build-1",
+      detectorRef: "detector-1",
+      suspectedProblem: "The toolbar target may be hard to discover.",
+      evaluationRefs: [],
+      supportingEventRefs: [],
+      evidenceLimitations: ["Passive signal only."],
+      distinctObservationSessions: 2,
+      distinctJourneyInstances: 2,
+      state: "proposed",
     });
     const overview = await productOverview([tenantId], productId);
     expect(overview?.product.id).toBe(productId);
     expect(overview?.studies.map((s) => s.id)).toEqual([studyId]);
-    expect(overview?.signals_by_severity).toEqual({ low: 0, medium: 0, high: 1 });
+    expect(overview?.candidates_by_state).toEqual({
+      proposed: 1,
+      accepted: 0,
+      dismissed: 0,
+      study_linked: 0,
+    });
+    expect(overview?.latest_candidates).toMatchObject([
+      {
+        category: "discoverability",
+        target_ref: "toolbar",
+        distinct_observation_sessions: 2,
+        state: "proposed",
+      },
+    ]);
     expect(overview?.open_issues).toBe(0);
     expect(overview?.paused).toBe(false);
     expect(await productOverview(["tenant_other"], productId)).toBeNull();

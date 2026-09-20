@@ -11,18 +11,18 @@ Human retesting of code candidates on previews (the former VC-05 scope) is defer
 
 ## Scope boundary
 
-The spec-2 team owns the in-product invitation popup, the interview delivery (the agent-designed task prompt shown to the participant), screen/voice recording, upload, and continuous activity tracking analysed by Jev. VC-05 assumes those exist and connects to them only through the contracts below:
+The SDK invitation popup, participant dialog, scenario rendering, screen/voice recording, upload, and Jev monitoring pipeline are implemented in-repo under VC-02 and the monitoring domain. VC-05 consumes their persisted rows and contracts:
 
 | Direction | Contract | Owner |
 | --- | --- | --- |
 | VibeCheck → SDK | `study.published` event and `GET /api/studies/:id` (immutable plan with the participant-facing scenario) | VC-01 |
-| SDK → VibeCheck | `POST /api/studies/:id/participation` (participation events) | VC-05 (this spec) |
+| SDK → VibeCheck | `POST /api/studies/:id/participation` (external-channel-only participation additions) | VC-05 (this spec) |
 | SDK → VibeCheck | `SessionManifest` + events/transcript (`session.upload_verified`) | VC-02 → VC-03 |
-| Jev → VibeCheck | `signal.flagged` (continuous-signal findings) | VC-06 Signals panel; contract open |
+| Jev → VibeCheck | persisted `research_candidates` and `jev_evaluations` | VC-03/06 monitoring and summary context |
 
 ## Participation events
 
-The SDK reports the invitation funnel so the summary can state denominators. Events are idempotent by `event_id`; unknown participants are opaque ids and no personal data is accepted. Until SDK-specific authentication is delivered, this endpoint authenticates with tenant credentials through `requireTenantActor`.
+Persisted VC-02 invitation/assignment/session rows are the primary funnel source. Because `invitation_deliveries` does not carry `study_revision`, `invited` uses the revision-scoped assignment count. `participation_events` remains supported only for external channels; events whose session is null or does not match a persisted session are deduplicated by participant and kind and added as an overlay. Events are idempotent by `event_id`; unknown participants are opaque ids and no personal data is accepted.
 
 ```json
 {
@@ -42,9 +42,9 @@ The SDK reports the invitation funnel so the summary can state denominators. Eve
 ## Summary generation
 
 1. Trigger: every `analysis.completed` for the study, every `participation` event of kind `completed`/`abandoned`, and an explicit owner request. Generation is a durable `summary.generate` job with one queued/running job per study revision; input changes can schedule a later run.
-2. Inputs are read from persisted rows only: findings (VC-03), analysis runs with their manifest outcome/completeness, participation events and issue mappings. Repair-run status is deferred until the VC-04 port lands on main and is always null today. `inputs_hash` is the hash of the sorted ids and statuses of those rows; an unchanged hash produces no new revision.
+2. Inputs are read from persisted rows only: VC-02 assignments and sessions, external-channel participation events, findings (VC-03), analysis runs with their manifest outcome/completeness, repair runs, issue mappings and matching research candidates. `inputs_hash` includes their ids and relevant states/outcomes; an unchanged hash produces no new revision.
 3. Deterministic part (computed in code, not by the agent): participation funnel, session outcomes, findings grouped by fingerprint with `observed/eligible` counts, certainty, issue and repair status per finding, exclusions with reasons (`baseline_mismatch`, `incomplete_capture`, `analysis_failed`).
-4. Narrative part (agent, structured output): a headline, 3–5 key observations each citing finding ids, and limitations. The agent receives only the deterministic summary and sanitized finding fields; it never receives media, transcripts or participant identifiers. Output is validated: every cited `finding_id` must exist in the summary; counts in the text are not trusted and the UI renders numbers from the deterministic part.
+4. Narrative part (agent, structured output): a headline, 3–5 key observations each citing finding ids, and limitations. The agent receives only the deterministic summary and sanitized finding fields; passive Jev candidates are not supplied as narrative evidence. It never receives media, transcripts or participant identifiers. Output is validated: every cited `finding_id` must exist in the summary; counts in the text are not trusted and the UI renders numbers from the deterministic part.
 5. The summary is stored as an immutable `ExperimentSummary` revision; the latest is selected by revision ordering. Older revisions stay readable.
 
 Provider adapters: `fixture` (deterministic narrative for tests and demos, labeled) and `devin` (reuses the VC-01/03 Devin client and structured-output schema).
@@ -102,6 +102,8 @@ Provider adapters: `fixture` (deterministic narrative for tests and demos, label
 
 Themes carry the current repair-run status for their finding, or `null` when no repair run exists. Repair-run identifiers, statuses, and update timestamps are included in `inputs_hash`, so a repair state change produces a new summary revision. `status`: `collecting` (no eligible session yet), `summarized`, `insufficient_data` (deadline passed with fewer eligible sessions than `recruitment.target_count` and at least one finding absent), `failed` (agent output invalid after one correction request; the deterministic part is still stored). `provenance` is the strictest provenance among the included sessions: any fixture or simulated session makes the whole summary `fixture`/`simulated_session` and the UI labels it as sample data.
 
+An optional `jev_screening` object is labeled `passive_signal` and contains source candidate references plus matching candidate category, target, observation-session count and lifecycle state. It is passive context, not human evidence.
+
 ## Interpretation rules
 
 Report counts with denominators. Small samples are exploratory; do not display significance, uplift, satisfaction scores or a universal UX score. A summary with contradicting sessions keeps the contradiction visible (`certainty: contradictory`). Missing instrumentation stays `unknown`. The summary must not name, quote verbatim or otherwise identify a participant; observations paraphrase.
@@ -121,9 +123,8 @@ The summary is available to the product team through the tenant-scoped dashboard
 
 ## Open decisions / future changes
 
-- [ ] Repair status per theme depends on the VC-04 repair-run port (PR #5).
 - [ ] Participation event authentication for the SDK (shared secret vs. per-product key) — depends on spec-2's delivery design.
-- [ ] Jev `signal.flagged` contract and whether signals should be listed inside the experiment summary or only in the Signals panel.
+- [ ] Per-study-session Jev evaluation of instrumentation logs needs a journey/detector mapping for study events; not implemented.
 - [ ] Share links (signed, expiring) and in-app visibility roles.
 - [ ] Export (Markdown/PDF) of a summary for people without dashboard access.
 - [ ] Add a persisted recruitment deadline before implementing `insufficient_data`; the current `StudyPlan` contract has `target_count` but no deadline source.

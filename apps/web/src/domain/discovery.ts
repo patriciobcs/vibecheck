@@ -168,6 +168,7 @@ export async function handleDiscoveryRun(runId: string, providerOverride?: Disco
           estimatedDurationSeconds: p.estimated_duration_seconds ?? null,
           confidence: p.confidence ?? null,
           sourceCandidateRefs: p.source_candidate_refs ?? [],
+          scenario: p.scenario ?? null,
         })),
       );
     }

@@ -76,7 +76,7 @@ export async function computeDeterministic(
   });
   if (!revision) throw new Error("study_plan_not_found");
   const plan = StudyPlanSchema.parse(revision.plan);
-  const [runs, participation, findings, repairRuns] = await Promise.all([
+  const [runs, participation, findings, repairRuns, assignments, candidates] = await Promise.all([
     db.query.analysisRuns.findMany({
       where: and(
         eq(schema.analysisRuns.studyId, studyId),
@@ -104,12 +104,64 @@ export async function computeDeterministic(
         eq(schema.repairRuns.studyRevision, studyRevision),
       ),
     }),
+    db.query.assignments.findMany({
+      where: and(
+        eq(schema.assignments.studyId, studyId),
+        eq(schema.assignments.tenantId, tenantId),
+        eq(schema.assignments.studyRevision, studyRevision),
+      ),
+    }),
+    db.query.researchCandidates.findMany({
+      where: and(
+        eq(schema.researchCandidates.productId, study.productId),
+        eq(schema.researchCandidates.tenantId, tenantId),
+      ),
+    }),
   ]);
+  const sessions = assignments.length
+    ? await db.query.sessions.findMany({
+        where: and(
+          eq(schema.sessions.tenantId, tenantId),
+          inArray(
+            schema.sessions.assignmentId,
+            assignments.map((assignment) => assignment.id),
+          ),
+        ),
+      })
+    : [];
   const repairStatuses = new Map(repairRuns.map((row) => [row.findingId, row.status]));
+  const persistedSessionIds = new Set(sessions.map((session) => session.id));
+  const externalParticipation = new Map<string, (typeof participation)[number]>();
+  for (const row of participation) {
+    if (row.sessionId && persistedSessionIds.has(row.sessionId)) continue;
+    externalParticipation.set(`${row.participantRef}:${row.kind}`, row);
+  }
+  const persistedCompleted = sessions.filter(
+    (session) =>
+      session.endedAt &&
+      (session.participantReportedOutcome === "completed" ||
+        session.instrumentedOutcome === "completed"),
+  ).length;
+  const persistedAbandoned = sessions.filter(
+    (session) =>
+      (session.endedAt &&
+        (session.participantReportedOutcome === "gave_up" ||
+          session.participantReportedOutcome === "withdrew")) ||
+      session.completeness === "incomplete",
+  ).length;
+  const persistedFunnel = {
+    invited: assignments.length,
+    accepted: assignments.filter((assignment) => assignment.consentedAt !== null).length,
+    started: sessions.filter((session) => session.startedAt !== null).length,
+    completed: persistedCompleted,
+    abandoned: persistedAbandoned,
+    dismissed: 0,
+  };
   const funnel = Object.fromEntries(
     participationKinds.map((kind) => [
       kind,
-      participation.filter((row) => row.kind === kind).length,
+      persistedFunnel[kind as keyof typeof persistedFunnel] +
+        [...externalParticipation.values()].filter((row) => row.kind === kind).length,
     ]),
   ) as Record<(typeof participationKinds)[number], number>;
   const excluded: ExperimentSummary["sessions"]["excluded"] = [];
@@ -167,6 +219,17 @@ export async function computeDeterministic(
           : null,
       repair_status: repairStatuses.get(row.id) ?? null,
     }));
+  const sourceCandidateRefs = revision.sourceCandidateRefs;
+  const findingCategories = new Set(findings.map((finding) => finding.category));
+  const findingTargets = new Set(
+    findings
+      .map((finding) => finding.semanticTarget)
+      .filter((target): target is string => Boolean(target)),
+  );
+  const relatedCandidates = candidates.filter(
+    (candidate) =>
+      findingCategories.has(candidate.category) || findingTargets.has(candidate.targetRef),
+  );
   const provenance = strictestProvenance([
     ...findings.map((row) => row.provenance),
     ...eligibleRuns.map((run) => run.evidencePackage?.provenance ?? "human_session"),
@@ -182,6 +245,16 @@ export async function computeDeterministic(
       row.id,
       `${row.kind}:${row.occurredAt.toISOString()}`,
     ]),
+    ...assignments.map((row): [string, string, string] => [
+      "assignment",
+      row.id,
+      `${row.studyRevision}:${row.consentedAt?.toISOString() ?? ""}:${row.state}`,
+    ]),
+    ...sessions.map((row): [string, string, string] => [
+      "session",
+      row.id,
+      `${row.assignmentId}:${row.startedAt?.toISOString() ?? ""}:${row.endedAt?.toISOString() ?? ""}:${row.completeness}:${row.participantReportedOutcome}:${row.instrumentedOutcome}`,
+    ]),
     ...findings.map((row): [string, string, string] => [
       "finding",
       row.id,
@@ -191,6 +264,11 @@ export async function computeDeterministic(
       "repair",
       row.id,
       `${row.status}:${row.updatedAt.toISOString()}`,
+    ]),
+    ...candidates.map((row): [string, string, string] => [
+      "candidate",
+      row.id,
+      `${row.state}:${row.category}:${row.targetRef}:${row.distinctObservationSessions}`,
     ]),
   ];
   const inputsHash = inputHash(rows);
@@ -202,9 +280,26 @@ export async function computeDeterministic(
     study_id: studyId,
     study_revision: studyRevision,
     baseline_commit_sha: plan.baseline.commit_sha,
-    participation: { ...funnel, unknown: participation.length === 0 },
+    participation: {
+      ...funnel,
+      unknown: assignments.length === 0 && externalParticipation.size === 0,
+    },
     sessions: { eligible: eligibleRuns.length, excluded, outcomes },
     themes,
+    jev_screening:
+      sourceCandidateRefs.length || relatedCandidates.length
+        ? {
+            label: "passive_signal" as const,
+            source_candidate_refs: sourceCandidateRefs,
+            related_candidates: relatedCandidates.map((candidate) => ({
+              candidate_id: candidate.id,
+              category: candidate.category,
+              target_ref: candidate.targetRef,
+              distinct_observation_sessions: candidate.distinctObservationSessions,
+              state: candidate.state,
+            })),
+          }
+        : null,
     provenance,
     inputs_hash: inputsHash,
   };

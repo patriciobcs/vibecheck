@@ -25,7 +25,6 @@ export const EVENT_TYPES = [
   "evaluation.requested",
   "evaluation.completed",
   "research_candidate.updated",
-  "signal.flagged",
   "tenant.paused",
   "tenant.resumed",
 ] as const;

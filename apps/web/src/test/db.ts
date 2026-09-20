@@ -12,7 +12,6 @@ const TABLES = [
   "monitoring_policy_revisions",
   "detector_definitions",
   "evaluation_budget_ledger",
-  "signals",
   "publish_requests",
   "issue_publish_requests",
   "experiment_summaries",

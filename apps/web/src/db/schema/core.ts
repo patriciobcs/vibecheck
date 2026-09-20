@@ -164,6 +164,12 @@ export const proposals = pgTable(
       .$type<string[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    scenario: jsonb("scenario").$type<{
+      intro: string;
+      steps: { order: number; instruction: string }[];
+      think_aloud_cues: string[];
+      estimated_minutes: number;
+    } | null>(),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("proposals_run_task_uq").on(t.discoveryRunId, t.taskId)],
@@ -765,43 +771,6 @@ export const jobs = pgTable(
   (t) => [
     index("jobs_status_next_run_idx").on(t.status, t.nextRunAt),
     index("jobs_tenant_idx").on(t.tenantId),
-  ],
-);
-
-/**
- * Inbound flag from the Jev pipeline (VC-06), keyed by the caller's `signal_id` per product.
- * A hint, not a finding: no session evidence, never creates issues/repairs. Distinct from
- * `jev_evaluations` (internal screening); `evidence_ref` may point at a window/evaluation there.
- */
-export const signals = pgTable(
-  "signals",
-  {
-    id: text("id").primaryKey(),
-    tenantId: text("tenant_id")
-      .notNull()
-      .references(() => tenants.id, { onDelete: "cascade" }),
-    productId: text("product_id")
-      .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
-    signalId: text("signal_id").notNull(),
-    source: text("source").notNull(),
-    title: text("title").notNull(),
-    description: text("description").notNull(),
-    severity: text("severity", { enum: ["low", "medium", "high"] }).notNull(),
-    semanticTarget: text("semantic_target").notNull(),
-    observedSessions: jsonb("observed_sessions")
-      .$type<string[]>()
-      .notNull()
-      .default(sql`'[]'::jsonb`),
-    windowStart: ts("window_start").notNull(),
-    windowEnd: ts("window_end").notNull(),
-    evidenceRef: text("evidence_ref"),
-    createdAt: createdAt(),
-    updatedAt: ts("updated_at").defaultNow().notNull(),
-  },
-  (t) => [
-    uniqueIndex("signals_product_signal_uq").on(t.productId, t.signalId),
-    index("signals_tenant_idx").on(t.tenantId),
   ],
 );
 

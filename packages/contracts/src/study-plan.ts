@@ -24,6 +24,22 @@ export const StudyTaskSchema = z.object({
   time_limit_seconds: z.number().int().positive(),
   success_rule_ref: z.string().min(1),
   fixture_ref: z.string().min(1),
+  scenario: z
+    .object({
+      intro: z.string().min(1).max(400),
+      steps: z
+        .array(
+          z.object({
+            order: z.number().int().positive(),
+            instruction: z.string().min(1).max(300),
+          }),
+        )
+        .min(1)
+        .max(7),
+      think_aloud_cues: z.array(z.string().min(1).max(200)).max(5),
+      estimated_minutes: z.number().int().positive().max(60),
+    })
+    .optional(),
 });
 
 export const StudyPlanSchema = z.object({
