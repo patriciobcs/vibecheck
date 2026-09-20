@@ -99,6 +99,11 @@ See [specs/README.md](specs/README.md) for the workflow specifications, shared c
 
 Discovery runs through a provider adapter: `fixture` returns labeled sample proposals for local
 development and tests; `devin` starts a Devin analysis session (`DEVIN_API_KEY`, `DISCOVERY_PROVIDER=devin`).
+
+VC-03 analysis can publish sanitized findings through a GitHub App installation. Set
+`GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` for bot-authored issues; `GITHUB_ISSUES_TOKEN` is a
+development/test fallback. Set `APP_BASE_URL` to a public deployment URL for the dashboard link to
+appear in issue bodies; localhost, `.local`, loopback, and private-network URLs are omitted.
 A remote agent cannot reach `localhost`, so Devin discovery needs a publicly reachable target URL.
 Set `ALLOW_LOCAL_TARGETS=true` to accept loopback product URLs in development. Programmatic access to
 the product/discovery/study endpoints uses `Authorization: Bearer <api key>` (hashed at rest, seeded

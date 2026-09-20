@@ -10,6 +10,7 @@ const optionalSecret = z
 
 const CoreSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url(),
+  APP_BASE_URL: z.url().optional(),
   PUBLIC_WEBHOOK_BASE_URL: z.url().optional(),
   DATABASE_URL: z.string().min(1),
   SUPABASE_URL: z.url(),
@@ -37,6 +38,10 @@ const CoreSchema = z.object({
   DEVIN_POLL_MS: z.coerce.number().int().positive().default(10_000),
   DEVIN_TIMEOUT_MS: z.coerce.number().int().positive().default(1_200_000),
   DEVIN_MAX_ACU: z.coerce.number().positive().default(5),
+  GITHUB_APP_ID: optionalSecret,
+  GITHUB_APP_PRIVATE_KEY: optionalSecret,
+  GITHUB_ISSUES_TOKEN: optionalSecret,
+  ISSUE_PUBLISHER: z.enum(["github", "memory"]).default("github"),
   ALLOW_LOCAL_TARGETS: z.enum(["true", "false"]).default("false"),
   DEV_API_KEY: optionalSecret,
   /** Hides developer-only copy (seed hints, SDK snippets, test inbox) and enables one-click demo sign-in. Never in production. */

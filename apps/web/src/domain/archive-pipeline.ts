@@ -1,6 +1,8 @@
+import { StudyPlanSchema } from "@vibecheck/contracts";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db/client";
+import { env } from "@/lib/env";
 import { newId } from "@/lib/ids";
 import { mapDeepgramResponse, type SttClient } from "@/providers/slng";
 import type { StorageClient } from "@/providers/storage";
@@ -180,6 +182,53 @@ export async function fetchArchiveJob(
             asset_count: all.length,
           },
         });
+        if (completeness === "complete") {
+          const revision = await tx.query.studyRevisions.findFirst({
+            where: eq(schema.studyRevisions.studyId, assignment.studyId),
+          });
+          const plan = revision ? StudyPlanSchema.safeParse(revision.plan) : null;
+          if (plan?.success) {
+            await emitEvent(tx, {
+              type: "session.analysis_ready",
+              tenantId: assignment.tenantId,
+              productId: assignment.productId,
+              correlationId: session.id,
+              idempotencyKey: `${session.id}:analysis_ready`,
+              payload: { session_id: session.id, study_id: assignment.studyId },
+            });
+            const [analysis] = await tx
+              .insert(schema.analysisRuns)
+              .values({
+                id: newId("analysis"),
+                tenantId: assignment.tenantId,
+                studyId: assignment.studyId,
+                sessionId: session.id,
+                status: "queued",
+                provider: env().DISCOVERY_PROVIDER,
+                rawResponses: [],
+              })
+              .onConflictDoNothing()
+              .returning();
+            const analysisRun =
+              analysis ??
+              (await tx.query.analysisRuns.findFirst({
+                where: and(
+                  eq(schema.analysisRuns.studyId, assignment.studyId),
+                  eq(schema.analysisRuns.sessionId, session.id),
+                ),
+              }));
+            if (analysisRun)
+              await enqueueJob(
+                {
+                  type: "analysis.run",
+                  payload: { analysisRunId: analysisRun.id, tenantId: assignment.tenantId },
+                  dedupeKey: `analysis.run:${analysisRun.id}`,
+                  maxAttempts: 3,
+                },
+                tx,
+              );
+          }
+        }
       }
     }
 

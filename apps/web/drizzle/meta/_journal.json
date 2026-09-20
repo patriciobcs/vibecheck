@@ -50,6 +50,13 @@
       "when": 1789853680896,
       "tag": "0006_review_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789885461775,
+      "tag": "0007_daffy_ma_gnuci",
+      "breakpoints": true
     }
   ]
 }

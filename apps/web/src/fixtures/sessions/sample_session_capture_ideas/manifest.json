@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "session_id": "sample_session_capture_ideas",
+  "assignment_id": "assignment_fixture_capture_ideas",
+  "study_revision": 1,
+  "tested_commit_sha": "97c68dd371e13c017a8dcca49f8b3995ba7890a8",
+  "consent_version": "fixture-consent-1",
+  "capture_policy_ref": "fixture-capture",
+  "assets": [
+    {
+      "kind": "screen_audio",
+      "asset_ref": "fixture://sample_session_capture_ideas/screen-audio",
+      "status": "verified",
+      "duration_ms": 102000
+    }
+  ],
+  "events_ref": "fixture://sample_session_capture_ideas/events",
+  "transcript_ref": "fixture://sample_session_capture_ideas/transcript",
+  "clock_map_ref": "fixture://sample_session_capture_ideas/clockmap",
+  "completeness": "complete",
+  "instrumentation": "sdk",
+  "outcome": {
+    "participant_reported": "completed",
+    "instrumented": "unknown"
+  },
+  "provenance": "fixture"
+}

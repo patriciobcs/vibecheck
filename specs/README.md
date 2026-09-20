@@ -86,7 +86,7 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | StudyPlan | immutable task revision, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
 | Assignment | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
 | SessionManifest | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
-| Finding | observation, hypothesis, evidence refs, uncertainty, fingerprint | VC-03 → VC-04/06 |
+| Finding | title, observation, hypothesis, evidence refs, uncertainty, fingerprint, provenance | VC-03 → VC-04/06 |
 | RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version | VC-04 → VC-05/06 |
 | Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
 | ValidationSummary | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
@@ -201,4 +201,3 @@ Add unresolved proposals under Open decisions until resolved. JSON schema versio
 - [ ] Measure timestamp alignment tolerance between video, transcript and events, and verify Safari/Firefox screen share end to end. Vonage recording, signed callbacks and SLNG transcription are verified with real calls (2026-09-19); see VC-02's verification record.
 - [ ] Select notification provider; local development writes magic links and invitations to a database test inbox (`/dev/inbox`).
 - [ ] Confirm hackathon eligibility of the selected third-party demo target; see VC-07.
-

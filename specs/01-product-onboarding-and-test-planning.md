@@ -11,7 +11,10 @@ Let an owner describe and connect a product, have an agent identify useful UX ch
 ## Owner experience
 
 1. Create a product with name, description, URL, supported language and intended audience.
-2. Connect GitHub through an installation scoped to selected repositories. A URL-only research setup remains usable, but repair modes are disabled until repository setup passes.
+2. Connect GitHub through an installation scoped to selected repositories. The shared `repo_binding`
+   is validated as either `{ provider: "github", owner, repo, default_branch?, baseline_commit_sha? }`
+   or `{ provider: "local", path, baseline_commit_sha? }`. A URL-only research setup remains usable,
+   but repair modes are disabled until repository setup passes.
 3. Identify the base branch, preview/build workflow, startup and test commands, test data reset command, supported origins and credentials via secret references.
 4. Supply optional release notes, support complaints, known journeys and product events. Mark imported/sample material and its provenance.
 5. Run discovery. Show progress and actionable connection errors.
@@ -140,7 +143,11 @@ Additional acceptance criteria:
 
 Implemented (ported into the `apps/web` monorepo on 2026-09-19): API-key tenant authentication (`Authorization: Bearer`, hashed at rest) or the signed-in owner session, `POST/GET /api/products`, `POST /api/products/:id/discovery-runs`, `GET /api/discovery-runs/:id`, `POST/GET /api/studies`, both discovery providers (`fixture`, `devin`), malformed-output correction (exactly one), durable processing on the shared `jobs` table, idempotent publication writing `study_revisions` (provenance `vc01`) and the `study.published` outbox event, and the owner UI (`/products`, `/products/new`, `/products/:id` with runs and proposal cards, `/products/:id/publish`, `/studies/:id`). A published study is immediately claimable through VC-02's channels because both sides validate the same `StudyPlan` schema in `packages/contracts`. Verified by unit/integration tests and a browser e2e (`e2e/discovery.spec.ts`) that connects a product, runs fixture discovery, publishes a proposal and reads it back.
 
-Not yet implemented, so the corresponding acceptance criteria are open: GitHub installation and `repo_binding` validation (accepted as opaque JSON), `launch_policy` / `auto_launch` and automatic limits, editing proposal cards before publication (only `participant_prompt` and `time_limit_seconds` are overridable), study revisions after the first, and the `recruiting` transition, which belongs to VC-02.
+Not yet implemented, so the corresponding acceptance criteria are open: GitHub installation setup
+wizard UX, `launch_policy` / `auto_launch` and automatic limits, editing proposal cards before
+publication (only `participant_prompt` and `time_limit_seconds` are overridable), study revisions
+after the first, and the `recruiting` transition, which belongs to VC-02. The product binding shape
+is validated at persistence boundaries and consumed by VC-03 publication.
 
 ## Open decisions / future changes
 
@@ -149,4 +156,3 @@ Not yet implemented, so the corresponding acceptance criteria are open: GitHub i
 - [ ] Release-trigger integration versus manual release description for the first build.
 - [ ] Multi-task studies and audience quotas after the one-task pipeline works.
 - [ ] Calibrate generated detectors and discovery cadence against labeled journeys before broader rollout.
-
