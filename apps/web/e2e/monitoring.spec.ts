@@ -171,9 +171,9 @@ test("passive signal → Jev screening → candidate → task proposal, with col
 
   // The live board lists the session and shows the completed evaluation with its answers.
   await page.goto(`/products/${product.id}/monitoring/live`);
-  await expect(page.getByRole("heading", { name: "Live analysis" })).toBeVisible();
+  await expect(page.getByText("Live analysis", { exact: true })).toBeVisible();
   // Sessions render as tabs or, past six, as a dropdown; the count line is present either way.
-  await expect(page.getByText(/^\d+ sessions?$/)).toBeVisible();
+  await expect(page.getByText("Instrumentation log")).toBeVisible();
   await expect(page.getByText("jev-stub").first()).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/friction observed/i).first()).toBeVisible();
   await expect(page.getByText("What Jev reads into it")).toBeVisible();

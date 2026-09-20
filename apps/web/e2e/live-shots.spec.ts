@@ -14,7 +14,7 @@ test.skip(process.env.SHOTS !== "1", "set SHOTS=1 to capture live board screensh
 test("live board screenshots", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Find the friction/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /already telling you/ })).toBeVisible();
   await page.screenshot({ path: `${OUT}/landing.png`, fullPage: true });
   await page.goto("/sign-in");
   await page.screenshot({ path: `${OUT}/sign-in.png`, fullPage: true });
@@ -32,7 +32,7 @@ test("live board screenshots", async ({ page }) => {
 
   // Board: the Excalidraw demo product with existing sessions.
   await page.goto("/products/product_excalidraw_local/monitoring/live");
-  await expect(page.getByRole("heading", { name: "Live analysis" })).toBeVisible();
+  await expect(page.getByText("Live analysis", { exact: true })).toBeVisible();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}/live-board.png`, fullPage: true });
 

@@ -1,0 +1,8 @@
+Okay. Two boxes, and an arrow between them. That's my diagram.
+Now I need to send this to Ana as an image. She doesn't use this app.
+Share. Hmm, no, that's live collaboration, I don't want to invite her, I just want a picture.
+Let me try the menu. Save to. That gives me some dot excalidraw file, she can't open that.
+Where is the export? Maybe Share again. No. Same thing.
+Let me check the help. Okay, there's an export shortcut here.
+Ah, it's in the menu on the top left, Export image. I want the white background, and a bit bigger.
+PNG. Finally. That took way too long.

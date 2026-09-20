@@ -58,7 +58,7 @@ landing and sign-in pages offer "Enter the demo", a one-click sign-in as the see
 `pnpm demo:record` (in `apps/web`) records the two-window demo as `demo-recordings/demo.mp4`:
 the visitor on the Excalidraw clone on the left, the owner's live analysis on the right. It drives
 the real pipeline (fake microphone → passive screening with Jev → audio-only study → transcript)
-and composes the halves with ffmpeg. Needs `pnpm dev` with demo mode, `pnpm tunnel`, the clone on
+and composes the halves with ffmpeg, mixing in synthesized voices (macOS `say`, see `apps/web/scripts/voice`): the participant's think-aloud goes through the fake microphone and ends up in the real transcript, narrator clips are placed at the recorded phase times. Needs `pnpm dev` with demo mode, `pnpm tunnel`, the clone on
 :3200 and real provider keys.
 
 ### Excalidraw demo target

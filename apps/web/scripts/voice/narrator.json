@@ -1,0 +1,22 @@
+[
+  {
+    "id": "intro",
+    "text": "A visitor opens Excalidraw. The VibeCheck SDK reports semantic events only: no text, no screenshots, no recording."
+  },
+  {
+    "id": "detour",
+    "text": "They want an image of their diagram. Share opens live collaboration instead. Save to writes a file nobody else can open. Two detours, then a help request."
+  },
+  {
+    "id": "jev",
+    "text": "Jev reads the window: friction, a wrong path, recovery after help. Above the gate, it becomes a research candidate."
+  },
+  {
+    "id": "study",
+    "text": "Now the same task as a study, with a real person thinking out loud. Actions and speech land on one clock, no screen recording."
+  },
+  {
+    "id": "outro",
+    "text": "A verified audio archive, a transcript, and the exact actions behind it. Evidence, not opinions."
+  }
+]
