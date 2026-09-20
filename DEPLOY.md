@@ -19,15 +19,12 @@ product with its publishable key, the demo study, the owner, the tester and the 
 
 ```sh
 cd apps/web
-DATABASE_URL='postgresql://…6543/postgres?sslmode=require' \
-SUPABASE_URL=https://<project>.supabase.co SUPABASE_SERVICE_ROLE_KEY=… \
-NEXT_PUBLIC_APP_URL=https://vibecheck.patriciobcs.com \
-EXCALIDRAW_DEMO_URL=https://excalidraw.patriciobcs.com/ \
-DEMO_TESTER_EMAIL=tester@vibecheck.demo SEED_OWNER_EMAIL=owner@vibecheck.demo \
-pnpm db:migrate && pnpm db:seed          # prints the Excalidraw publishable key: keep it for step 3
+cp .env.production.example .env.production.local   # fill in the Supabase values; the file is gitignored
+pnpm db:migrate:prod && pnpm db:seed:prod          # prints the Excalidraw publishable key: keep it for step 3
 ```
 
-(`pnpm db:migrate`/`db:seed` read `.env.local` first; variables on the command line win.)
+`.env.local` stays your local development config; `.env.production.local` is only read by the two
+`:prod` scripts and never by `pnpm dev`.
 
 ## 2. VibeCheck on Vercel
 
