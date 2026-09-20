@@ -117,7 +117,7 @@ const STEPS = [
 export function HowItWorks() {
   const [active, setActive] = useState(1);
   return (
-    <div className="grid gap-10 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-center">
+    <div className="grid gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
       <ol className="space-y-1">
         {STEPS.map((s, i) => {
           const on = i === active;
@@ -168,11 +168,11 @@ export function HowItWorks() {
 function ScreenFlow() {
   return (
     <div className="rounded-2xl border border-border/70 bg-card p-6 md:p-8">
-      <div className="grid grid-cols-[1fr_auto_1fr_auto_1.3fr] items-center gap-2 text-[13px]">
+      <div className="grid grid-cols-1 items-center gap-3 text-[13px] sm:grid-cols-[1fr_auto_1fr_auto_1.3fr] sm:gap-2">
         <Node mono="0:17.4">help_request</Node>
         <Line />
         <Node>Window in the last 90 s?</Node>
-        <div className="flex flex-col gap-1 self-stretch justify-between py-3">
+        <div className="flex gap-3 sm:flex-col sm:justify-between sm:gap-1 sm:self-stretch sm:py-3">
           <Branch label="yes" on />
           <Branch label="no" />
         </div>
@@ -221,7 +221,7 @@ function Node({
 }
 
 function Line() {
-  return <span className="h-px w-6 bg-border" aria-hidden />;
+  return <span className="hidden h-px w-6 bg-border sm:block" aria-hidden />;
 }
 
 function Branch({ label, on }: { label: string; on?: boolean }) {

@@ -17,18 +17,20 @@ export default async function Home() {
       wide
       nav={
         <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-card p-0.5 text-xs">
-          <NavLink href="/products">Owners</NavLink>
-          <NavLink href="/marketplace">Participants</NavLink>
+          <span className="hidden sm:contents">
+            <NavLink href="/products">Owners</NavLink>
+            <NavLink href="/marketplace">Participants</NavLink>
+          </span>
           <Link
             href={enter}
-            className="rounded-full bg-foreground px-3 py-1.5 text-background transition-opacity hover:opacity-90"
+            className="whitespace-nowrap rounded-full bg-foreground px-3 py-1.5 text-background transition-opacity hover:opacity-90"
           >
             {session ? "Workspace" : demo ? "Enter demo" : "Sign in"}
           </Link>
         </div>
       }
     >
-      <section className="grid items-center gap-12 py-16 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:py-28">
+      <section className="grid items-center gap-12 py-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:py-28">
         <div>
           <h1 className="text-[2.75rem] font-medium leading-[1.05] tracking-tight md:text-[3.75rem]">
             Your users are already telling you what is broken.
