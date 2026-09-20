@@ -67,6 +67,7 @@ describe("publishStudy", () => {
     expect(res?.plan.task.task_id).toBe("task");
     expect(res?.plan.recruitment.eligibility_rule_ref).toBe("eligible_whiteboard_users_v1");
     expect(res?.plan.task.scenario?.intro).toBe("Complete the task.");
+    expect(res?.plan.automation.mode).toBe("draft_pr");
     const revisions = await db.query.studyRevisions.findMany();
     expect(revisions).toHaveLength(1);
     expect(revisions[0]?.provenance).toBe("vc01");

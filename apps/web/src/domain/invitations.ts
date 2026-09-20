@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { StudyPlanSchema } from "@vibecheck/contracts";
+import { type StudyPlan, StudyPlanSchema } from "@vibecheck/contracts";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { type Db, db, schema, type Tx } from "@/db/client";
 import { newId, newToken } from "@/lib/ids";
@@ -182,6 +182,7 @@ export type EmbeddedStudyOffer = {
   participantPrompt: string;
   estimatedSeconds: number;
   capture: { screen: string; microphone: string };
+  scenario?: NonNullable<StudyPlan["task"]["scenario"]>;
 };
 
 export type EligibilityResult =
@@ -278,6 +279,7 @@ export async function checkEmbeddedEligibility(input: {
         participantPrompt: plan.task.participant_prompt,
         estimatedSeconds: plan.task.time_limit_seconds,
         capture: { screen: plan.capture.screen, microphone: plan.capture.microphone },
+        scenario: plan.task.scenario,
       },
     };
   }

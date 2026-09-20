@@ -1,3 +1,4 @@
+import { StudyPlanSchema } from "@vibecheck/contracts";
 import { and, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -29,6 +30,7 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
       eq(schema.studyRevisions.revision, study.currentRevision),
     ),
   });
+  const plan = revision ? StudyPlanSchema.parse(revision.plan) : null;
   const event = await db.query.eventOutbox.findFirst({
     where: eq(
       schema.eventOutbox.idempotencyKey,
@@ -110,8 +112,39 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Immutable plan (handoff to VC-02)
           </p>
+          <div className="mt-3 rounded-lg bg-secondary/60 p-3 text-sm">
+            <p className="font-medium">Participant scenario</p>
+            {plan?.task.scenario ? (
+              <>
+                <p className="mt-1">{plan.task.scenario.intro}</p>
+                <ol className="mt-2 list-decimal space-y-1 pl-5">
+                  {plan.task.scenario.steps
+                    .slice()
+                    .sort((a, b) => a.order - b.order)
+                    .map((step) => (
+                      <li key={step.order}>{step.instruction}</li>
+                    ))}
+                </ol>
+                {plan.task.scenario.think_aloud_cues.length ? (
+                  <div className="mt-2">
+                    <p className="font-medium">Think aloud</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4">
+                      {plan.task.scenario.think_aloud_cues.map((cue) => (
+                        <li key={cue}>{cue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Estimated time: {plan.task.scenario.estimated_minutes} minutes
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-muted-foreground">none (single prompt)</p>
+            )}
+          </div>
           <pre className="mt-3 overflow-x-auto rounded-xl bg-secondary/60 p-4 font-mono text-[11px] leading-relaxed">
-            {JSON.stringify(revision?.plan, null, 2)}
+            {JSON.stringify(plan, null, 2)}
           </pre>
         </section>
         <section className="surface p-5">

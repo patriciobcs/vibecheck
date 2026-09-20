@@ -158,6 +158,33 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                           ) : null}
                         </div>
                         <blockquote className="mt-2 text-sm">{p.participantPrompt}</blockquote>
+                        {p.scenario ? (
+                          <div className="mt-3 rounded-lg bg-secondary/60 p-3 text-sm">
+                            <p className="font-medium">Participant scenario</p>
+                            <p className="mt-1">{p.scenario.intro}</p>
+                            <ol className="mt-2 list-decimal space-y-1 pl-5">
+                              {p.scenario.steps
+                                .slice()
+                                .sort((a, b) => a.order - b.order)
+                                .map((step) => (
+                                  <li key={step.order}>{step.instruction}</li>
+                                ))}
+                            </ol>
+                            {p.scenario.think_aloud_cues.length ? (
+                              <div className="mt-2">
+                                <p className="font-medium">Think aloud</p>
+                                <ul className="mt-1 list-disc space-y-1 pl-4">
+                                  {p.scenario.think_aloud_cues.map((cue) => (
+                                    <li key={cue}>{cue}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Estimated time: {p.scenario.estimated_minutes} minutes
+                            </p>
+                          </div>
+                        ) : null}
                         <p className="mt-2 text-xs text-muted-foreground">{p.rationale}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Evidence: {p.evidenceRefs.join(", ") || "none"} ({p.evidenceType}) ·
