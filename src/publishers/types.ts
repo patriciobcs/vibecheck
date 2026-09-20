@@ -20,6 +20,7 @@ export interface IssuePublisher {
 }
 
 export interface RepoPublisher extends IssuePublisher {
+  getDefaultBranch(repo: IssueRepository): Promise<string>;
   getBranchSha(repo: IssueRepository, branch: string): Promise<string | null>;
   getCommit?(repo: IssueRepository, commitSha: string): Promise<boolean>;
   compareFiles(repo: IssueRepository, base: string, head: string): Promise<string[]>;

@@ -64,9 +64,7 @@ ${sanitizeForPublic(row.hypothesis, dashboardUrl)}
 - Tested version: ${sanitizeForPublic(row.baselineCommitSha, dashboardUrl)}
 
 ### Safe reproduction
-1. Open the tested version.
-2. Follow the neutral task above.
-3. Observe the reported effect without using session-specific content.
+${renderReproductionSteps(row)}
 
 ### Evidence
 - Observed sessions: ${row.observedSessionCount}
@@ -85,6 +83,14 @@ ${sanitizeForPublic(row.suggestedExperiment ?? "No experiment proposed.", dashbo
 - Mode: ${plan.automation.mode}
 ${dashboardUrl ? `- Dashboard: ${dashboardUrl}` : ""}
 `;
+}
+
+export function renderReproductionSteps(_row: Finding) {
+  return [
+    "1. Open the tested version.",
+    "2. Follow the neutral task above.",
+    "3. Observe the reported effect without using session-specific content.",
+  ].join("\n");
 }
 
 export function publicDashboardUrl(): string | null {

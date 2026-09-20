@@ -1,5 +1,5 @@
 {
-  "id": "56c9751c-49be-4a58-ae95-fd0f993aff1c",
+  "id": "456b0478-6014-41f5-8dd9-305887843453",
   "prevId": "0490b631-110c-4f8c-8265-d7bbaee41609",
   "version": "7",
   "dialect": "postgresql",
@@ -255,7 +255,8 @@
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "CheckStatus",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -1140,15 +1141,6 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "Preview_repairRunId_RepairRun_id_fk": {
-          "name": "Preview_repairRunId_RepairRun_id_fk",
-          "tableFrom": "Preview",
-          "tableTo": "RepairRun",
-          "columnsFrom": ["repairRunId"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1551,7 +1543,8 @@
         },
         "mode": {
           "name": "mode",
-          "type": "text",
+          "type": "RepairMode",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -1911,6 +1904,11 @@
       "schema": "public",
       "values": ["queued", "analysing", "completed", "failed"]
     },
+    "public.CheckStatus": {
+      "name": "CheckStatus",
+      "schema": "public",
+      "values": ["passed", "failed", "error"]
+    },
     "public.DiscoveryOutcome": {
       "name": "DiscoveryOutcome",
       "schema": "public",
@@ -1945,6 +1943,11 @@
       "name": "ProductStatus",
       "schema": "public",
       "values": ["draft", "connecting", "ready", "needs_setup"]
+    },
+    "public.RepairMode": {
+      "name": "RepairMode",
+      "schema": "public",
+      "values": ["issues_only", "draft_pr", "prototype_and_retest"]
     },
     "public.RepairStatus": {
       "name": "RepairStatus",

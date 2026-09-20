@@ -152,6 +152,9 @@ function publisher(): RepoPublisher {
     async findByMarker() {
       return null;
     },
+    async getDefaultBranch() {
+      return "master";
+    },
     async create() {
       return { number: 4, url: "https://github.com/owner/repo/issues/4" };
     },
@@ -263,8 +266,17 @@ describe.skipIf(!process.env.DATABASE_URL)("repair service", () => {
     const data = await fixture("draft_pr");
     let revisions = 0;
     let validations = 0;
+    let branchLookups = 0;
+    const basePublisher = publisher();
     const provider: RepairProvider = {
       ...fixtureRepairProvider,
+      async start(context, onSession) {
+        const result = await fixtureRepairProvider.start(context, onSession);
+        return {
+          ...result,
+          handle: { ...result.handle, sessionId: "fixture-session" },
+        };
+      },
       async revise(handle, diagnostics) {
         revisions += 1;
         return fixtureRepairProvider.revise(handle, diagnostics);
@@ -281,12 +293,76 @@ describe.skipIf(!process.env.DATABASE_URL)("repair service", () => {
     const result = await runRepair(data.run.id, {
       provider,
       validator,
-      publisher: publisher(),
+      publisher: {
+        ...basePublisher,
+        async getBranchSha() {
+          branchLookups += 1;
+          return branchLookups === 1 ? "candidate-sha" : "candidate-sha-revised";
+        },
+      },
     });
     expect({ status: result.status, revisions, validations }).toEqual({
       status: "draft_pr_ready",
       revisions: 1,
       validations: 2,
+    });
+    await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+  });
+
+  it("fails when a retry returns the same candidate commit", async () => {
+    const data = await fixture("draft_pr");
+    const provider: RepairProvider = {
+      ...fixtureRepairProvider,
+      async start(context, onSession) {
+        const result = await fixtureRepairProvider.start(context, onSession);
+        return {
+          ...result,
+          handle: { ...result.handle, sessionId: "fixture-session" },
+        };
+      },
+    };
+    let validations = 0;
+    const validator: Validator = {
+      version: "fixture_validator_v1",
+      async run(input) {
+        validations += 1;
+        const result = await fixtureValidator.run(input);
+        return validations === 1 ? { ...result, status: "failed" as const } : result;
+      },
+    };
+    const result = await runRepair(data.run.id, {
+      provider,
+      validator,
+      publisher: publisher(),
+    });
+    const [stored] = await db.select().from(repairRun).where(eq(repairRun.id, data.run.id));
+    expect({ status: result.status, reason: stored?.blockedReason }).toEqual({
+      status: "failed",
+      reason: "candidate_unchanged",
+    });
+    await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+  });
+
+  it("fails with session_lost when retry state has no provider session", async () => {
+    const data = await fixture("draft_pr");
+    let validations = 0;
+    const validator: Validator = {
+      version: "fixture_validator_v1",
+      async run(input) {
+        validations += 1;
+        const result = await fixtureValidator.run(input);
+        return validations === 1 ? { ...result, status: "failed" as const } : result;
+      },
+    };
+    const result = await runRepair(data.run.id, {
+      provider: fixtureRepairProvider,
+      validator,
+      publisher: publisher(),
+    });
+    const [stored] = await db.select().from(repairRun).where(eq(repairRun.id, data.run.id));
+    expect({ status: result.status, reason: stored?.blockedReason }).toEqual({
+      status: "failed",
+      reason: "session_lost",
     });
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });

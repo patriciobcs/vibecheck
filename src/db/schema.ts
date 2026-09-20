@@ -63,6 +63,7 @@ export const findingCertainty = pgEnum("FindingCertainty", [
 export const issueAction = pgEnum("IssueAction", ["created", "updated", "unchanged", "skipped"]);
 export const repairStatus = pgEnum("RepairStatus", REPAIR_STATES);
 export const repairMode = pgEnum("RepairMode", ["issues_only", "draft_pr", "prototype_and_retest"]);
+export const checkStatus = pgEnum("CheckStatus", ["passed", "failed", "error"]);
 
 export const tenant = pgTable("Tenant", {
   id: id(),
@@ -393,7 +394,7 @@ export const checkRun = pgTable(
     attempt: integer("attempt").notNull(),
     commitSha: text("commitSha").notNull(),
     validatorVersion: text("validatorVersion").notNull(),
-    status: text("status").notNull(),
+    status: checkStatus("status").notNull(),
     results: jsonb("results").$type<CheckRun["results"]>().notNull(),
     diagnostics: text("diagnostics"),
     startedAt: timestamp("startedAt", { mode: "date" }).notNull(),

@@ -34,7 +34,7 @@ import { fixturePreviewDeployer } from "@/previews/fixture";
 import type { PreviewDeployer } from "@/previews/types";
 import type { RepoPublisher } from "@/publishers/types";
 import { githubIssuePublisher } from "@/publishers/github";
-import { renderIssueBody } from "./issues";
+import { renderIssueBody, renderReproductionSteps } from "./issues";
 
 type IssueRef = { repo: string; number: number; url: string };
 type RepairDeps = {
@@ -49,11 +49,10 @@ function providerFor() {
 }
 
 function validatorFor() {
-  return process.env.VALIDATOR && process.env.VALIDATOR !== "fixture"
-    ? (() => {
-        throw new Error(`validator_unavailable_${process.env.VALIDATOR}`);
-      })()
-    : fixtureValidator;
+  if (process.env.VALIDATOR && process.env.VALIDATOR !== "fixture") {
+    throw new Error(`validator_unavailable_${process.env.VALIDATOR}`);
+  }
+  return fixtureValidator;
 }
 
 function deployerFor() {
@@ -72,10 +71,24 @@ function isGithubPermissionError(error: unknown) {
 
 function outputOrThrow(raw: unknown, repairRunId: string): RepairOutput {
   const parsed = repairOutputSchema.parse(raw);
-  if (parsed.repair_run_id !== repairRunId && parsed.repair_run_id !== "fixture-repair") {
+  if (parsed.repair_run_id !== repairRunId) {
     throw new Error("repair_output_run_mismatch");
   }
   return parsed;
+}
+
+type StepResult<T> =
+  | { kind: "ok"; value: T }
+  | { kind: "blocked"; reason: string }
+  | { kind: "failed"; reason: string };
+
+async function withGithub<T>(operation: () => Promise<T>): Promise<StepResult<T>> {
+  try {
+    return { kind: "ok", value: await operation() };
+  } catch (error) {
+    if (isGithubPermissionError(error)) return { kind: "blocked", reason: "github_permissions" };
+    throw error;
+  }
 }
 
 async function transition(id: string, status: RepairRun["status"], values = {}) {
@@ -85,6 +98,20 @@ async function transition(id: string, status: RepairRun["status"], values = {}) 
     .where(eq(repairRun.id, id))
     .returning();
   return updated;
+}
+
+async function ensureBaseCommit(
+  publisher: RepoPublisher,
+  repo: { owner: string; repo: string },
+  baseCommitSha: string,
+): Promise<StepResult<true>> {
+  const result = await withGithub(async () =>
+    publisher.getCommit ? publisher.getCommit(repo, baseCommitSha) : true,
+  );
+  if (result.kind !== "ok") return result;
+  return result.value
+    ? { kind: "ok", value: true }
+    : { kind: "failed", reason: "base_sha_missing" };
 }
 
 export async function enqueueRepair(tx: Tx, row: Finding, issueRef: IssueRef, plan: StudyPlan) {
@@ -120,7 +147,7 @@ export async function enqueueRepair(tx: Tx, row: Finding, issueRef: IssueRef, pl
   return created;
 }
 
-async function loadContext(run: RepairRun, deps: RepairDeps) {
+async function loadContext(run: RepairRun) {
   const [findingRow] = await db
     .select()
     .from(finding)
@@ -141,10 +168,6 @@ async function loadContext(run: RepairRun, deps: RepairDeps) {
     .limit(1);
   if (!planRow) throw new Error("study_plan_not_found");
   const repository = repoParts(run.issueRepo);
-  const body = renderIssueBody(findingRow, planRow.plan, null);
-  const reproductionSteps =
-    body.split("### Safe reproduction")[1]?.split("### Evidence")[0]?.trim() ??
-    "Follow the neutral task and observe the reported effect.";
   const context: RepairContext = {
     repairRunId: run.id,
     repo: repository,
@@ -158,7 +181,7 @@ async function loadContext(run: RepairRun, deps: RepairDeps) {
       hypothesis: findingRow.hypothesis,
       suggestedExperiment: findingRow.suggestedExperiment,
       limitations: findingRow.limitations,
-      reproductionSteps,
+      reproductionSteps: renderReproductionSteps(findingRow),
     },
     task: {
       participant_prompt: planRow.plan.task.participant_prompt,
@@ -167,10 +190,21 @@ async function loadContext(run: RepairRun, deps: RepairDeps) {
     allowedPaths: demoAllowedPaths,
     invariants: demoInvariants,
   };
-  return { findingRow, studyRow, plan: planRow.plan, repository, context };
+  return {
+    findingRow,
+    studyRow,
+    productId: studyRow.productId,
+    plan: planRow.plan,
+    repository,
+    context,
+  };
 }
 
-async function persistCheck(run: RepairRun, result: Awaited<ReturnType<Validator["run"]>>) {
+async function persistCheck(
+  run: RepairRun,
+  productId: string,
+  result: Awaited<ReturnType<Validator["run"]>>,
+) {
   const diagnostics = result.results
     .filter((item) => item.status === "failed")
     .map((item) => `${item.id}: ${item.details ?? item.name}`)
@@ -197,13 +231,7 @@ async function persistCheck(run: RepairRun, result: Awaited<ReturnType<Validator
       eventType: "checks.completed",
       idempotencyKey: `${run.id}:checks:${run.attempt}`,
       tenantId: run.tenantId,
-      productId: (
-        await db
-          .select({ productId: study.productId })
-          .from(study)
-          .where(eq(study.id, run.studyId))
-          .limit(1)
-      )[0]!.productId,
+      productId,
       correlationId: run.id,
       payload: {
         repair_run_id: run.id,
@@ -217,7 +245,7 @@ async function persistCheck(run: RepairRun, result: Awaited<ReturnType<Validator
   return { stored, diagnostics };
 }
 
-async function blocked(run: RepairRun, reason: string) {
+async function blocked(run: RepairRun, productId: string, reason: string) {
   const payload = workflowBlockedPayload.parse({ repair_run_id: run.id, reason });
   const updated = await transition(run.id, "blocked", { blockedReason: reason });
   await db
@@ -227,13 +255,7 @@ async function blocked(run: RepairRun, reason: string) {
       eventType: "workflow.blocked",
       idempotencyKey: `${run.id}:blocked:${reason}`,
       tenantId: run.tenantId,
-      productId: (
-        await db
-          .select({ productId: study.productId })
-          .from(study)
-          .where(eq(study.id, run.studyId))
-          .limit(1)
-      )[0]!.productId,
+      productId,
       correlationId: run.id,
       payload,
       occurredAt: new Date(),
@@ -266,6 +288,124 @@ Refs #${issueNumber}
 <!-- vibecheck:repair=${repairRunId} -->`;
 }
 
+type CandidateStep = {
+  output: RepairOutput;
+  handle: ProviderHandle;
+  candidateSha: string;
+};
+
+async function obtainCandidate(
+  run: RepairRun,
+  attempt: number,
+  loaded: Awaited<ReturnType<typeof loadContext>>,
+  provider: RepairProvider,
+  publisher: RepoPublisher,
+  handle: ProviderHandle,
+  retryDiagnostics: string | null,
+  previousCommitSha: string | null,
+): Promise<StepResult<CandidateStep>> {
+  if (attempt > 1 && !run.devinSessionId) return { kind: "failed", reason: "session_lost" };
+  const result =
+    attempt === 1
+      ? await provider.start(loaded.context, async (session) => {
+          handle = session;
+          await db
+            .update(repairRun)
+            .set({
+              devinSessionId: session.sessionId ?? null,
+              devinSessionUrl: session.url ?? null,
+            })
+            .where(eq(repairRun.id, run.id));
+        })
+      : await provider.revise(
+          handle,
+          retryDiagnostics ?? "Continue the repair run and return the structured output.",
+        );
+  handle = result.handle;
+  const output = outputOrThrow(result.raw, run.id);
+  await db.update(repairRun).set({ lastOutput: result.raw }).where(eq(repairRun.id, run.id));
+  if (output.outcome === "cannot_reproduce") {
+    return { kind: "blocked", reason: "not_reproduced" };
+  }
+  if (output.outcome === "out_of_scope") return { kind: "blocked", reason: "out_of_scope" };
+  if (!output.branch) return { kind: "failed", reason: "branch_missing" };
+  const branchResult = await withGithub(() =>
+    publisher.getBranchSha(loaded.repository, output.branch as string),
+  );
+  if (branchResult.kind !== "ok") return branchResult;
+  if (!branchResult.value) return { kind: "failed", reason: "branch_not_found" };
+  if (branchResult.value === run.baseCommitSha) {
+    return { kind: "failed", reason: "candidate_same_as_base" };
+  }
+  if (previousCommitSha && branchResult.value === previousCommitSha) {
+    return { kind: "failed", reason: "candidate_unchanged" };
+  }
+  return {
+    kind: "ok",
+    value: { output, handle, candidateSha: branchResult.value },
+  };
+}
+
+async function validateCandidate(
+  run: RepairRun,
+  loaded: Awaited<ReturnType<typeof loadContext>>,
+  publisher: RepoPublisher,
+  validator: Validator,
+  candidateSha: string,
+): Promise<StepResult<Awaited<ReturnType<Validator["run"]>>>> {
+  const files = await withGithub(() =>
+    publisher.compareFiles(loaded.repository, run.baseCommitSha, candidateSha),
+  );
+  if (files.kind !== "ok") return files;
+  return {
+    kind: "ok",
+    value: await validator.run({
+      repo: loaded.repository,
+      baseCommitSha: run.baseCommitSha,
+      candidateCommitSha: candidateSha,
+      allowedPaths: loaded.context.allowedPaths,
+      changedPaths: files.value,
+    }),
+  };
+}
+
+async function openDraftPullRequest(
+  run: RepairRun,
+  loaded: Awaited<ReturnType<typeof loadContext>>,
+  publisher: RepoPublisher,
+  checks: Awaited<ReturnType<Validator["run"]>>,
+): Promise<StepResult<{ number: number; url: string }>> {
+  if (run.pullRequestNumber && run.pullRequestUrl) {
+    return { kind: "ok", value: { number: run.pullRequestNumber, url: run.pullRequestUrl } };
+  }
+  const result = await withGithub(async () => {
+    const base = await publisher.getDefaultBranch(loaded.repository);
+    return publisher.createDraftPullRequest(loaded.repository, {
+      title: loaded.findingRow.title,
+      head: run.branch ?? `vibecheck/repair-${run.id}`,
+      base,
+      body: prBody(loaded.findingRow, loaded.plan, checks, run.issueNumber, run.id),
+    });
+  });
+  return result;
+}
+
+async function deployPreview(
+  run: RepairRun,
+  loaded: Awaited<ReturnType<typeof loadContext>>,
+  deployer: PreviewDeployer,
+  candidateCommitSha: string,
+): Promise<StepResult<{ deploymentId: string; url: string; healthStatus: "healthy" }>> {
+  const deployment = await deployer.deploy({
+    repo: loaded.repository,
+    commitSha: candidateCommitSha,
+    repairRunId: run.id,
+  });
+  const healthStatus = await deployer.health(deployment.url);
+  if (healthStatus !== "healthy") return { kind: "blocked", reason: "preview_unhealthy" };
+  return { kind: "ok", value: { ...deployment, healthStatus } };
+}
+
 export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tenantId?: string) {
   let [run] = await db
     .select()
@@ -293,31 +433,25 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
   const validator = deps.validator ?? validatorFor();
   const deployer = deps.deployer ?? deployerFor();
   const publisher = deps.publisher ?? githubIssuePublisher;
-  const loaded = await loadContext(run, deps);
+  const loaded = await loadContext(run);
   const repo = loaded.repository;
 
   await transition(run.id, "preparing");
-  let baseExists = true;
-  try {
-    baseExists = publisher.getCommit ? await publisher.getCommit(repo, run.baseCommitSha) : true;
-  } catch (error) {
-    if (isGithubPermissionError(error)) {
-      return toRepairRunContract(await blocked(run, "github_permissions"));
-    }
-    throw error;
+  const base = await ensureBaseCommit(publisher, repo, run.baseCommitSha);
+  if (base.kind !== "ok") {
+    const terminal =
+      base.kind === "blocked"
+        ? await blocked(run, loaded.productId, base.reason)
+        : await transition(run.id, "failed", { blockedReason: base.reason });
+    return toRepairRunContract(terminal);
   }
-  if (!baseExists) {
-    const failed = await transition(run.id, "failed", { blockedReason: "base_sha_missing" });
-    return toRepairRunContract(failed);
-  }
-
   let handle: ProviderHandle = {
     sessionId: run.devinSessionId ?? undefined,
     url: run.devinSessionUrl ?? undefined,
   };
-  let output: RepairOutput | null = null;
-  let pendingOutput: RepairOutput | null = null;
   let checks: Awaited<ReturnType<Validator["run"]>> | null = null;
+  let retryDiagnostics: string | null = null;
+  let previousCommitSha: string | null = null;
   while (run.attempt <= run.maxAttempts) {
     const [existingCheck] = await db
       .select()
@@ -329,75 +463,54 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
       checks = {
         validator_version: existingCheck.validatorVersion,
         commit_sha: existingCheck.commitSha,
-        status: existingCheck.status as "passed" | "failed" | "error",
+        status: existingCheck.status,
         results: existingCheck.results,
         started_at: existingCheck.startedAt.toISOString(),
         finished_at: existingCheck.finishedAt.toISOString(),
       };
     } else {
       await transition(run.id, run.attempt === 1 ? "reproducing" : "implementing");
-      const result: ProviderResult | null = pendingOutput
-        ? null
-        : run.attempt === 1 && !run.devinSessionId
-          ? await provider.start(loaded.context, async (session) => {
-              handle = session;
-              await db
-                .update(repairRun)
-                .set({
-                  devinSessionId: session.sessionId ?? null,
-                  devinSessionUrl: session.url ?? null,
-                })
-                .where(eq(repairRun.id, run.id));
-            })
-          : await provider.revise(
-              handle,
-              "Continue the repair run and return the structured output.",
-            );
-      if (pendingOutput) {
-        output = pendingOutput;
-        pendingOutput = null;
-      } else {
-        if (!result) throw new Error("repair_provider_result_missing");
-        handle = result.handle;
-        output = outputOrThrow(result.raw, run.id);
-        await db.update(repairRun).set({ lastOutput: result.raw }).where(eq(repairRun.id, run.id));
+      const candidate = await obtainCandidate(
+        run,
+        run.attempt,
+        loaded,
+        provider,
+        publisher,
+        handle,
+        retryDiagnostics,
+        previousCommitSha,
+      );
+      retryDiagnostics = null;
+      if (candidate.kind !== "ok") {
+        const terminal =
+          candidate.kind === "blocked"
+            ? await blocked(run, loaded.productId, candidate.reason)
+            : await transition(run.id, "failed", { blockedReason: candidate.reason });
+        return toRepairRunContract(terminal);
       }
-      if (output.outcome === "cannot_reproduce")
-        return toRepairRunContract(await blocked(run, "not_reproduced"));
-      if (output.outcome === "out_of_scope")
-        return toRepairRunContract(await blocked(run, "out_of_scope"));
-      const branch = output.branch;
-      if (!branch)
-        return toRepairRunContract(
-          await transition(run.id, "failed", { blockedReason: "branch_missing" }),
-        );
+      handle = candidate.value.handle;
+      if (handle.sessionId || handle.url) {
+        run = {
+          ...run,
+          devinSessionId: handle.sessionId ?? run.devinSessionId,
+          devinSessionUrl: handle.url ?? run.devinSessionUrl,
+        };
+      }
       await transition(run.id, "implementing");
-      let candidate: string | null;
-      try {
-        candidate = await publisher.getBranchSha(repo, branch);
-      } catch (error) {
-        if (isGithubPermissionError(error)) {
-          return toRepairRunContract(await blocked(run, "github_permissions"));
-        }
-        throw error;
-      }
-      if (!candidate)
-        return toRepairRunContract(
-          await transition(run.id, "failed", { blockedReason: "branch_not_found" }),
-        );
-      if (candidate === run.baseCommitSha)
-        return toRepairRunContract(
-          await transition(run.id, "failed", { blockedReason: "candidate_same_as_base" }),
-        );
       await db
         .update(repairRun)
-        .set({ candidateCommitSha: candidate })
+        .set({
+          candidateCommitSha: candidate.value.candidateSha,
+          devinSessionId: handle.sessionId ?? run.devinSessionId ?? null,
+          devinSessionUrl: handle.url ?? run.devinSessionUrl ?? null,
+        })
         .where(eq(repairRun.id, run.id));
-      run = { ...run, candidateCommitSha: candidate };
+      previousCommitSha = candidate.value.candidateSha;
+      run = { ...run, candidateCommitSha: candidate.value.candidateSha };
       const candidatePayload = repairCandidateReadyPayload.parse({
         repair_run_id: run.id,
         finding_id: run.findingId,
-        candidate_commit_sha: candidate,
+        candidate_commit_sha: candidate.value.candidateSha,
       });
       await db
         .insert(outboxEvent)
@@ -406,30 +519,29 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
           eventType: "repair.candidate_ready",
           idempotencyKey: `${run.id}:candidate:${run.attempt}`,
           tenantId: run.tenantId,
-          productId: loaded.studyRow.productId,
+          productId: loaded.productId,
           correlationId: run.id,
           payload: candidatePayload,
           occurredAt: new Date(),
         })
         .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
       await transition(run.id, "validating");
-      let changedPaths: string[];
-      try {
-        changedPaths = await publisher.compareFiles(repo, run.baseCommitSha, candidate);
-      } catch (error) {
-        if (isGithubPermissionError(error)) {
-          return toRepairRunContract(await blocked(run, "github_permissions"));
-        }
-        throw error;
+      const validation = await validateCandidate(
+        run,
+        loaded,
+        publisher,
+        validator,
+        candidate.value.candidateSha,
+      );
+      if (validation.kind !== "ok") {
+        const terminal =
+          validation.kind === "blocked"
+            ? await blocked(run, loaded.productId, validation.reason)
+            : await transition(run.id, "failed", { blockedReason: validation.reason });
+        return toRepairRunContract(terminal);
       }
-      checks = await validator.run({
-        repo,
-        baseCommitSha: run.baseCommitSha,
-        candidateCommitSha: candidate,
-        allowedPaths: loaded.context.allowedPaths,
-        changedPaths,
-      });
-      const persisted = await persistCheck(run, checks);
+      checks = validation.value;
+      const persisted = await persistCheck(run, loaded.productId, checks);
       checksCompletedPayload.parse({
         repair_run_id: run.id,
         finding_id: run.findingId,
@@ -439,22 +551,12 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
     }
     if (checks.status === "failed" || checks.status === "error") {
       if (run.attempt >= run.maxAttempts)
-        return toRepairRunContract(await blocked(run, "checks_failed"));
+        return toRepairRunContract(await blocked(run, loaded.productId, "checks_failed"));
       await transition(run.id, "retrying");
-      const diagnostics = checks.results
+      retryDiagnostics = checks.results
         .map((result) => `${result.id}: ${result.details ?? result.status}`)
         .join("\n");
-      const revised = await provider.revise(handle, diagnostics);
-      handle = revised.handle;
-      pendingOutput = outputOrThrow(revised.raw, run.id);
-      await db
-        .update(repairRun)
-        .set({
-          lastOutput: revised.raw,
-          devinSessionId: handle.sessionId ?? run.devinSessionId,
-          devinSessionUrl: handle.url ?? run.devinSessionUrl,
-        })
-        .where(eq(repairRun.id, run.id));
+      previousCommitSha = checks.commit_sha;
       run = (await transition(run.id, "implementing", {
         attempt: run.attempt + 1,
         candidateCommitSha: null,
@@ -468,35 +570,22 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
       await transition(run.id, "failed", { blockedReason: "checks_missing" }),
     );
   const candidateCommitSha = run.candidateCommitSha;
-  const [currentFinding] = await db
-    .select()
-    .from(finding)
-    .where(eq(finding.id, run.findingId))
-    .limit(1);
-  if (!currentFinding) throw new Error("finding_not_found");
-  const pr =
-    run.pullRequestNumber && run.pullRequestUrl
-      ? { number: run.pullRequestNumber, url: run.pullRequestUrl }
-      : await (async () => {
-          try {
-            return await publisher.createDraftPullRequest(repo, {
-              title: currentFinding.title,
-              head: run.branch ?? `vibecheck/repair-${run.id}`,
-              base: "master",
-              body: prBody(currentFinding, loaded.plan, checks, run.issueNumber, run.id),
-            });
-          } catch (error) {
-            if (isGithubPermissionError(error)) {
-              return toRepairRunContract(await blocked(run, "github_permissions"));
-            }
-            throw error;
-          }
-        })();
-  if ("status" in pr) return pr;
+  const pr = await openDraftPullRequest(run, loaded, publisher, checks);
+  if (pr.kind !== "ok") {
+    const terminal =
+      pr.kind === "blocked"
+        ? await blocked(run, loaded.productId, pr.reason)
+        : await transition(run.id, "failed", { blockedReason: pr.reason });
+    return toRepairRunContract(terminal);
+  }
   run = (
     await db
       .update(repairRun)
-      .set({ pullRequestNumber: pr.number, pullRequestUrl: pr.url, status: "draft_pr_ready" })
+      .set({
+        pullRequestNumber: pr.value.number,
+        pullRequestUrl: pr.value.url,
+        status: "draft_pr_ready",
+      })
       .where(eq(repairRun.id, run.id))
       .returning()
   )[0]!;
@@ -507,22 +596,26 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
       eventType: "repair.draft_pr_ready",
       idempotencyKey: `${run.id}:draft_pr_ready`,
       tenantId: run.tenantId,
-      productId: loaded.studyRow.productId,
+      productId: loaded.productId,
       correlationId: run.id,
-      payload: { repair_run_id: run.id, finding_id: run.findingId, pull_request_ref: pr.url },
+      payload: {
+        repair_run_id: run.id,
+        finding_id: run.findingId,
+        pull_request_ref: pr.value.url,
+      },
       occurredAt: new Date(),
     })
     .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
   if (run.mode === "draft_pr") return toRepairRunContract(run);
   await transition(run.id, "deploying");
-  const deployment = await deployer.deploy({
-    repo,
-    commitSha: candidateCommitSha,
-    repairRunId: run.id,
-  });
-  const healthStatus = await deployer.health(deployment.url);
-  if (healthStatus !== "healthy")
-    return toRepairRunContract(await blocked(run, "preview_unhealthy"));
+  const deployment = await deployPreview(run, loaded, deployer, candidateCommitSha);
+  if (deployment.kind !== "ok") {
+    const terminal =
+      deployment.kind === "blocked"
+        ? await blocked(run, loaded.productId, deployment.reason)
+        : await transition(run.id, "failed", { blockedReason: deployment.reason });
+    return toRepairRunContract(terminal);
+  }
   const [preview] = await db
     .insert(previewTable)
     .values({
@@ -530,9 +623,9 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
       repairRunId: run.id,
       candidateCommitSha,
       provider: deployer.name,
-      deploymentId: deployment.deploymentId,
-      url: deployment.url,
-      healthStatus,
+      deploymentId: deployment.value.deploymentId,
+      url: deployment.value.url,
+      healthStatus: deployment.value.healthStatus,
       fixtureRef: loaded.plan.task.fixture_ref,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     })
@@ -549,13 +642,13 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
       eventType: "preview.ready",
       idempotencyKey: `${run.id}:preview_ready`,
       tenantId: run.tenantId,
-      productId: loaded.studyRow.productId,
+      productId: loaded.productId,
       correlationId: run.id,
       payload: previewReadyPayload.parse({
         repair_run_id: run.id,
         finding_id: run.findingId,
         candidate_commit_sha: candidateCommitSha,
-        preview_url: deployment.url,
+        preview_url: deployment.value.url,
         fixture_ref: loaded.plan.task.fixture_ref,
         study_id: run.studyId,
         study_revision: run.studyRevision,
@@ -577,11 +670,13 @@ export async function getRepairRun(repairRunId: string, tenantId: string) {
     .select()
     .from(checkRunTable)
     .where(and(eq(checkRunTable.repairRunId, run.id), eq(checkRunTable.tenantId, tenantId)));
-  const [preview] = await db
-    .select()
-    .from(previewTable)
-    .where(and(eq(previewTable.id, run.previewId ?? ""), eq(previewTable.tenantId, tenantId)))
-    .limit(1);
+  const [preview] = run.previewId
+    ? await db
+        .select()
+        .from(previewTable)
+        .where(and(eq(previewTable.id, run.previewId), eq(previewTable.tenantId, tenantId)))
+        .limit(1)
+    : [];
   return {
     repairRun: toRepairRunContract({ ...run, checkRunId: checks.at(-1)?.id }),
     checks,

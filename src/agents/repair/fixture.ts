@@ -30,7 +30,7 @@ export const fixtureRepairProvider: RepairProvider = {
       handle,
       raw: {
         schema_version: "1.0",
-        repair_run_id: handle.runId ?? "fixture-repair",
+        repair_run_id: handle.runId ?? "",
         reproduced: true,
         reproduction_notes: "Fixture adapter reproduced the recorded behavior.",
         outcome: "candidate",

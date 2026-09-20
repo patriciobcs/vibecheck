@@ -15,6 +15,15 @@ async function headers(repo: IssueRepository) {
 }
 
 export const githubIssuePublisher: RepoPublisher = {
+  async getDefaultBranch(repo) {
+    const response = await fetch(`${apiBase}/repos/${repo.owner}/${repo.repo}`, {
+      headers: await headers(repo),
+    });
+    if (!response.ok) throw new Error(`github_api_${response.status}`);
+    const body = (await response.json()) as { default_branch?: string };
+    if (!body.default_branch) throw new Error("github_default_branch_missing");
+    return body.default_branch;
+  },
   async findByMarker(repo, marker) {
     const query = encodeURIComponent(`repo:${repo.owner}/${repo.repo} "${marker}" in:body`);
     const requestHeaders = await headers(repo);
