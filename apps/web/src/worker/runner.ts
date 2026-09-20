@@ -1,9 +1,13 @@
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/db/client";
+import { handleAnalysisRun } from "@/domain/analyses";
 import { fetchArchiveJob, transcribeAssetJob } from "@/domain/archive-pipeline";
 import {
   handleDiscoveryRun,
   markDiscoveryRunFailed,
   markDiscoveryRunQueued,
 } from "@/domain/discovery";
+import { publishFinding } from "@/domain/issues";
 import { completeJob, failJob, heartbeatJob, leaseNextJob } from "@/domain/jobs";
 import { detectorGeneratorFor, generateDetector } from "@/domain/monitoring/detectors";
 import { evaluateJob } from "@/domain/monitoring/evaluate";
@@ -31,6 +35,10 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     }
     case "discovery.run":
       return handleDiscoveryRun((payload as { runId: string }).runId);
+    case "analysis.run":
+      return handleAnalysisRun((payload as { analysisRunId: string }).analysisRunId);
+    case "issue.publish":
+      return publishFinding((payload as { findingId: string }).findingId);
     case "monitoring.scan": {
       const p = payload as {
         journeyInstanceId: string;
@@ -74,6 +82,20 @@ async function onJobFailure(
   job: { type: string; payload: unknown; attempts: number; maxAttempts: number },
   err: unknown,
 ) {
+  if (job.type === "analysis.run") {
+    const runId = (job.payload as { analysisRunId?: string }).analysisRunId;
+    if (!runId) return;
+    const terminal = job.attempts + 1 >= job.maxAttempts;
+    await db
+      .update(schema.analysisRuns)
+      .set({
+        status: terminal ? "failed" : "queued",
+        error: terminal ? (err instanceof Error ? err.message : "job_failed") : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.analysisRuns.id, runId));
+    return;
+  }
   if (job.type !== "discovery.run") return;
   const runId = (job.payload as { runId?: string }).runId;
   if (!runId) return;

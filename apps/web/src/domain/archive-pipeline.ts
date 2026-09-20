@@ -1,10 +1,12 @@
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db/client";
+import { env } from "@/lib/env";
 import { newId } from "@/lib/ids";
 import { mapDeepgramResponse, type SttClient } from "@/providers/slng";
 import type { StorageClient } from "@/providers/storage";
 import type { MediaClient } from "@/providers/vonage";
+import { enqueueAnalysisForSession } from "./analyses";
 import { emitEvent } from "./events";
 import { enqueueJob } from "./jobs";
 
@@ -180,6 +182,23 @@ export async function fetchArchiveJob(
             asset_count: all.length,
           },
         });
+        if (completeness === "complete") {
+          await emitEvent(tx, {
+            type: "session.analysis_ready",
+            tenantId: assignment.tenantId,
+            productId: assignment.productId,
+            correlationId: session.id,
+            idempotencyKey: `${session.id}:analysis_ready`,
+            payload: { session_id: session.id, study_id: assignment.studyId },
+          });
+          await enqueueAnalysisForSession(tx, {
+            tenantId: assignment.tenantId,
+            studyId: assignment.studyId,
+            sessionId: session.id,
+            provider: env().ANALYSIS_PROVIDER,
+            source: "persisted",
+          });
+        }
       }
     }
 

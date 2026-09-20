@@ -21,6 +21,13 @@ Convert real sessions into evidence-backed findings, review them through Devin, 
 7. Deduplicate locally and against existing issues in the authorized target repository.
 8. Create or update sanitized GitHub issues. Stop if the study mode is `issues_only`; otherwise emit `finding.ready_for_repair` for eligible findings.
 
+The target monorepo persists `analysis_runs`, `findings`, and `issue_publish_requests`. A completed
+session emits `session.analysis_ready` and enqueues durable `analysis.run` work. Fixture evidence is
+explicitly labeled `fixture`; persisted sessions are labeled `human_session`. Provider session handles
+and raw responses are retained in restricted database fields, while only bounded, validated evidence
+citations reach the provider. Requests with `source: fixture` use the labeled fixture evidence source
+and are refused in production; persisted session requests use `source: persisted`.
+
 ## Finding model
 
 ```json
@@ -30,6 +37,7 @@ Convert real sessions into evidence-backed findings, review them through Devin, 
   "study_id": "study_example",
   "study_revision": 1,
   "baseline_commit_sha": "REPLACE_WITH_REAL_SHA",
+  "title": "Toolbar: sticky note tool is hard to discover",
   "category": "discoverability",
   "observation": "The participant drew a rectangle and typed inside it instead of using the tool intended for capturing an idea.",
   "hypothesis": "The intended tool may be difficult to discover in the toolbar.",
@@ -45,6 +53,10 @@ Convert real sessions into evidence-backed findings, review them through Devin, 
 }
 ```
 
+Finding titles are provider output validated before persistence. They are 8–72 characters in
+sentence case and present tense, contain exactly one `: ` separator, use a 1–3 word area, state
+the problem rather than the fix, contain no participant-specific content, and do not end in a period.
+
 Certainty states: `insufficient_evidence`, `preliminary`, `repeated_observation`, `contradictory`. They describe evidence, not statistical significance. Severity considers task/business impact separately from certainty. Set repair eligibility only when the change scope and supported finding justify an experiment.
 
 ## Deduplication and publication
@@ -53,7 +65,16 @@ Compute a stable local fingerprint from product, journey, normalized problem typ
 
 For an existing open issue, append new sanitized evidence or update a managed evidence section. For a closed issue that recurs, preserve history and link a recurrence or reopen only under configured policy. MVP default: create a linked recurrence issue after confirming it is not a duplicate current run.
 
-Issue content: problem and observed effect, task context, safe reproduction steps, tested version, evidence counts and limits, proposed experiment, functional constraints, private dashboard link, automation mode and provenance. Never publish participant names, email addresses, private recordings, raw transcripts, test credentials, or secret URLs to a public repository.
+Issue content: problem and observed effect, task context, safe reproduction steps, tested version, evidence counts and limits, proposed experiment, functional constraints, dashboard link, automation mode and provenance. The dashboard line is omitted unless `APP_BASE_URL` (or the equivalent deployment URL) is a public, non-loopback/non-private HTTP(S) origin; all other URLs are redacted. Never publish participant names, email addresses, private recordings, raw transcripts, test credentials, or secret URLs to a public repository.
+
+Issue publication is idempotent. A repeat with no increase in observed sessions and no certainty
+change records `unchanged`, posts no comment, and emits no update or repair-readiness event.
+When evidence changes, an open issue receives one concise human-readable “Observed again” comment.
+GitHub App authentication resolves an installation per repository, exchanges a short-lived token with
+Issues write permission, caches it in memory, and never stores the token. `GITHUB_ISSUES_TOKEN` is
+used only when App credentials are absent and is intended for local development; production
+publication uses the GitHub App. Installation-token search uses the GitHub search API, with
+repository pagination fallback for 403/422 responses.
 
 The orchestrator, not an unconstrained analysis prompt, performs issue publication with an idempotency record. Reconcile uncertain API responses before retries. Developers must use the demo fork, never the upstream open-source issue tracker for demo findings.
 
@@ -171,4 +192,6 @@ Additional acceptance criteria:
 - [ ] Tune matching thresholds against a labeled set of duplicate and distinct findings.
 - [ ] Choose aggregation timing: per session initially, with an explicit study-close pass later.
 - [ ] Support export to other issue trackers through an adapter.
-
+- [ ] Confirm whether installation-token `/search/issues` remains supported for every GitHub App
+  installation type; retain repository pagination fallback for 403/422 responses.
+- [ ] Decide whether to persist `installation_id` in `repo_binding` instead of resolving it per publication.

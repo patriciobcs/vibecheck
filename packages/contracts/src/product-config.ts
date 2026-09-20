@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RepoBindingSchema } from "./repo-binding";
 
 const SourceItemSchema = z.object({
   id: z.string().min(1),
@@ -15,7 +16,7 @@ export const ProductConfigSchema = z.object({
   permitted_origins: z.array(z.url()).default([]),
   language: z.string().default("en"),
   audience: z.string().default(""),
-  repo_binding: z.record(z.string(), z.unknown()).optional(),
+  repo_binding: RepoBindingSchema.optional(),
   release_notes: z.array(SourceItemSchema).default([]),
   support_complaints: z.array(SourceItemSchema).default([]),
   known_journeys: z.array(z.string()).default([]),

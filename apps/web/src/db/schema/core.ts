@@ -1,4 +1,4 @@
-import type { SourceItem } from "@vibecheck/contracts";
+import type { EvidencePackage, Finding, SourceItem } from "@vibecheck/contracts";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -213,6 +213,102 @@ export const studyRevisions = pgTable(
     publishedAt: ts("published_at").notNull(),
   },
   (t) => [uniqueIndex("study_revisions_study_rev_uq").on(t.studyId, t.revision)],
+);
+
+export const analysisRuns = pgTable(
+  "analysis_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    status: text("status", { enum: ["queued", "analysing", "completed", "failed"] }).notNull(),
+    provider: text("provider", { enum: ["fixture", "devin"] }).notNull(),
+    evidenceSource: text("evidence_source", { enum: ["persisted", "fixture"] }).notNull(),
+    outcome: text("outcome"),
+    evidencePackage: jsonb("evidence_package").$type<EvidencePackage | null>(),
+    rawResponses: jsonb("raw_responses").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    providerSessionId: text("provider_session_id"),
+    providerSessionUrl: text("provider_session_url"),
+    error: text("error"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("analysis_runs_study_session_uq").on(t.studyId, t.sessionId),
+    index("analysis_runs_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const findings = pgTable(
+  "findings",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    studyRevision: integer("study_revision").notNull(),
+    baselineCommitSha: text("baseline_commit_sha").notNull(),
+    title: text("title").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    category: text("category").notNull(),
+    semanticTarget: text("semantic_target").notNull(),
+    observation: text("observation").notNull(),
+    hypothesis: text("hypothesis").notNull(),
+    impact: text("impact").notNull(),
+    certainty: text("certainty", {
+      enum: ["insufficient_evidence", "preliminary", "repeated_observation", "contradictory"],
+    }).notNull(),
+    limitations: jsonb("limitations").$type<string[]>().notNull(),
+    suggestedExperiment: text("suggested_experiment"),
+    evidence: jsonb("evidence").$type<Finding["evidence"]>().notNull(),
+    observedSessionCount: integer("observed_session_count").notNull(),
+    eligibleSessionCount: integer("eligible_session_count").notNull(),
+    provenance: text("provenance").notNull(),
+    issueRepo: text("issue_repo"),
+    issueNumber: integer("issue_number"),
+    issueUrl: text("issue_url"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("findings_study_fingerprint_uq").on(t.studyId, t.fingerprint),
+    index("findings_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const issuePublishRequests = pgTable(
+  "issue_publish_requests",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    findingId: text("finding_id")
+      .notNull()
+      .references(() => findings.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    action: text("action", { enum: ["created", "updated", "unchanged", "skipped"] }).notNull(),
+    skipReason: text("skip_reason"),
+    issueNumber: integer("issue_number"),
+    issueUrl: text("issue_url"),
+    observedSessionCount: integer("observed_session_count"),
+    certainty: text("certainty"),
+    repoOwner: text("repo_owner"),
+    repoName: text("repo_name"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("issue_publish_requests_tenant_key_uq").on(t.tenantId, t.idempotencyKey),
+    index("issue_publish_requests_issue_repo_idx").on(t.issueNumber, t.repoOwner, t.repoName),
+  ],
 );
 
 /* ---------------- Participants and invitations ---------------- */

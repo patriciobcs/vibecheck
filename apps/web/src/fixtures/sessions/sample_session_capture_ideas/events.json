@@ -1,0 +1,105 @@
+[
+  {
+    "event_id": "event_01",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 1,
+    "t_ms": 1000,
+    "type": "pointer_move",
+    "safe_target_ref": "canvas",
+    "coordinates": { "x": 420, "y": 260 }
+  },
+  {
+    "event_id": "event_02",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 2,
+    "t_ms": 3000,
+    "type": "click",
+    "safe_target_ref": "canvas",
+    "coordinates": { "x": 420, "y": 260 }
+  },
+  {
+    "event_id": "event_03",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 3,
+    "t_ms": 7000,
+    "type": "pointer_move",
+    "safe_target_ref": "toolbar.rectangle",
+    "coordinates": { "x": 130, "y": 40 }
+  },
+  {
+    "event_id": "event_04",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 4,
+    "t_ms": 9000,
+    "type": "click",
+    "safe_target_ref": "toolbar.rectangle"
+  },
+  {
+    "event_id": "event_05",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 5,
+    "t_ms": 15000,
+    "type": "pointer_move",
+    "safe_target_ref": "canvas",
+    "coordinates": { "x": 360, "y": 240 }
+  },
+  {
+    "event_id": "event_06",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 6,
+    "t_ms": 18000,
+    "type": "click",
+    "safe_target_ref": "canvas"
+  },
+  {
+    "event_id": "event_07",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 7,
+    "t_ms": 24000,
+    "type": "pointer_move",
+    "safe_target_ref": "canvas",
+    "coordinates": { "x": 510, "y": 350 }
+  },
+  {
+    "event_id": "event_08",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 8,
+    "t_ms": 27000,
+    "type": "click",
+    "safe_target_ref": "canvas"
+  },
+  {
+    "event_id": "event_09",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 9,
+    "t_ms": 32000,
+    "type": "keydown",
+    "safe_target_ref": "canvas",
+    "key": "Enter"
+  },
+  {
+    "event_id": "event_10",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 10,
+    "t_ms": 35000,
+    "type": "edit_count",
+    "safe_target_ref": "canvas",
+    "count": 1
+  },
+  {
+    "event_id": "event_11",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 11,
+    "t_ms": 52000,
+    "type": "task_marker",
+    "label": "stuck"
+  },
+  {
+    "event_id": "event_12",
+    "session_id": "sample_session_capture_ideas",
+    "sequence": 12,
+    "t_ms": 96000,
+    "type": "task_marker",
+    "label": "finished_early"
+  }
+]

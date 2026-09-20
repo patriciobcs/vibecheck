@@ -17,8 +17,13 @@ describe("parseEnv", () => {
   it("parses required core settings and leaves providers unconfigured", () => {
     const env = parseEnv(valid);
     expect(env.DATABASE_URL).toBe(valid.DATABASE_URL);
+    expect(env.ANALYSIS_PROVIDER).toBe("fixture");
     expect(env.vonage).toBeNull();
     expect(env.slng).toBeNull();
+  });
+
+  it("defaults analysis provider to the discovery provider", () => {
+    expect(parseEnv({ ...valid, DISCOVERY_PROVIDER: "devin" }).ANALYSIS_PROVIDER).toBe("devin");
   });
 
   it("treats REPLACE_WITH_ placeholders as unconfigured", () => {

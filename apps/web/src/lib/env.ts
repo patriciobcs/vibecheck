@@ -10,6 +10,7 @@ const optionalSecret = z
 
 const CoreSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url(),
+  APP_BASE_URL: z.url().optional(),
   PUBLIC_WEBHOOK_BASE_URL: z.url().optional(),
   DATABASE_URL: z.string().min(1),
   SUPABASE_URL: z.url(),
@@ -32,11 +33,16 @@ const CoreSchema = z.object({
   SLNG_STT_LANGUAGE: z.string().default("en"),
   // VC-01 discovery
   DISCOVERY_PROVIDER: z.enum(["fixture", "devin"]).default("fixture"),
+  ANALYSIS_PROVIDER: z.enum(["fixture", "devin"]).optional(),
   DEVIN_API_KEY: optionalSecret,
   DEVIN_API_BASE: z.url().default("https://api.devin.ai/v1"),
   DEVIN_POLL_MS: z.coerce.number().int().positive().default(10_000),
   DEVIN_TIMEOUT_MS: z.coerce.number().int().positive().default(1_200_000),
   DEVIN_MAX_ACU: z.coerce.number().positive().default(5),
+  GITHUB_APP_ID: optionalSecret,
+  GITHUB_APP_PRIVATE_KEY: optionalSecret,
+  GITHUB_ISSUES_TOKEN: optionalSecret,
+  ISSUE_PUBLISHER: z.enum(["github", "memory"]).default("github"),
   ALLOW_LOCAL_TARGETS: z.enum(["true", "false"]).default("false"),
   DEV_API_KEY: optionalSecret,
   /** Hides developer-only copy (seed hints, SDK snippets, test inbox) and enables one-click demo sign-in. Never in production. */
@@ -73,7 +79,8 @@ export type JevEnvConfig = {
   priceMicrosPer1k: { input: number; output: number } | null;
 };
 
-export type Env = z.infer<typeof CoreSchema> & {
+export type Env = Omit<z.infer<typeof CoreSchema>, "ANALYSIS_PROVIDER"> & {
+  ANALYSIS_PROVIDER: "fixture" | "devin";
   appUrl: string;
   /** DEMO_MODE=true outside production: developer copy hidden, one-click demo sign-in. */
   demo: boolean;
@@ -100,6 +107,7 @@ export function parseEnv(
     throw new Error(`Invalid environment:\n${lines.join("\n")}`);
   }
   const core = parsed.data;
+  const analysisProvider = core.ANALYSIS_PROVIDER ?? core.DISCOVERY_PROVIDER;
 
   let vonage: VonageConfig | null = null;
   if (core.VONAGE_APPLICATION_ID) {
@@ -154,6 +162,7 @@ export function parseEnv(
 
   return {
     ...core,
+    ANALYSIS_PROVIDER: analysisProvider,
     devin,
     jev,
     appUrl: core.NEXT_PUBLIC_APP_URL,
