@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { type Db, db, schema, type Tx } from "@/db/client";
 import { newId } from "@/lib/ids";
 
@@ -12,6 +12,8 @@ export async function enqueueJob(
   input: {
     type: string;
     payload: Record<string, unknown>;
+    /** Owning tenant; defaults to a `tenantId` string on the payload. Null = tenant-agnostic. */
+    tenantId?: string | null;
     dedupeKey?: string;
     maxAttempts?: number;
     runAt?: Date;
@@ -20,10 +22,13 @@ export async function enqueueJob(
   executor: Db | Tx = db,
 ): Promise<JobRow> {
   const id = newId("job");
+  const tenantId =
+    input.tenantId ?? (typeof input.payload.tenantId === "string" ? input.payload.tenantId : null);
   const [inserted] = await executor
     .insert(schema.jobs)
     .values({
       id,
+      tenantId,
       type: input.type,
       payload: input.payload,
       dedupeKey: input.dedupeKey ?? null,
@@ -54,22 +59,26 @@ export async function leaseNextJob(input: {
       and(eq(schema.jobs.status, "running"), lte(schema.jobs.leaseExpiresAt, now)),
     );
     const typeFilter = input.types?.length ? inArray(schema.jobs.type, input.types) : undefined;
+    // A paused tenant's jobs stay queued (attempts and nextRunAt untouched) until resume.
+    const notPaused = or(isNull(schema.jobs.tenantId), eq(schema.tenants.paused, false));
     const [candidate] = await tx
-      .select()
+      .select({ job: schema.jobs })
       .from(schema.jobs)
-      .where(typeFilter ? and(runnable, typeFilter) : runnable)
+      .leftJoin(schema.tenants, eq(schema.jobs.tenantId, schema.tenants.id))
+      .where(typeFilter ? and(runnable, notPaused, typeFilter) : and(runnable, notPaused))
       .orderBy(schema.jobs.nextRunAt)
       .limit(1)
-      .for("update", { skipLocked: true });
+      .for("update", { skipLocked: true, of: schema.jobs });
     if (!candidate) return null;
+    const job = candidate.job;
     // An expired lease means the previous worker died mid-job: that was an attempt, so a job that
     // keeps crashing its worker is dead-lettered instead of looping forever.
-    const expired = candidate.status === "running";
-    const attempts = expired ? candidate.attempts + 1 : candidate.attempts;
+    const expired = job.status === "running";
+    const attempts = expired ? job.attempts + 1 : job.attempts;
     const lastError = expired
-      ? `lease expired while running on ${candidate.lockedBy ?? "unknown worker"}`
-      : candidate.lastError;
-    if (expired && attempts >= candidate.maxAttempts) {
+      ? `lease expired while running on ${job.lockedBy ?? "unknown worker"}`
+      : job.lastError;
+    if (expired && attempts >= job.maxAttempts) {
       await tx
         .update(schema.jobs)
         .set({
@@ -80,7 +89,7 @@ export async function leaseNextJob(input: {
           lockedBy: null,
           updatedAt: now,
         })
-        .where(eq(schema.jobs.id, candidate.id));
+        .where(eq(schema.jobs.id, job.id));
       return null;
     }
     const [leased] = await tx
@@ -93,7 +102,7 @@ export async function leaseNextJob(input: {
         leaseExpiresAt: leaseUntil,
         updatedAt: now,
       })
-      .where(eq(schema.jobs.id, candidate.id))
+      .where(eq(schema.jobs.id, job.id))
       .returning();
     return leased ?? null;
   });
@@ -138,9 +147,9 @@ export async function failJob(id: string, err: unknown) {
     .where(eq(schema.jobs.id, id));
 }
 
-/** Requeue a failed/dead job explicitly (owner-visible retry, VC-06). */
-export async function retryJob(id: string) {
-  await db
+/** Requeue a failed/dead/cancelled job explicitly (owner-visible retry, VC-06). */
+export async function retryJob(id: string): Promise<JobRow | null> {
+  const [row] = await db
     .update(schema.jobs)
     .set({
       status: "queued",
@@ -149,5 +158,19 @@ export async function retryJob(id: string) {
       lastError: null,
       updatedAt: new Date(),
     })
-    .where(eq(schema.jobs.id, id));
+    .where(
+      and(eq(schema.jobs.id, id), inArray(schema.jobs.status, ["failed", "dead", "cancelled"])),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Cancel a job that has not started; running work is left to finish (VC-06). */
+export async function cancelJob(id: string): Promise<JobRow | null> {
+  const [row] = await db
+    .update(schema.jobs)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(and(eq(schema.jobs.id, id), eq(schema.jobs.status, "queued")))
+    .returning();
+  return row ?? null;
 }

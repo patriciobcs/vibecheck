@@ -2,10 +2,14 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
+import { productOverview } from "@/domain/overview";
 import { ownerContext, ownerProduct, productDiscovery } from "@/domain/owner-products";
 import { createDiscoveryRun } from "@/domain/products";
+import { listSignals } from "@/domain/signals";
 import { env } from "@/lib/env";
 import { AutoRefresh } from "./auto-refresh";
+import { OverviewSection } from "./overview-section";
+import { SignalsPanel } from "./signals-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +42,10 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   const product = await ownerProduct(ctx.tenantIds, id);
   if (!product) notFound();
   const runs = await productDiscovery(product.id);
+  const [overview, signals] = await Promise.all([
+    productOverview(ctx.tenantIds, product.id),
+    listSignals(ctx.tenantIds, product.id),
+  ]);
   const sources = new Map(
     [...product.releaseNotes, ...product.supportComplaints].map((s) => [s.id, s]),
   );
@@ -51,11 +59,13 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         <>
           <NavLink href="/products">Products</NavLink>
           <NavLink href="/owner">Sessions</NavLink>
+          <NavLink href="/operations">Operations</NavLink>
           <span className="px-3 text-foreground">{ctx.email}</span>
         </>
       }
     >
       <AutoRefresh active={active} />
+      {overview ? <OverviewSection overview={overview} /> : null}
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <div>
           <Link href="/products" className="text-xs text-muted-foreground hover:text-foreground">
@@ -191,6 +201,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               ) : null}
             </article>
           ))}
+          <SignalsPanel signals={signals} />
         </div>
         <aside className="space-y-4">
           <div className="surface p-5 text-sm">

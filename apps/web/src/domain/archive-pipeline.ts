@@ -205,6 +205,7 @@ export async function fetchArchiveJob(
     await enqueueJob(
       {
         type: "asset.transcribe",
+        tenantId: session.tenantId,
         payload: { assetId: asset.id },
         dedupeKey: `asset.transcribe:${asset.id}`,
       },

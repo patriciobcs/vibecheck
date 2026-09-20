@@ -214,6 +214,7 @@ export async function enqueueAnalysisForSession(
     await enqueueJob(
       {
         type: "analysis.run",
+        tenantId: input.tenantId,
         payload: { analysisRunId: created.id, tenantId: input.tenantId },
         dedupeKey: `analysis.run:${created.id}`,
         maxAttempts: 3,
@@ -416,6 +417,7 @@ async function persistAnalysis(
         await enqueueJob(
           {
             type: "issue.publish",
+            tenantId: run.tenantId,
             payload: { findingId, tenantId: run.tenantId },
             dedupeKey: `issue.publish:${findingId}:${run.id}`,
           },

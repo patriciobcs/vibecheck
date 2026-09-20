@@ -48,6 +48,7 @@ export const POST = route(async (req, ctx: RouteContext<"/api/owner/products/[id
   if (body.provider === "devin" && !env().devin) return fail(503, "devin_not_configured");
   const job = await enqueueJob({
     type: "detector.generate",
+    tenantId: product.tenantId,
     payload: {
       productId: product.id,
       detectorId: body.detector_id,
