@@ -63,8 +63,19 @@ Function limits: inline jobs run inside the request's `after()` window (60 s on 
 Archive download + transcription of a short demo recording fits; a Devin discovery run does not and
 stays for `pnpm worker` locally (the fixture provider is instant and is the demo default).
 
-Domain: Vercel project → Settings → Domains → add `vibecheck.patriciobcs.com`, then in Cloudflare DNS
-add `CNAME vibecheck → cname.vercel-dns.com` with the proxy **off** (DNS only) so Vercel can issue TLS.
+Domain (done for `patriciobcs.com`): in Cloudflare DNS add `CNAME vibecheck → cname.vercel-dns.com`
+with the proxy **off** (DNS only), then add the domain to the project. Because the apex is not a
+Vercel-owned domain, `vercel domains add` answers 403 `domain_not_owned`; use the project-domains API
+instead, which returns a verification record:
+
+```sh
+curl -X POST "https://api.vercel.com/v10/projects/$PROJECT_ID/domains?teamId=$TEAM_ID" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"vibecheck.patriciobcs.com"}'
+```
+
+Add the returned `vc-domain-verify=…` value as a TXT record at `_vercel` (one per subdomain; they
+coexist), then `POST .../domains/<name>/verify`. TLS is issued once the CNAME is unproxied.
 
 Point the Vonage archive callback at the deployment once (uses the account key/secret in `.env.local`):
 
@@ -86,9 +97,9 @@ Environment variables (Production):
 | `VITE_APP_VIBECHECK_ORIGIN` | `https://vibecheck.patriciobcs.com` |
 | `VITE_APP_VIBECHECK_KEY` | the `pk_excalidraw_…` key printed by the seed in step 1 |
 
-Domain: add `excalidraw.patriciobcs.com` to the project and `CNAME excalidraw → cname.vercel-dns.com`
-(DNS only). The seed already lists this origin as permitted for the product, so the SDK toast,
-passive observation and the participant dialog work from it.
+Domain: same procedure as the app, with `CNAME excalidraw → cname.vercel-dns.com` (DNS only) and its
+own `_vercel` TXT record. The seed already lists this origin as permitted for the product, so the SDK
+toast, passive observation and the participant dialog work from it.
 
 ## 4. Check
 
@@ -97,6 +108,9 @@ passive observation and the participant dialog work from it.
   tester" lands on Studies. Both are seeded accounts; nobody types an email.
 - `https://excalidraw.patriciobcs.com/` shows the study toast after a few seconds; the live console at
   `/products/product_excalidraw_local/monitoring/live` follows the session.
+
+Both domains are live. A macOS resolver that cached the name before the record existed keeps failing
+to resolve it while `dig` succeeds; `sudo dscacheutil -flushcache` fixes that locally.
 
 ## Cloudflare instead of Vercel
 
