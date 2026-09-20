@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db, schema } from "@/db/client";
 import { ApiError } from "@/lib/api";
 import { newId } from "@/lib/ids";
+import type { RepoPublisher } from "@/providers/github/types";
 import { createProduct } from "./products";
+import { repoBindingErrorMessage, resolveGithubBinding } from "./repo-binding";
 
 const webUrl = z.url({ protocol: /^https?$/, error: "Enter a valid http:// or https:// URL." });
 const OnboardingSchema = ProductConfigSchema.extend({
@@ -16,6 +18,16 @@ const OnboardingSchema = ProductConfigSchema.extend({
     }),
   ),
 });
+
+export function parseGithubRepository(input: string): { owner: string; repo: string } | null {
+  const value = input.trim();
+  const path = value.startsWith("https://github.com/")
+    ? value.slice("https://github.com/".length).split(/[?#]/, 1)[0]
+    : value;
+  const match = path.match(/^([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
+  if (!match || !/^[\w.-]+$/.test(match[1]) || !/^[\w.-]+$/.test(match[2])) return null;
+  return { owner: match[1], repo: match[2] };
+}
 
 export function parseOnboardingForm(formData: FormData) {
   const text = (name: string) => String(formData.get(name) ?? "").trim();
@@ -31,6 +43,21 @@ export function parseOnboardingForm(formData: FormData) {
       source: "owner import",
       isSample: formData.get("sample") === "on",
     }));
+  const repository = text("repository");
+  const parsedRepository = repository ? parseGithubRepository(repository) : null;
+  if (repository && !parsedRepository) {
+    return {
+      success: false as const,
+      error: new z.ZodError([
+        {
+          code: "custom",
+          path: ["repository"],
+          message: "Enter a repository as owner/repo or a github.com URL.",
+        },
+      ]),
+    };
+  }
+  const baseline = text("baseline_commit");
   const parsed = OnboardingSchema.safeParse({
     name: text("name"),
     url: text("url"),
@@ -44,6 +71,15 @@ export function parseOnboardingForm(formData: FormData) {
     release_notes: sourceItems("release_notes", "release"),
     support_complaints: sourceItems("complaints", "complaint"),
     known_journeys: lines("journeys"),
+    repo_binding: parsedRepository
+      ? {
+          provider: "github",
+          owner: parsedRepository.owner,
+          repo: parsedRepository.repo,
+          ...(baseline ? { baseline_commit_sha: baseline } : {}),
+          issues_enabled: true,
+        }
+      : undefined,
   });
   if (parsed.success && parsed.data.permitted_origins.length === 0) {
     parsed.data.permitted_origins = [new URL(parsed.data.url).origin];
@@ -56,8 +92,18 @@ export async function createOwnerProduct(
   input: unknown,
   selectedTenantId?: string,
   resolver?: Parameters<typeof createProduct>[2],
+  publisher?: RepoPublisher,
 ) {
-  const config = ProductConfigSchema.parse(input);
+  let config = ProductConfigSchema.parse(input);
+  let repoSetupError: string | null = null;
+  if (config.repo_binding?.provider === "github") {
+    const result = await resolveGithubBinding(config.repo_binding, publisher);
+    if (result.ok) config = { ...config, repo_binding: result.binding };
+    else {
+      config = { ...config, repo_binding: undefined };
+      repoSetupError = repoBindingErrorMessage(result.reason);
+    }
+  }
   return db.transaction(async (tx) => {
     const [user] = await tx
       .select({ id: schema.user.id })
@@ -97,6 +143,13 @@ export async function createOwnerProduct(
         role: "owner",
       });
     }
-    return createProduct(tenantId, config, resolver, tx);
+    const product = await createProduct(tenantId, config, resolver, tx);
+    if (!repoSetupError) return product;
+    const [updated] = await tx
+      .update(schema.products)
+      .set({ repoBinding: null, status: "needs_setup", setupError: repoSetupError })
+      .where(eq(schema.products.id, product.id))
+      .returning();
+    return updated ?? product;
   });
 }

@@ -1,9 +1,19 @@
 import type { ExistingIssue, IssueRepository, PublishedIssue, RepoPublisher } from "./types";
 
 export class MemoryIssuePublisher implements RepoPublisher {
+  private readonly defaultBranch: string;
+  private readonly branchSha: string | null;
+  private readonly commits: Set<string> | null;
   readonly issues: ExistingIssue[] = [];
   readonly comments: string[] = [];
   createCalls = 0;
+  constructor(
+    options: { defaultBranch?: string; branchSha?: string | null; commits?: string[] } = {},
+  ) {
+    this.defaultBranch = options.defaultBranch ?? "master";
+    this.branchSha = options.branchSha === undefined ? "candidate-sha" : options.branchSha;
+    this.commits = options.commits ? new Set(options.commits) : null;
+  }
   async findByMarker(_repo: IssueRepository, marker: string) {
     return this.issues.find((issue) => issue.body.includes(marker)) ?? null;
   }
@@ -30,13 +40,13 @@ export class MemoryIssuePublisher implements RepoPublisher {
     this.comments.push(`${number}:${body}`);
   }
   async getDefaultBranch() {
-    return "master";
+    return this.defaultBranch;
   }
   async getBranchSha(_repo: IssueRepository, branch: string) {
-    return branch ? "candidate-sha" : null;
+    return branch ? this.branchSha : null;
   }
-  async getCommit() {
-    return true;
+  async getCommit(_repo: IssueRepository, commitSha: string) {
+    return this.commits ? this.commits.has(commitSha) : true;
   }
   async compareFiles() {
     return ["packages/excalidraw/components/Toolbar.tsx"];

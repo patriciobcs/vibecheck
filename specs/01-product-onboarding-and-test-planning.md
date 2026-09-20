@@ -10,13 +10,12 @@ Let an owner describe and connect a product, have an agent identify useful UX ch
 
 ## Owner experience
 
-1. From the landing page, choose **Add your project**. Sign in once with email; the return path leads to `/products/new`. Require only a project name and an HTTP(S) app URL. A deployed preview is sufficient. A description, audience, language, origin override, release notes, complaints and journeys live in a collapsed optional section; sample labeling remains alongside imported context. English is the default language, and the app URL's origin (without path/query) is the default SDK allowlist. No repository, credentials, company profile or technical setup is required to save the project.
+1. From the landing page, choose **Add your project**. Sign in once with email; the return path leads to `/products/new`. Require only a project name and an HTTP(S) app URL. A deployed preview is sufficient. A description, audience, language, origin override, release notes, complaints, journeys, optional GitHub repository (`owner/repo` or URL) and optional baseline commit live in a collapsed optional section; sample labeling remains alongside imported context. English is the default language, and the app URL's origin (without path/query) is the default SDK allowlist. No repository, credentials, company profile or technical setup is required to save the project.
 2. A signed-in user with no memberships gets a private workspace and owner membership when the first project is saved, in the same transaction. Concurrent submissions reuse that workspace. Existing owners/admins/researchers use their authorized workspace; multiple writable workspaces require an explicit choice. Viewers cannot create projects or acquire elevated access. Account email is not collected again in the project form.
 3. Run discovery from the saved project and choose a proposed study. With no release notes, discovery inspects available app context and proposes exploratory tasks, or reports `cannot_assess` / `needs_setup` honestly. Project creation does not install the SDK, enable monitoring, run an agent or publish a study automatically.
 4. When GitHub issues or repairs are needed, connect GitHub through an installation scoped to selected repositories. The shared `repo_binding`
    is validated as either `{ provider: "github", owner, repo, default_branch?, baseline_commit_sha? }`
-   or `{ provider: "local", path, baseline_commit_sha? }`. A URL-only research setup remains usable,
-   but repair modes are disabled until repository setup passes.
+   or `{ provider: "local", path, baseline_commit_sha? }`. GitHub validation requires the repository to be reachable through the installed Seamless UX GitHub App. The baseline defaults to the head SHA of the repository's default branch. A validation failure creates or leaves the product in `needs_setup` with `setup_error`; URL-only research remains usable, but repair modes are disabled until repository setup passes. Owners can connect or replace a repository from the project page or `PATCH /api/products/:id`.
 5. For repair setup, identify the base branch, preview/build workflow, startup and test commands, test data reset command, supported origins and credentials via secret references.
 6. Display proposed tasks as cards: neutral participant task, optional agent-designed scenario, research question, rationale, supporting candidates, eligibility, estimated duration and confidence/uncertainty.
 7. Owner edits/selects cards and chooses delivery, capture, recruitment and automation settings. Publish selected studies. Default to one task per study in the MVP.
@@ -138,6 +137,7 @@ Additional acceptance criteria:
 - An owner can connect a product, inspect proposed tasks and publish only selected tasks.
 - A first-time signed-in founder can save a project with only name and URL, receives a private owner workspace, and lands on the saved project with discovery as the next action.
 - The default form shows two project inputs; optional context is keyboard-accessible through a disclosure. Multiple existing workspaces add a required authorized workspace choice.
+- The optional onboarding disclosure accepts a GitHub repository and baseline commit; valid bindings are resolved to a default branch and baseline SHA, while invalid repository input reports a field error.
 - The app origin is derived correctly for URLs containing paths, queries or ports; an explicit origin override is preserved and destination checks still apply.
 - Invalid input preserves the form values and creates no workspace/product. Concurrent first submissions create only one owner workspace. Existing viewer and cross-tenant restrictions remain enforced.
 - Minimal context reaches exploratory discovery without fabricated release notes; no matching registered rules remains an explicit limitation.
@@ -146,17 +146,19 @@ Additional acceptance criteria:
 - The agent can return no useful proposal without causing downstream work.
 - A published plan contains concrete dates, baseline identity, eligibility, capture and automation policy; all consumers validate the same schema.
 - URL-only projects cannot trigger repo writes; auto-launch cannot exceed saved limits.
+- A repository that cannot be validated through the installed GitHub App leaves the product saveable with `needs_setup` and a human-readable `setup_error`; a later project-page connection can clear that state.
 - A duplicate publish request creates one study event and one recruitment operation.
 
 ## Implementation status
 
-Implemented (ported into the `apps/web` monorepo on 2026-09-19): API-key tenant authentication (`Authorization: Bearer`, hashed at rest) or the signed-in owner session, `POST/GET /api/products`, `POST /api/products/:id/discovery-runs`, `GET /api/discovery-runs/:id`, `POST/GET /api/studies`, both discovery providers (`fixture`, `devin`), malformed-output correction (exactly one), durable processing on the shared `jobs` table, idempotent publication writing `study_revisions` (provenance `vc01`) and the `study.published` outbox event, and the owner UI (`/products`, `/products/new`, `/products/:id` with runs and proposal cards, `/products/:id/publish`, `/studies/:id`). `/products/:id` accepts the product's tenant-unique `slug` as well as the id; the slug is server-derived from the product name at creation (collisions get a numeric suffix) and is not part of `ProductConfig`. A published study is immediately claimable through VC-02's channels because both sides validate the same `StudyPlan` schema in `packages/contracts`. Verified by unit/integration tests and a browser e2e (`e2e/discovery.spec.ts`) that connects a product, runs fixture discovery, publishes a proposal and reads it back.
+Implemented (ported into the `apps/web` monorepo on 2026-09-19): API-key tenant authentication (`Authorization: Bearer`, hashed at rest) or the signed-in owner session, `POST/GET /api/products`, `POST /api/products/:id/discovery-runs`, `GET /api/discovery-runs/:id`, `POST/GET /api/studies`, both discovery providers (`fixture`, `devin`), malformed-output correction (exactly one), durable processing on the shared `jobs` table, idempotent publication writing `study_revisions` (provenance `vc01`) and the `study.published` outbox event, repository binding validation and later connection through `PATCH /api/products/:id`, and the owner UI (`/products`, `/products/new`, `/products/:id` with runs, proposal cards and repository connection in the Setup card, `/products/:id/publish`, `/studies/:id`). `/products/:id` accepts the product's tenant-unique `slug` as well as the id; the slug is server-derived from the product name at creation (collisions get a numeric suffix) and is not part of `ProductConfig`. A published study is immediately claimable through VC-02's channels because both sides validate the same `StudyPlan` schema in `packages/contracts`. Verified by unit/integration tests and a browser e2e (`e2e/discovery.spec.ts`) that connects a product, runs fixture discovery, publishes a proposal and reads it back.
 
 Not yet implemented, so the corresponding acceptance criteria are open: GitHub installation setup
 wizard UX, `launch_policy` / `auto_launch` and automatic limits, editing proposal cards before
 publication (only `participant_prompt` and `time_limit_seconds` are overridable), study revisions
 after the first, and the `recruiting` transition, which belongs to VC-02. The product binding shape
-is validated at persistence boundaries and consumed by VC-03 publication.
+is validated at persistence boundaries, resolved against GitHub when configured, and consumed by
+VC-03 publication.
 
 Live sign-in email delivery is not implemented: the current adapter writes magic links to the development test inbox. Saving arbitrary projects is supported, but registered success/eligibility rules remain demo-specific; a useful publishable study for an arbitrary app is not guaranteed by completing this form. Product context editing after creation is not yet implemented.
 

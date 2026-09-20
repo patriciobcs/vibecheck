@@ -176,6 +176,14 @@ async function main() {
         knownJourneys: EXCALIDRAW_JOURNEYS,
         productEvents: [],
         status: "ready",
+        repoBinding: {
+          provider: "github",
+          owner: "seamlessux",
+          repo: "excalidraw-seamlessux",
+          default_branch: "main",
+          baseline_commit_sha: "740a3f85ee0f883b763839b99c7676b6364d2942",
+          issues_enabled: true,
+        },
       })
       .onConflictDoUpdate({
         target: schema.products.id,
@@ -189,6 +197,14 @@ async function main() {
           supportComplaints: EXCALIDRAW_COMPLAINTS,
           knownJourneys: EXCALIDRAW_JOURNEYS,
           status: "ready",
+          repoBinding: {
+            provider: "github",
+            owner: "seamlessux",
+            repo: "excalidraw-seamlessux",
+            default_branch: "main",
+            baseline_commit_sha: "740a3f85ee0f883b763839b99c7676b6364d2942",
+            issues_enabled: true,
+          },
         },
       });
 

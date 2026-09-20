@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { GET as getProduct } from "@/app/api/products/[id]/route";
+import { GET as getProduct, PATCH as patchProduct } from "@/app/api/products/[id]/route";
 import { POST as postProducts } from "@/app/api/products/route";
 import { POST as postStudies } from "@/app/api/studies/route";
 import { db, schema } from "@/db/client";
@@ -72,5 +72,51 @@ describe("VC-01 API tenancy", () => {
     );
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("idempotency_key_required");
+  });
+
+  it("updates a product repository binding through PATCH", async () => {
+    const created = await postProducts(
+      req("/api/products", "key-a", {
+        method: "POST",
+        body: JSON.stringify({ name: "x", url: "https://example.com" }),
+      }),
+      {} as never,
+    );
+    const { id } = (await created.json()) as { id: string };
+    const response = await patchProduct(
+      req(`/api/products/${id}`, "key-a", {
+        method: "PATCH",
+        body: JSON.stringify({
+          repo_binding: { provider: "local", path: "/tmp/repo" },
+        }),
+      }),
+      { params: Promise.resolve({ id }) } as never,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      repo_binding: { provider: "local", path: "/tmp/repo" },
+    });
+  });
+
+  it("returns 422 when GitHub binding validation cannot run", async () => {
+    const created = await postProducts(
+      req("/api/products", "key-a", {
+        method: "POST",
+        body: JSON.stringify({ name: "x", url: "https://example.com" }),
+      }),
+      {} as never,
+    );
+    const { id } = (await created.json()) as { id: string };
+    const response = await patchProduct(
+      req(`/api/products/${id}`, "key-a", {
+        method: "PATCH",
+        body: JSON.stringify({
+          repo_binding: { provider: "github", owner: "owner", repo: "repo" },
+        }),
+      }),
+      { params: Promise.resolve({ id }) } as never,
+    );
+    expect(response.status).toBe(422);
+    expect((await response.json()).error).toBe("github_unconfigured");
   });
 });

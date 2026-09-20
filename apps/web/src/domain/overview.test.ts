@@ -1,4 +1,5 @@
 import { SAMPLE_STUDY_PLAN } from "@vibecheck/contracts";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
 import { resetDb } from "@/test/db";
@@ -47,6 +48,33 @@ describe("productOverview", () => {
     expect(overview?.open_issues).toBe(0);
     expect(overview?.paused).toBe(false);
     expect(await productOverview(["tenant_other"], productId)).toBeNull();
+  });
+
+  it("includes repository binding details and setup errors", async () => {
+    const { tenantId, productId } = await seedStudy();
+    await db
+      .update(schema.products)
+      .set({
+        repoBinding: {
+          provider: "github",
+          owner: "owner",
+          repo: "repo",
+          default_branch: "main",
+          baseline_commit_sha: "a".repeat(40),
+          issues_enabled: true,
+        },
+        status: "needs_setup",
+        setupError: "Repository setup needs attention.",
+      })
+      .where(eq(schema.products.id, productId));
+    const overview = await productOverview([tenantId], productId);
+    expect(overview?.product.repo_binding).toMatchObject({
+      kind: "github",
+      repo: "owner/repo",
+      default_branch: "main",
+      baseline_commit_sha: "a".repeat(40),
+    });
+    expect(overview?.product.setup_error).toBe("Repository setup needs attention.");
   });
 
   it("marks a draft PR repair ready and counts its status", async () => {

@@ -2,6 +2,7 @@ import { ProductConfigSchema } from "@vibecheck/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
 import { buildDiscoveryPrompt } from "@/providers/discovery/devin-prompt";
+import { MemoryIssuePublisher } from "@/providers/github/memory";
 import { resetDb } from "@/test/db";
 import { seedParticipant } from "@/test/fixtures";
 import { createOwnerProduct, parseOnboardingForm } from "./onboarding";
@@ -17,6 +18,31 @@ const minimal = { name: "Acme", url: "https://app.example.com/start?preview=1" }
 const publicResolver = async () => ["93.184.216.34"];
 
 describe("minimal onboarding input", () => {
+  it.each([
+    ["owner/repo", { owner: "owner", repo: "repo" }],
+    ["https://github.com/owner/repo", { owner: "owner", repo: "repo" }],
+    ["owner/repo.git", { owner: "owner", repo: "repo" }],
+    ["https://github.com/owner/repo.git/", { owner: "owner", repo: "repo" }],
+  ])("parses repository %s", (input, expected) => {
+    const result = parseOnboardingForm(form({ ...minimal, repository: input }));
+    expect(result.success).toBe(true);
+    if (!result.success) throw result.error;
+    expect(result.data.repo_binding).toMatchObject({
+      provider: "github",
+      ...expected,
+      issues_enabled: true,
+    });
+  });
+
+  it("rejects an invalid repository", () => {
+    const result = parseOnboardingForm(form({ ...minimal, repository: "foo" }));
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues[0]?.message).toBe(
+      "Enter a repository as owner/repo or a github.com URL.",
+    );
+  });
+
   it("accepts only name and URL and derives an origin without the path or query", () => {
     const result = parseOnboardingForm(form({ name: " Acme ", url: minimal.url }));
     expect(result.success).toBe(true);
@@ -73,6 +99,22 @@ describe("minimal onboarding input", () => {
       support_complaints: [{ id: "complaint_0", source: "owner import", isSample: true }],
       known_journeys: ["Book a visit", "Cancel a booking"],
     });
+  });
+
+  it("leaves repo_binding undefined when no repository is provided", () => {
+    const result = parseOnboardingForm(form(minimal));
+    expect(result.success).toBe(true);
+    if (!result.success) throw result.error;
+    expect(result.data.repo_binding).toBeUndefined();
+  });
+
+  it("includes a trimmed baseline in the repository binding", () => {
+    const result = parseOnboardingForm(
+      form({ ...minimal, repository: "owner/repo", baseline_commit: "  abc123  " }),
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) throw result.error;
+    expect(result.data.repo_binding).toMatchObject({ baseline_commit_sha: "abc123" });
   });
 });
 
@@ -179,6 +221,41 @@ describe("first project ownership", () => {
       "10.0.0.1",
     ]);
     expect(product).toMatchObject({ status: "needs_setup", setupError: "destination_not_allowed" });
+  });
+
+  it("saves a valid GitHub binding and defaults its branch SHA", async () => {
+    const { userId } = await seedParticipant();
+    const product = await createOwnerProduct(
+      userId,
+      { ...minimal, repo_binding: { provider: "github", owner: "owner", repo: "repo" } },
+      undefined,
+      publicResolver,
+      new MemoryIssuePublisher({ defaultBranch: "main", branchSha: "base-sha" }),
+    );
+    expect(product).toMatchObject({
+      status: "ready",
+      repoBinding: {
+        provider: "github",
+        default_branch: "main",
+        baseline_commit_sha: "base-sha",
+      },
+    });
+  });
+
+  it("keeps a URL-only project saveable when repository validation fails", async () => {
+    const { userId } = await seedParticipant();
+    const product = await createOwnerProduct(
+      userId,
+      { ...minimal, repo_binding: { provider: "github", owner: "owner", repo: "repo" } },
+      undefined,
+      publicResolver,
+      new MemoryIssuePublisher({ branchSha: null }),
+    );
+    expect(product).toMatchObject({
+      repoBinding: null,
+      status: "needs_setup",
+      setupError: "Repository not found or the seamlessuxbot GitHub App isn't installed on it.",
+    });
   });
 });
 
