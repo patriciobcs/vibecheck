@@ -60,6 +60,20 @@ export const githubIssuePublisher: RepoPublisher = {
     }
     return null;
   },
+  async findComment(repo, number, marker) {
+    const requestHeaders = await headers(repo);
+    for (let page = 1; page <= 5; page += 1) {
+      const response = await fetch(
+        `${apiBase}/repos/${repo.owner}/${repo.repo}/issues/${number}/comments?per_page=100&page=${page}`,
+        { headers: requestHeaders },
+      );
+      if (!response.ok) throw new Error(`github_api_${response.status}`);
+      const comments = (await response.json()) as { body?: string | null }[];
+      if (comments.some((comment) => comment.body?.includes(marker))) return true;
+      if (comments.length < 100) return false;
+    }
+    return false;
+  },
   async create(repo, input) {
     const response = await fetch(`${apiBase}/repos/${repo.owner}/${repo.repo}/issues`, {
       method: "POST",

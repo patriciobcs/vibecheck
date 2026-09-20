@@ -12,6 +12,7 @@ export type DraftPullRequest = { number: number; url: string };
 
 export interface IssuePublisher {
   findByMarker(repo: IssueRepository, marker: string): Promise<ExistingIssue | null>;
+  findComment(repo: IssueRepository, number: number, marker: string): Promise<boolean>;
   create(
     repo: IssueRepository,
     input: { title: string; body: string; labels: string[] },

@@ -20,6 +20,7 @@ import { memoryIssuePublisher } from "@/providers/github/memory";
 import type { RepoPublisher } from "@/providers/github/types";
 import { fixturePreviewDeployer } from "@/providers/previews/fixture";
 import type { PreviewDeployer } from "@/providers/previews/types";
+import { createVercelPreviewDeployer } from "@/providers/previews/vercel";
 import { demoAllowedPaths, demoInvariants } from "@/providers/repair/demo-policy";
 import { createDevinRepairProvider } from "@/providers/repair/devin";
 import { fixtureRepairProvider } from "@/providers/repair/fixture";
@@ -57,6 +58,19 @@ function validatorFor() {
 }
 
 function deployerFor() {
+  const settings = env();
+  if (settings.PREVIEW_PROVIDER === "vercel") {
+    if (!settings.VERCEL_TOKEN || !settings.VERCEL_PROJECT_ID)
+      throw new Error("preview_provider_unconfigured");
+    return createVercelPreviewDeployer({
+      token: settings.VERCEL_TOKEN,
+      projectId: settings.VERCEL_PROJECT_ID,
+      teamId: settings.VERCEL_TEAM_ID,
+      apiBase: settings.VERCEL_API_BASE,
+      deployTimeoutMs: settings.VERCEL_DEPLOY_TIMEOUT_MS,
+      pollMs: settings.VERCEL_POLL_MS,
+    });
+  }
   return fixturePreviewDeployer;
 }
 
@@ -413,11 +427,22 @@ async function deployPreview(
   deployer: PreviewDeployer,
   candidateCommitSha: string,
 ): Promise<StepResult<{ deploymentId: string; url: string; healthStatus: "healthy" }>> {
-  const deployment = await deployer.deploy({
-    repo: loaded.repository,
-    commitSha: candidateCommitSha,
-    repairRunId: run.id,
-  });
+  let deployment: Awaited<ReturnType<PreviewDeployer["deploy"]>>;
+  try {
+    deployment = await deployer.deploy({
+      repo: loaded.repository,
+      commitSha: candidateCommitSha,
+      repairRunId: run.id,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === "preview_build_failed" || error.message === "preview_not_found")
+    ) {
+      return { kind: "blocked", reason: error.message };
+    }
+    throw error;
+  }
   const healthStatus = await deployer.health(deployment.url);
   if (healthStatus !== "healthy") return { kind: "blocked", reason: "preview_unhealthy" };
   return { kind: "ok", value: { ...deployment, healthStatus } };
@@ -618,7 +643,7 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
     idempotencyKey: `${run.id}:draft_pr_ready`,
     payload: { repair_run_id: run.id, finding_id: run.findingId, pull_request_ref: pr.value.url },
   });
-  if (run.mode === "draft_pr") return toRepairRunContract(run);
+  if (run.mode === "draft_pr" && deployer.name === "fixture") return toRepairRunContract(run);
   await transition(run.id, "deploying");
   const deployment = await deployPreview(run, loaded, deployer, candidateCommitSha);
   if (deployment.kind !== "ok") {
@@ -648,6 +673,16 @@ export async function runRepair(repairRunId: string, deps: RepairDeps = {}, tena
     .set({ previewId: preview.id, status: "preview_ready" })
     .where(eq(schema.repairRuns.id, run.id))
     .returning();
+  if (deployer.name === "vercel" && run.pullRequestNumber) {
+    const marker = `<!-- vibecheck:preview=${candidateCommitSha.slice(0, 7)} -->`;
+    if (!(await publisher.findComment(repo, run.pullRequestNumber, marker))) {
+      await publisher.comment(
+        repo,
+        run.pullRequestNumber,
+        `Preview (Vercel, candidate ${candidateCommitSha.slice(0, 7)}): ${deployment.value.url}\n${marker}`,
+      );
+    }
+  }
   await emitRepairEvent({
     type: "preview.ready",
     tenantId: run.tenantId,
