@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/patriciobcs/vibecheck/actions/workflows/ci.yml/badge.svg)](https://github.com/patriciobcs/vibecheck/actions/workflows/ci.yml)
 
-**Real people. Honest feedback. Tested improvements.**
+**Find the friction. Then ask real people.**
 
 VibeCheck helps founders and product teams discover where users struggle, and turns those findings into working design alternatives — backed by real usability sessions, not just analytics.
 
