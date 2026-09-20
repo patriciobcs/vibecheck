@@ -49,13 +49,13 @@ export function ProductForm({
         defaultValue={values.name}
       />
       <Field
-        label="App URL"
-        name="url"
+        label="GitHub repository URL"
+        name="repository_url"
         type="url"
         required
-        placeholder="https://app.example.com"
-        hint="Link to the app you want people to try, such as a live site or deployed preview."
-        defaultValue={values.url}
+        placeholder="https://github.com/your-team/your-project"
+        hint="Start with your repository link. Saving it does not grant GitHub access or enable code changes."
+        defaultValue={values.repository_url}
       />
       <details
         className="rounded-xl border border-border/70 p-4"
@@ -65,6 +65,14 @@ export function ProductForm({
           Add context or adjust settings (optional)
         </summary>
         <div className="mt-5 space-y-5">
+          <Field
+            label="Live app URL (optional)"
+            name="url"
+            type="url"
+            placeholder="https://app.example.com"
+            hint="Add a deployed app or preview when you are ready for research. You can add it later."
+            defaultValue={values.url}
+          />
           <Area
             label="Description"
             name="description"
@@ -85,7 +93,7 @@ export function ProductForm({
             label="Permitted origins"
             name="origins"
             placeholder="https://app.example.com, https://staging.example.com"
-            hint="Defaults to your app's origin. Override with a comma-separated list if needed."
+            hint="Derived from your live app URL when provided. Otherwise collection stays unconfigured."
             defaultValue={values.origins}
           />
           <Area
@@ -126,8 +134,8 @@ export function ProductForm({
         {pending ? "Adding project…" : "Add project"}
       </Button>
       <p className="text-xs text-muted-foreground">
-        Next: run discovery and choose a study. Connecting a repository is only needed for GitHub
-        issues and code changes.
+        Next: review your project. Add a live app URL before research, and authorize GitHub access
+        before enabling issues or code changes.
       </p>
     </form>
   );

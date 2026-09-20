@@ -79,6 +79,7 @@ export async function handleDiscoveryRun(runId: string, providerOverride?: Disco
     where: and(eq(schema.products.id, run.productId), eq(schema.products.tenantId, run.tenantId)),
   });
   if (!product) throw new Error("product_not_found");
+  if (!product.url) throw new Error("app_url_required");
 
   await db
     .update(schema.discoveryRuns)

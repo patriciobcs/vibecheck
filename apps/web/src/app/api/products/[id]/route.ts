@@ -24,6 +24,7 @@ export const GET = route(async (req, ctx: RouteContext<"/api/products/[id]">) =>
     : [];
   return json({
     ...product,
+    schema_version: "2.0",
     discoveryRuns: runs.map(({ rawResponses: _raw, ...run }) => ({
       ...run,
       proposals: proposals.filter((p) => p.discoveryRunId === run.id),

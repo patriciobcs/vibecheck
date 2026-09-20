@@ -4,8 +4,10 @@ import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
 import { productOverview } from "@/domain/overview";
 import { ownerContext, ownerProduct, productDiscovery } from "@/domain/owner-products";
-import { createDiscoveryRun } from "@/domain/products";
+import { createDiscoveryRun, setProductAppUrl } from "@/domain/products";
+import { ApiError } from "@/lib/api";
 import { env } from "@/lib/env";
+import { AppUrlForm, type AppUrlState } from "./app-url-form";
 import { AutoRefresh } from "./auto-refresh";
 import { OverviewSection } from "./overview-section";
 import { CandidatesPanel } from "./signals-panel";
@@ -19,6 +21,23 @@ const RUN_STATUS: Record<string, string> = {
   failed: "Failed",
   cancelled: "Cancelled",
 };
+
+async function saveAppUrl(_previous: AppUrlState, formData: FormData): Promise<AppUrlState> {
+  "use server";
+  const ctx = await ownerContext();
+  if (!ctx) redirect("/sign-in?next=/products");
+  const productId = String(formData.get("productId") ?? "");
+  const url = String(formData.get("url") ?? "");
+  try {
+    await setProductAppUrl(ctx.userId, productId, url);
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : "We couldn't save the app URL. Try again.",
+      url,
+    };
+  }
+  redirect(`/products/${productId}`);
+}
 
 async function runDiscovery(formData: FormData) {
   "use server";
@@ -74,8 +93,9 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           <p className="mt-1 text-sm text-muted-foreground">{product.url}</p>
           {product.status === "needs_setup" ? (
             <p className="mt-3 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-              Needs setup: {product.setupError ?? "check the product URL"}. URL-only research still
-              works; repair modes stay disabled.
+              {product.setupError === "app_url_required"
+                ? "Project saved. Add a live app URL when you are ready to run research."
+                : `Needs setup: ${product.setupError ?? "check the product URL"}.`}
             </p>
           ) : null}
         </div>
@@ -91,17 +111,23 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               Devin {devinReady ? "" : "(not configured)"}
             </option>
           </select>
-          <Button type="submit" className="rounded-full px-5" disabled={active}>
+          <Button type="submit" className="rounded-full px-5" disabled={active || !product.url}>
             {active ? "Discovery running…" : "Run discovery"}
           </Button>
         </form>
       </div>
 
+      {!product.url && ctx.writableTenantIds.includes(product.tenantId) ? (
+        <AppUrlForm productId={product.id} action={saveAppUrl} />
+      ) : null}
+
       <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           {runs.length === 0 ? (
             <div className="surface p-8 text-center text-sm text-muted-foreground">
-              No discovery runs yet. Run one to get proposed tasks.
+              {product.url
+                ? "No discovery runs yet. Run one to get proposed tasks."
+                : "Your repository is saved. Research will be available after you add a live app URL."}
             </div>
           ) : null}
           {runs.map((run) => (

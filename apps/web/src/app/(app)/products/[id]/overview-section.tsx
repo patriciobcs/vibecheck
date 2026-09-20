@@ -35,7 +35,9 @@ export function OverviewSection({ overview }: { overview: Overview }) {
               : (product.repo_binding?.path ?? "Not connected")}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {product.connection.kind}: {product.connection.healthy ? "healthy" : "needs attention"}
+            {product.connection.kind === "github" && !product.connection.writesEnabled
+              ? "Repository link saved. GitHub access is not verified; issues and code changes are off."
+              : `${product.connection.kind}: ${product.connection.healthy ? "credentials configured" : "needs attention"}`}
           </p>
           {product.baseline_sha ? (
             <p className="mt-1 font-mono text-xs text-muted-foreground">

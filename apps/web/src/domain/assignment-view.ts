@@ -27,7 +27,7 @@ export async function assignmentViewForParticipant(participantId: string, assign
   const product = await db.query.products.findFirst({
     where: eq(schema.products.id, assignment.productId),
   });
-  if (!revision || !product) return null;
+  if (!revision || !product?.url) return null;
   const plan = StudyPlanSchema.parse(revision.plan);
   const media = await sessionForAssignment(assignment.id);
   return {

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { PublishInputSchema, type StudyPlan, StudyPlanSchema } from "@vibecheck/contracts";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import { newId } from "@/lib/ids";
 import { emitEvent } from "./events";
 
@@ -69,6 +70,9 @@ export async function publishStudy(
       })
     : null;
   if (!product || !run || !proposal) return null;
+  if (!product.url) {
+    throw new ApiError(409, "app_url_required", "Add a live app URL before publishing a study.");
+  }
 
   const studyId = newId("study");
   const plan = StudyPlanSchema.parse({

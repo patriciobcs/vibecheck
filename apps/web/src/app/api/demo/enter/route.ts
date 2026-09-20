@@ -1,8 +1,10 @@
 import { desc, eq } from "drizzle-orm";
 import { auth } from "@/auth/auth";
+import { safeReturnPath } from "@/auth/return-path";
 import { db, schema } from "@/db/client";
 import { fail, route } from "@/lib/api";
 import { env } from "@/lib/env";
+import { withTestInbox } from "@/providers/email";
 
 /**
  * DEMO_MODE only: one-click sign-in as a seeded demo identity by issuing the normal magic link and
@@ -15,12 +17,10 @@ export const GET = route(async (req) => {
   const role = params.get("as") === "tester" ? "tester" : "owner";
   const email = role === "tester" ? env().DEMO_TESTER_EMAIL : env().SEED_OWNER_EMAIL;
   const requested = params.get("next");
-  const next = requested?.startsWith("/")
-    ? requested
-    : role === "tester"
-      ? "/marketplace"
-      : "/products";
-  await auth.api.signInMagicLink({ body: { email, callbackURL: next }, headers: req.headers });
+  const next = safeReturnPath(requested, role === "tester" ? "/marketplace" : "/products");
+  await withTestInbox(() =>
+    auth.api.signInMagicLink({ body: { email, callbackURL: next }, headers: req.headers }),
+  );
   const msg = await db.query.notificationOutbox.findFirst({
     where: eq(schema.notificationOutbox.toEmail, email),
     orderBy: desc(schema.notificationOutbox.createdAt),

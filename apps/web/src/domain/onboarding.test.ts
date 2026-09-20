@@ -5,7 +5,7 @@ import { buildDiscoveryPrompt } from "@/providers/discovery/devin-prompt";
 import { resetDb } from "@/test/db";
 import { seedParticipant } from "@/test/fixtures";
 import { createOwnerProduct, parseOnboardingForm } from "./onboarding";
-import { productForTenant } from "./products";
+import { createDiscoveryRun, productForTenant, setProductAppUrl } from "./products";
 
 function form(values: Record<string, string>) {
   const data = new FormData();
@@ -13,17 +13,21 @@ function form(values: Record<string, string>) {
   return data;
 }
 
-const minimal = { name: "Acme", url: "https://app.example.com/start?preview=1" };
+const minimal = { name: "Acme", repository_url: "https://github.com/acme/booking.git/" };
+const appUrl = "https://app.example.com/start?preview=1";
+const binding = { provider: "github", owner: "acme", repo: "booking", issues_enabled: false };
 const publicResolver = async () => ["93.184.216.34"];
 
 describe("minimal onboarding input", () => {
-  it("accepts only name and URL and derives an origin without the path or query", () => {
-    const result = parseOnboardingForm(form({ name: " Acme ", url: minimal.url }));
+  it("accepts name and a repository without enabling collection or repository writes", () => {
+    const result = parseOnboardingForm(form({ ...minimal, name: " Acme " }));
     expect(result.success).toBe(true);
     if (!result.success) throw result.error;
     expect(result.data).toMatchObject({
       ...minimal,
-      permitted_origins: ["https://app.example.com"],
+      url: null,
+      schema_version: "2.0",
+      permitted_origins: [],
       language: "en",
       description: "",
       audience: "",
@@ -32,14 +36,30 @@ describe("minimal onboarding input", () => {
       known_journeys: [],
       product_events: [],
     });
-    expect(result.data.repo_binding).toBeUndefined();
+    expect(result.data.repo_binding).toEqual(binding);
+  });
+
+  it("derives the app origin only when a live URL is provided", () => {
+    const result = parseOnboardingForm(form({ ...minimal, url: appUrl }));
+    expect(result.success).toBe(true);
+    if (!result.success) throw result.error;
+    expect(result.data.permitted_origins).toEqual(["https://app.example.com"]);
   });
 
   it.each([
-    { name: "   ", url: minimal.url },
-    { name: "Acme", url: "" },
-    { name: "Acme", url: "not-a-url" },
-    { name: "Acme", url: "ftp://example.com" },
+    { ...minimal, name: "   " },
+    { ...minimal, repository_url: "" },
+    { ...minimal, repository_url: "not-a-url" },
+    { ...minimal, repository_url: "https://example.com/acme/booking" },
+    { ...minimal, repository_url: "https://github.com/acme/booking/tree/main" },
+    { ...minimal, repository_url: "https://github.com/acme/booking?token=private" },
+    { ...minimal, repository_url: "https://github.com/acme/.." },
+    { ...minimal, repository_url: "https://github.com/acme/.git" },
+    { ...minimal, repository_url: "https://github.com.evil.test/acme/booking" },
+    { ...minimal, repository_url: "https://user:token@github.com/acme/booking" },
+    { ...minimal, url: "not-a-url" },
+    { ...minimal, url: "ftp://example.com" },
+    { ...minimal, origins: "not-a-url" },
     { ...minimal, origins: "https://example.com/path" },
   ])("rejects invalid onboarding fields: %j", (values) => {
     expect(parseOnboardingForm(form(values)).success).toBe(false);
@@ -88,10 +108,12 @@ describe("first project ownership", () => {
     expect(memberships).toMatchObject([{ userId, tenantId: product.tenantId, role: "owner" }]);
     expect(product).toMatchObject({
       name: "Acme",
-      status: "ready",
-      permittedOrigins: ["https://app.example.com"],
+      url: null,
+      status: "needs_setup",
+      setupError: "app_url_required",
+      permittedOrigins: [],
       embedMode: "hosted",
-      repoBinding: null,
+      repoBinding: binding,
       releaseNotes: [],
     });
     expect(await productForTenant(product.tenantId, product.id)).toBeDefined();
@@ -173,12 +195,67 @@ describe("first project ownership", () => {
 
   it("retains destination protection for derived origins", async () => {
     const { userId } = await seedParticipant();
-    const parsed = parseOnboardingForm(form(minimal));
+    const parsed = parseOnboardingForm(form({ ...minimal, url: appUrl }));
     if (!parsed.success) throw parsed.error;
     const product = await createOwnerProduct(userId, parsed.data, undefined, async () => [
       "10.0.0.1",
     ]);
     expect(product).toMatchObject({ status: "needs_setup", setupError: "destination_not_allowed" });
+  });
+
+  it("blocks research until an authorized owner adds a safe app URL", async () => {
+    const { userId } = await seedParticipant();
+    const parsed = parseOnboardingForm(form(minimal));
+    if (!parsed.success) throw parsed.error;
+    const product = await createOwnerProduct(userId, parsed.data);
+    await expect(createDiscoveryRun(product.tenantId, product.id, "fixture")).rejects.toMatchObject(
+      {
+        status: 409,
+        code: "app_url_required",
+      },
+    );
+    expect(await db.$count(schema.jobs)).toBe(0);
+    await expect(
+      setProductAppUrl(userId, product.id, appUrl, async () => ["10.0.0.1"]),
+    ).rejects.toMatchObject({
+      code: "destination_not_allowed",
+    });
+    expect((await productForTenant(product.tenantId, product.id))?.url).toBeNull();
+    await setProductAppUrl(userId, product.id, appUrl, publicResolver);
+    expect(await productForTenant(product.tenantId, product.id)).toMatchObject({
+      url: appUrl,
+      status: "ready",
+      setupError: null,
+      permittedOrigins: ["https://app.example.com"],
+      repoBinding: binding,
+    });
+    expect((await createDiscoveryRun(product.tenantId, product.id, "fixture"))?.status).toBe(
+      "queued",
+    );
+    await expect(
+      setProductAppUrl(userId, product.id, "https://different.example.com", publicResolver),
+    ).rejects.toMatchObject({
+      code: "app_url_already_set",
+    });
+  });
+
+  it("does not let another user or a viewer configure the research URL", async () => {
+    const { userId } = await seedParticipant();
+    const { userId: other } = await seedParticipant();
+    const product = await createOwnerProduct(userId, minimal);
+    await expect(setProductAppUrl(other, product.id, appUrl, publicResolver)).rejects.toMatchObject(
+      { status: 403 },
+    );
+    await db.insert(schema.memberships).values({
+      id: "viewer-member",
+      tenantId: product.tenantId,
+      userId: other,
+      role: "viewer",
+    });
+    await expect(setProductAppUrl(other, product.id, appUrl, publicResolver)).rejects.toMatchObject(
+      { status: 403 },
+    );
+    expect((await productForTenant(product.tenantId, product.id))?.url).toBeNull();
   });
 });
 
@@ -186,7 +263,7 @@ describe("discovery with minimal context", () => {
   it("allows exploratory research without pretending release notes or complaints exist", () => {
     const prompt = buildDiscoveryPrompt(
       {
-        ...ProductConfigSchema.parse(minimal),
+        ...ProductConfigSchema.parse({ ...minimal, url: appUrl }),
         sourceRevision: "revision",
       },
       "run",
