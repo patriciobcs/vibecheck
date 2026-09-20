@@ -31,7 +31,7 @@ describe("Vercel preview deployer", () => {
 
     await expect(
       deployer.deploy({
-        repo: { owner: "minasrc", repo: "excalidraw-demo" },
+        repo: { owner: "seamlessux", repo: "excalidraw-seamlessux" },
         commitSha: "candidate-sha",
         repairRunId: "repair_test",
       }),
@@ -55,7 +55,7 @@ describe("Vercel preview deployer", () => {
 
     await expect(
       deployer.deploy({
-        repo: { owner: "minasrc", repo: "excalidraw-demo" },
+        repo: { owner: "seamlessux", repo: "excalidraw-seamlessux" },
         commitSha: "candidate-sha",
         repairRunId: "repair_test",
       }),
@@ -70,7 +70,7 @@ describe("Vercel preview deployer", () => {
 
     await expect(
       deployer.deploy({
-        repo: { owner: "minasrc", repo: "excalidraw-demo" },
+        repo: { owner: "seamlessux", repo: "excalidraw-seamlessux" },
         commitSha: "candidate-sha",
         repairRunId: "repair_test",
       }),
