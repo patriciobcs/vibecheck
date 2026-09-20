@@ -248,7 +248,7 @@ export function ParticipantDialog({
               ? "What is recorded"
               : step === "device_check"
                 ? audioOnly
-                  ? "Share your microphone"
+                  ? "Your microphone"
                   : "Share screen and microphone"
                 : step === "outcome"
                   ? "How did it go?"
@@ -295,6 +295,29 @@ export function ParticipantDialog({
               <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 This browser cannot share its screen. Use a recent Chrome, Edge, Firefox or Safari.
               </p>
+            ) : audioOnly ? (
+              <div className="text-[13px]">
+                <p className="text-muted-foreground">
+                  We transcribe what you say while you do the task. Think out loud.
+                </p>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="flex-1">
+                    {rec.status === "idle" ? (
+                      <span className="text-muted-foreground">Microphone off</span>
+                    ) : (
+                      <MicMeter level={rec.micLevel} heard={rec.micHeard} />
+                    )}
+                  </span>
+                  <Button
+                    size="sm"
+                    className="w-36 rounded-full"
+                    disabled={rec.status === "starting" || rec.status === "recording"}
+                    onClick={() => void rec.startAudioOnly()}
+                  >
+                    {rec.status === "starting" ? "Connecting…" : "Allow and start"}
+                  </Button>
+                </div>
+              </div>
             ) : (
               <ol className="space-y-2 text-[13px]">
                 <li className="flex items-center gap-2">
@@ -317,22 +340,14 @@ export function ParticipantDialog({
                 </li>
                 <li className="flex items-center gap-2">
                   <StepBadge n={2} done={rec.status === "recording"} />
-                  <span className="flex-1 text-muted-foreground">
-                    {audioOnly
-                      ? "No screen capture: your actions are logged in the app"
-                      : "Screen: pick this app's tab"}
-                  </span>
+                  <span className="flex-1 text-muted-foreground">Screen: pick this app's tab</span>
                   <Button
                     size="sm"
                     className="w-32 rounded-full"
                     disabled={rec.status !== "mic_ready"}
-                    onClick={() => void (audioOnly ? rec.startAudioOnly() : rec.startWithScreen())}
+                    onClick={() => void rec.startWithScreen()}
                   >
-                    {rec.status === "starting"
-                      ? "Connecting…"
-                      : audioOnly
-                        ? "Start"
-                        : "Share and start"}
+                    {rec.status === "starting" ? "Connecting…" : "Share and start"}
                   </Button>
                 </li>
               </ol>

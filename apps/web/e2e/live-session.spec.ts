@@ -40,10 +40,15 @@ test("speech from a fake microphone ends up as a transcript aligned to a verifie
   const dialog = page.frameLocator('iframe[title="VibeCheck"]');
   await dialog.getByRole("button", { name: "Continue" }).click();
   await dialog.getByRole("button", { name: "Agree and continue" }).click();
-  await dialog.getByRole("button", { name: "Allow" }).click();
-  await expect(dialog.getByText("We can hear you")).toBeVisible({ timeout: 20_000 });
-  // Audio-only studies (capture policy screen: off) skip the screen picker.
-  await dialog.getByRole("button", { name: /^(Share and start|Start)$/ }).click();
+  // Audio-only studies (capture policy screen: off) have one "Allow and start" button.
+  const allowAndStart = dialog.getByRole("button", { name: "Allow and start" });
+  if (await allowAndStart.isVisible()) {
+    await allowAndStart.click();
+  } else {
+    await dialog.getByRole("button", { name: "Allow" }).click();
+    await expect(dialog.getByText("We can hear you")).toBeVisible({ timeout: 20_000 });
+    await dialog.getByRole("button", { name: "Share and start" }).click();
+  }
   await expect(dialog.getByText("Recording", { exact: true })).toBeVisible({ timeout: 60_000 });
 
   // "Use" the product while the fake microphone plays the sentence (it loops): draw a rectangle

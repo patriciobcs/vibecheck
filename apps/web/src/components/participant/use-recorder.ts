@@ -199,10 +199,27 @@ export function useRecorder(opts: {
     }
   }, [api, assignmentId, onSession, teardown]);
 
-  /** Audio-only studies (capture policy screen: off): one click after the microphone is allowed. */
+  /** Audio-only studies (capture policy screen: off): one click asks for the microphone and starts. */
   const startAudioOnly = useCallback(async () => {
     setError(null);
     const OT = await loadOT();
+    try {
+      if (!micRef.current) {
+        micRef.current = await OT.initPublisher.promise(undefined, {
+          videoSource: null,
+          publishVideo: false,
+          insertDefaultUI: false,
+        });
+        micRef.current.on("audioLevelUpdated", (event) => {
+          const level = event.audioLevel;
+          setMicLevel(level);
+          if (level > 0.04) setMicHeard(true);
+        });
+      }
+    } catch (e) {
+      setError(friendly(e));
+      return;
+    }
     setStatus("starting");
     try {
       const clockOrigin = Date.now();

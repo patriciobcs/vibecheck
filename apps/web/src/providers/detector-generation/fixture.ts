@@ -14,7 +14,7 @@ export const EXCALIDRAW_SHARE_DRAWING_DETECTOR = {
   ],
   missing_instrumentation: [],
   rationale:
-    "Fixture detector for the demo target: the export journey has progress (drawing started, export dialog opened), attempts/results for the export action, help requests and a client-observed completion.",
+    "Fixture detector for the demo target: the export journey has progress (drawing started, export dialog opened), attempts/results for the export and share controls, main-menu and share-dialog navigation, help requests and a client-observed completion.",
   questions: {
     evidence_sufficiency: {
       type: "choice" as const,
@@ -62,6 +62,47 @@ export const EXCALIDRAW_SHARE_DRAWING_DETECTOR = {
       criteria: {
         true: "A progress event for the export dialog is present.",
         false: "No export dialog progress event is present.",
+      },
+    },
+    wrong_path_taken: {
+      type: "noul" as const,
+      instructions:
+        "The supplied events show the user opened a control that does not lead to an image of the drawing, such as the share or live collaboration dialog, and left it without a successful result.",
+      criteria: {
+        true: "At least one attempt on a share or collaboration control ended cancelled or failed.",
+        false: "No such detour is present in the events.",
+      },
+    },
+    goal_reached: {
+      type: "noul" as const,
+      instructions:
+        "The supplied events show the journey reached its goal: an image export action succeeded and a completion event is present.",
+      criteria: {
+        true: "A successful export result and a completion event are present.",
+        false: "No successful export or completion is present.",
+      },
+    },
+    recovered_after_help: {
+      type: "noul" as const,
+      instructions:
+        "The supplied events show that a help request was followed, later in the same journey, by progress toward the goal or by the goal being reached.",
+      criteria: {
+        true: "Progress or completion events occur after a help request.",
+        false: "No help request is present, or nothing follows it.",
+      },
+    },
+    confusion_source: {
+      type: "choice" as const,
+      instructions:
+        "Judged only from the supplied events, which explanation best fits the observed difficulty in getting an image of the drawing.",
+      criteria: {
+        share_mistaken_for_export:
+          "The user tried the share or collaboration control when looking for an image export.",
+        export_hidden_in_menu:
+          "The user reached the export only after opening the main menu or asking for help.",
+        export_dialog_unclear: "The export dialog was opened but the export did not succeed.",
+        none_or_uncertain:
+          "No difficulty is observed, or the events do not support an explanation.",
       },
     },
   },

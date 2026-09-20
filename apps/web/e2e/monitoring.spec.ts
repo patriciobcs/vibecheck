@@ -175,7 +175,8 @@ test("passive signal → Jev screening → candidate → task proposal, with col
   // Sessions render as tabs or, past six, as a dropdown; the count line is present either way.
   await expect(page.getByText(/^\d+ sessions?$/)).toBeVisible();
   await expect(page.getByText("jev-stub").first()).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("Friction observed").first()).toBeVisible();
+  await expect(page.getByText(/friction observed/i).first()).toBeVisible();
+  await expect(page.getByText("What Jev reads into it")).toBeVisible();
 
   // The Monitoring view shows the candidate as a signal, and the owner asks discovery for a neutral task.
   await page.goto(`/products/${product.id}/monitoring`);

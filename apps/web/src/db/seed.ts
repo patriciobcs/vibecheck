@@ -1,10 +1,13 @@
 import { SAMPLE_STUDY_PLAN, type StudyPlan } from "@vibecheck/contracts";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { generateDetector } from "@/domain/monitoring/detectors";
 import { currentMonitoringPolicy, setMonitoringPolicy } from "@/domain/monitoring/policy";
 import { hashApiKey } from "@/lib/api-key";
 import { newId, newToken } from "@/lib/ids";
-import { fixtureDetectorGenerator } from "@/providers/detector-generation/fixture";
+import {
+  EXCALIDRAW_SHARE_DRAWING_DETECTOR,
+  fixtureDetectorGenerator,
+} from "@/providers/detector-generation/fixture";
 import { storage } from "@/providers/storage";
 import { db, schema, sql } from "./client";
 
@@ -55,7 +58,7 @@ const EXCALIDRAW_STUDY_PLAN: StudyPlan = {
   task: {
     task_id: "task_share_drawing",
     participant_prompt:
-      "Sketch a quick diagram of anything, for example two boxes joined by an arrow. Then get an image of your drawing that you could attach to an email to a colleague who does not use this app.",
+      "Sketch two boxes joined by an arrow. Then get a PNG image of your drawing that you could email to a colleague who does not use this app.",
     research_question: "Can a new user get their drawing out of the app as an image?",
     time_limit_seconds: 240,
     success_rule_ref: "drawing_exported_v1",
@@ -243,9 +246,19 @@ async function main() {
     );
   }
   const existingDetector = await db.query.detectorDefinitions.findFirst({
-    where: eq(schema.detectorDefinitions.productId, EXCALIDRAW_PRODUCT_ID),
+    where: and(
+      eq(schema.detectorDefinitions.productId, EXCALIDRAW_PRODUCT_ID),
+      eq(schema.detectorDefinitions.status, "active"),
+    ),
   });
-  if (!existingDetector) {
+  const wantedQuestions = Object.keys(EXCALIDRAW_SHARE_DRAWING_DETECTOR.questions).sort().join(",");
+  const currentQuestions = existingDetector
+    ? Object.keys(existingDetector.questions as object)
+        .sort()
+        .join(",")
+    : "";
+  // A changed fixture publishes a new detector version; older versions are superseded.
+  if (!existingDetector || currentQuestions !== wantedQuestions) {
     const res = await generateDetector(
       {
         productId: EXCALIDRAW_PRODUCT_ID,

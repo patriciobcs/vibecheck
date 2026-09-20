@@ -2,6 +2,7 @@ import { StudyPlanSchema } from "@vibecheck/contracts";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { env } from "@/lib/env";
+import { journeyMetrics } from "./journey-metrics";
 import { currentMonitoringPolicy } from "./policy";
 import type { JourneyEvent } from "./triggers";
 import { buildWindow } from "./windows";
@@ -280,9 +281,27 @@ async function observationDetail(
       ).filter((c) => c.evaluationRefs.some((ref) => evaluations.some((e) => e.id === ref)))
     : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
+  const journeyIds = [...new Set(rows.map((r) => r.journeyInstanceId))];
+  const journeys = journeyIds.map((journeyInstanceId) => {
+    const own = rows.filter((r) => r.journeyInstanceId === journeyInstanceId);
+    return {
+      journeyInstanceId,
+      journeyId: own[0]?.journeyId ?? "",
+      metrics: journeyMetrics(
+        own.map((r) => ({
+          id: r.id,
+          sequence: r.sequence,
+          t_ms: r.tMs,
+          type: r.type,
+          payload: r.payload as Record<string, unknown>,
+        })),
+      ),
+    };
+  });
 
   return {
     kind: "observation" as const,
+    journeys,
     session: {
       id: session.id,
       buildRef: session.buildRef,
@@ -411,8 +430,21 @@ async function studyDetail(productId: string, sessionId: string) {
     where: eq(schema.transcriptSegments.sessionId, session.id),
     orderBy: asc(schema.transcriptSegments.startMs),
   });
+  const semantic = events
+    .filter((e) => e.type === "semantic")
+    .map((e) => {
+      const p = e.payload as Record<string, unknown>;
+      return {
+        id: e.id,
+        sequence: e.sequence,
+        t_ms: e.tMs,
+        type: typeof p.semantic_type === "string" ? p.semantic_type : "semantic",
+        payload: p,
+      };
+    });
   return {
     kind: "study" as const,
+    metrics: journeyMetrics(semantic),
     session: {
       id: session.id,
       assignmentId: assignment.id,

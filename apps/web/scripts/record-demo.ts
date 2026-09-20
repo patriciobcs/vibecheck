@@ -38,12 +38,40 @@ async function resetDemoProduct() {
     .where(eq(schema.researchCandidates.productId, PRODUCT_ID));
 }
 
-async function drawRectangle(page: Page, from: [number, number], to: [number, number]) {
-  await page.keyboard.press("r");
+async function drag(page: Page, tool: string, from: [number, number], to: [number, number]) {
+  await page.keyboard.press(tool);
   await page.mouse.move(from[0], from[1]);
   await page.mouse.down();
   await page.mouse.move(to[0], to[1], { steps: 12 });
   await page.mouse.up();
+}
+
+/** Two boxes joined by an arrow: the task's diagram. */
+async function drawShapes(page: Page, dy = 0) {
+  await drag(page, "r", [300, 260 + dy], [480, 380 + dy]);
+  await wait(600);
+  await drag(page, "r", [620, 260 + dy], [800, 380 + dy]);
+  await wait(600);
+  await drag(page, "a", [485, 320 + dy], [615, 320 + dy]);
+  await page.keyboard.press("Escape");
+}
+
+/** The top-right Share button opens live collaboration, not an export: a detour, then closed. */
+async function openShareAndClose(page: Page) {
+  await page.locator(".collab-button").first().click();
+  await wait(2200);
+  await page.keyboard.press("Escape");
+}
+
+/** The real path: main menu → Export image… → PNG. */
+async function exportPng(page: Page) {
+  await page.getByTestId("main-menu-trigger").click();
+  await wait(1500);
+  await page.getByTestId("image-export-button").click();
+  await wait(2000);
+  await page.getByRole("button", { name: /PNG/ }).first().click();
+  await wait(1500);
+  await page.keyboard.press("Escape");
 }
 
 async function main() {
@@ -75,21 +103,28 @@ async function main() {
   log("owner on the live board");
   await wait(2000);
 
-  // Visitor: uses the product, draws, opens help → passive screening.
+  // Visitor: draws two boxes and an arrow, wants an image of it. Tries "Share" twice (live
+  // collaboration, a detour), asks for help, then finds Export in the main menu → passive screening.
   await visitorPage.goto(TARGET, { waitUntil: "load" });
   await wait(3000);
-  await drawRectangle(visitorPage, [380, 260], [640, 420]);
+  await drawShapes(visitorPage);
   await wait(1500);
+  await openShareAndClose(visitorPage);
+  await wait(1500);
+  await openShareAndClose(visitorPage);
+  await wait(1000);
   await visitorPage.keyboard.press("?");
-  await wait(1800);
+  await wait(2000);
   await visitorPage.keyboard.press("Escape");
-  log("visitor drew and asked for help; waiting for the screening");
+  await wait(1500);
+  await exportPng(visitorPage);
+  log("visitor detoured through Share, asked for help, then exported; waiting for the screening");
   const requestCtx = owner.request;
-  for (let i = 0; i < 12; i += 1) {
+  for (let i = 0; i < 14; i += 1) {
     await requestCtx.post(`${APP}/api/dev/drain-jobs`).catch(() => null);
     await wait(1500);
   }
-  await wait(3000);
+  await wait(2000);
 
   // Visitor: accepts the study toast and records with the microphone only.
   let assignmentId: string | null = null;
@@ -105,20 +140,19 @@ async function main() {
   await wait(2500);
   await dialog.getByRole("button", { name: "Agree and continue" }).click();
   await wait(1500);
-  await dialog.getByRole("button", { name: "Allow" }).click();
-  await dialog.getByText("We can hear you").waitFor({ timeout: 20_000 });
-  await wait(1000);
-  await dialog.getByRole("button", { name: /^(Share and start|Start)$/ }).click();
+  await dialog.getByRole("button", { name: "Allow and start" }).click();
   await dialog.getByText("Recording", { exact: true }).waitFor({ timeout: 60_000 });
   log("study recording started");
   await wait(2000);
-  await visitorPage.mouse.click(200, 500);
-  await drawRectangle(visitorPage, [300, 500], [520, 620]);
-  await wait(2000);
-  await visitorPage.keyboard.press("Meta+Shift+E");
-  await wait(2500);
-  await visitorPage.keyboard.press("Escape");
-  await wait(12_000);
+  await visitorPage.keyboard.press("Meta+a");
+  await visitorPage.keyboard.press("Delete");
+  await wait(800);
+  await drawShapes(visitorPage, 120);
+  await wait(1500);
+  await openShareAndClose(visitorPage);
+  await wait(3000);
+  await exportPng(visitorPage);
+  await wait(6000);
   await dialog.getByRole("button", { name: "Done" }).click();
   await dialog.getByText("How did it go?").waitFor({ timeout: 20_000 });
   await wait(1500);
