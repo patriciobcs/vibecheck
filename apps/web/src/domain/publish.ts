@@ -17,7 +17,7 @@ export const studyPlanDefaults = {
     retention_days: 30,
   },
   automation: {
-    mode: "prototype_and_retest" as const,
+    mode: "draft_pr" as const,
     max_variants: 1,
     max_repair_attempts: 2,
     agent_budget_ref: "demo_budget",

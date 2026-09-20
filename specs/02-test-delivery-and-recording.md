@@ -10,7 +10,7 @@ Deliver the same study through a link or an embedded invitation, capture declare
 ## Invitation and assignment
 
 - Direct link: owner shares a study invitation with friends or customers. Exchange a scoped token for an assignment after eligibility and consent; do not expose test credentials in URLs.
-- Embedded: a small SDK checks eligibility and invitation caps, then displays a dismissible toast at an appropriate moment. No capture begins merely because the toast appeared.
+- Embedded: a small SDK checks eligibility and invitation caps, then displays a dismissible toast at an appropriate moment. The eligibility offer carries the immutable participant-facing scenario when one is configured. No capture begins merely because the toast appeared.
 - Marketplace: signed-in testers claim available tasks from a simple queue. Transactional claims prevent exceeding the target count. Reserve a fixture/account per assignment.
 - Support dismissal and cooldown. Proposed starting default: one invitation per participant/product per seven days; configurable. Do not interrupt critical workflows such as checkout.
 - Reveal a neutral task, expected duration, recording requirements and any reward before participation. Failure to accomplish the task does not invalidate participation.

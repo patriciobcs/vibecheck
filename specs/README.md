@@ -80,22 +80,28 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 
 ### Entity ownership
 
-| Entity | Essential fields | Producer → consumers |
+| Contract / table | Essential fields | Producer → consumers |
 | --- | --- | --- |
-| ProductConfig | URL/origins, repo binding, audience, credential refs, setup adapter, policies | VC-01/06 → all |
-| DetectorDefinition | immutable questions, journey, required signals, app/build binding, policy ref | VC-01 → VC-02/03/06 |
-| ObservationWindow | observation session/journey, event IDs, coverage, goal provenance, build, policy | VC-02/03 → Jev |
-| JevEvaluation | window/detector refs, actual model, answers, usage, status | VC-03 → VC-01/06 |
-| ResearchCandidate | suspected problem, evaluation refs, limitations, unique journey counts, lifecycle | VC-03 → VC-01/06 |
-| StudyPlan | immutable task revision, optional agent scenario, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
-| Assignment | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
-| SessionManifest | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
-| Finding | title, observation, hypothesis, evidence refs, uncertainty, fingerprint, provenance | VC-03 → VC-04/06 |
-| RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version | VC-04 → VC-05/06 |
-| Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
-| ParticipationEvent | study revision, opaque participant ref, kind, session id | VC-02 (SDK) → VC-05 |
-| ExperimentSummary | study revision, participation funnel, session outcomes, themes with repair status, optional `jev_screening` passive context, narrative with finding citations, provenance, inputs hash including repair runs and candidates | VC-05 → VC-06 |
-| ValidationSummary (deferred) | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
+| ProductConfig (contract) | URL/origins, repo binding, audience, credential refs, setup adapter, policies | VC-01/06 → all |
+| DetectorDefinition (contract) | immutable questions, journey, required signals, app/build binding, policy ref | VC-01 → VC-02/03/06 |
+| ObservationWindow (table) | observation session/journey, event IDs, coverage, goal provenance, build, policy | VC-02/03 → Jev |
+| JevEvaluation (table) | window/detector refs, actual model, answers, usage, status | VC-03 → VC-01/06 |
+| ResearchCandidate (table) | suspected problem, evaluation refs, limitations, unique journey counts, lifecycle | VC-03 → VC-01/06 |
+| StudyPlan (contract) | immutable task revision, optional agent scenario, baseline SHA/build, capture and recruitment policy, success rubric | VC-01 → VC-02/03/05 |
+| Assignment (table) | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
+| SessionManifest (contract) | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
+| Finding (contract/table) | title, observation, hypothesis, evidence refs, uncertainty, fingerprint, provenance | VC-03 → VC-04/06 |
+| RepairRun (contract/table) | issue, base/candidate SHA, Devin session, attempt/budget, validator version | VC-04 → VC-05/06 |
+| Preview (table) | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
+| ParticipationEvent (contract/table) | study revision, opaque participant ref, kind, session id | VC-02 (SDK) → VC-05 |
+| ExperimentSummary (contract/table) | study revision, participation funnel, session outcomes, themes with repair status, optional `jev_screening` passive context, narrative with finding citations, provenance, inputs hash including repair runs and candidates | VC-05 → VC-06 |
+| EvidencePackage (contract) | bounded session evidence, provenance, citations and limitations | VC-03 → analysis providers |
+| AnalysisOutput (contract) | validated findings, citations, uncertainty and provenance | VC-03 → findings |
+| CheckRun (contract/table) | repair run, status, results, diagnostics and timestamps | VC-04 → VC-05/06 |
+| RepoBinding (contract) | provider, owner/repo or local path, branch and baseline SHA | VC-01/04 → repair |
+| MonitoringPolicy (contract) | sampling, caps, retention and candidate thresholds | VC-02/03/06 → monitoring |
+| ObservationEvent / ObservationBatch (contracts) | bounded passive event payloads and batch metadata | VC-02 → monitoring |
+| EventEnvelope (contract) | tenant-scoped event identity, type, correlation and payload | all workflow services |
 
 ### Study plan handoff
 
