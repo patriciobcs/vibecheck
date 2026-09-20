@@ -12,8 +12,9 @@ test("VC-01: connect a product, run fixture discovery, publish one proposal, han
   // Connect a product with labeled sample material.
   await page.goto("/products/new");
   await page.getByLabel("Project name").fill(`E2E Product ${Date.now()}`);
-  await page.getByLabel("URL").fill("http://localhost:3200/");
+  await page.getByLabel("GitHub repository URL").fill("https://github.com/acme/demo");
   await page.getByText("Add context or adjust settings (optional)", { exact: true }).click();
+  await page.getByLabel("Live app URL (optional)", { exact: true }).fill("http://localhost:3200/");
   await page.getByLabel("Release notes").fill("Sticky notes\nBucket fill");
   await page.getByLabel("Support complaints").fill("Sample complaint: could not find export");
   await page.getByLabel("Mark imported items as sample data").click();

@@ -85,6 +85,13 @@
       "when": 1789891721030,
       "tag": "0011_giant_zuras",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789904053849,
+      "tag": "0012_github_onboarding",
+      "breakpoints": true
     }
   ]
 }

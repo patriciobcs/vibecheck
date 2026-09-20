@@ -7,13 +7,26 @@ import { newId } from "@/lib/ids";
 import { createProduct } from "./products";
 
 const webUrl = z.url({ protocol: /^https?$/, error: "Enter a valid http:// or https:// URL." });
+const repositoryUrl = z
+  .string()
+  .regex(
+    /^https:\/\/github\.com\/[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\/[a-zA-Z0-9_.-]+\/?$/i,
+    "Enter a GitHub repository link, such as https://github.com/your-team/your-project.",
+  )
+  .refine((value) => {
+    const parts = value.split("/").slice(3).filter(Boolean);
+    return parts.length === 2 && !["", ".", ".."].includes(parts[1].replace(/\.git$/, ""));
+  }, "Enter a link to the repository itself, not a branch or file.");
 const OnboardingSchema = ProductConfigSchema.extend({
   name: z.string().trim().min(1, "Enter a project name."),
-  url: webUrl,
+  repository_url: repositoryUrl,
+  url: webUrl.nullable(),
   permitted_origins: z.array(
-    webUrl.refine((value) => new URL(value).origin === value, {
-      error: "Use origins without paths, such as https://app.example.com.",
-    }),
+    webUrl.pipe(
+      z.string().refine((value) => new URL(value).origin === value, {
+        error: "Use origins without paths, such as https://app.example.com.",
+      }),
+    ),
   ),
 });
 
@@ -33,7 +46,8 @@ export function parseOnboardingForm(formData: FormData) {
     }));
   const parsed = OnboardingSchema.safeParse({
     name: text("name"),
-    url: text("url"),
+    repository_url: text("repository_url"),
+    url: text("url") || null,
     description: text("description"),
     audience: text("audience"),
     language: text("language") || "en",
@@ -45,8 +59,17 @@ export function parseOnboardingForm(formData: FormData) {
     support_complaints: sourceItems("complaints", "complaint"),
     known_journeys: lines("journeys"),
   });
-  if (parsed.success && parsed.data.permitted_origins.length === 0) {
-    parsed.data.permitted_origins = [new URL(parsed.data.url).origin];
+  if (parsed.success) {
+    const [owner, repo] = new URL(parsed.data.repository_url).pathname.split("/").filter(Boolean);
+    parsed.data.repo_binding = {
+      provider: "github",
+      owner,
+      repo: repo.replace(/\.git$/, ""),
+      issues_enabled: false,
+    };
+    if (parsed.data.url && parsed.data.permitted_origins.length === 0) {
+      parsed.data.permitted_origins = [new URL(parsed.data.url).origin];
+    }
   }
   return parsed;
 }

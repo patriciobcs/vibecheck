@@ -5,6 +5,7 @@ import { db, schema } from "@/db/client";
 import { createOwnerProduct, parseOnboardingForm } from "@/domain/onboarding";
 import { ownerContext } from "@/domain/owner-products";
 import { ApiError } from "@/lib/api";
+import { env } from "@/lib/env";
 import { type FormState, ProductForm } from "./product-form";
 
 /** Reads env and the database at request time; never prerendered at build. */
@@ -44,6 +45,9 @@ async function submit(_previous: FormState, formData: FormData): Promise<FormSta
 export default async function NewProductPage() {
   const ctx = await ownerContext();
   if (!ctx) redirect("/sign-in?next=/products/new");
+  const config = env();
+  const demoAccount =
+    config.demo && [config.SEED_OWNER_EMAIL, config.DEMO_TESTER_EMAIL].includes(ctx.email);
   const workspaces =
     ctx.writableTenantIds.length > 1
       ? await db.query.tenants.findMany({
@@ -62,12 +66,19 @@ export default async function NewProductPage() {
     >
       <div className="mx-auto max-w-2xl">
         <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          Onboarding
+          Step 2 of 2 · Add your repository
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">Add your project</h1>
         <p className="mt-2 text-muted-foreground">
-          All you need is a name and a link to your app. Then choose what to research.
+          Start with your project name and GitHub repository. A live app URL can come later.
         </p>
+        <p className="mt-3 text-sm text-muted-foreground">Signed in as {ctx.email}.</p>
+        {demoAccount ? (
+          <p className="mt-4 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm">
+            Demo account: this is the same project form, but projects are saved in a shared demo
+            workspace.
+          </p>
+        ) : null}
         <ProductForm action={submit} workspaces={workspaces} />
       </div>
     </Shell>

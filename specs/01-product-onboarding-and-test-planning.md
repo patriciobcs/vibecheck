@@ -10,10 +10,10 @@ Let an owner describe and connect a product, have an agent identify useful UX ch
 
 ## Owner experience
 
-1. From the landing page, choose **Add your project**. Sign in once with email; the return path leads to `/products/new`. Require only a project name and an HTTP(S) app URL. A deployed preview is sufficient. A description, audience, language, origin override, release notes, complaints and journeys live in a collapsed optional section; sample labeling remains alongside imported context. English is the default language, and the app URL's origin (without path/query) is the default SDK allowlist. No repository, credentials, company profile or technical setup is required to save the project.
+1. From the landing page, choose **Add your project**. Step 1 is account sign-in; Step 2 at `/products/new` requires only project name and a GitHub repository URL. Validate an HTTPS `github.com/owner/repo` link (optional `.git` suffix/trailing slash); reject branch/file links, credentials, queries and other hosts. Persist the normalized owner/repo binding with `issues_enabled: false`. A link records the code location; it does not verify existence, install an app or grant GitHub access. A live app URL, description, audience, language, origin override, release notes, complaints and journeys live in a collapsed optional section. English is the default. When a live URL is supplied, derive its origin without path/query for the SDK allowlist; otherwise leave origins empty unless explicitly supplied.
 2. A signed-in user with no memberships gets a private workspace and owner membership when the first project is saved, in the same transaction. Concurrent submissions reuse that workspace. Existing owners/admins/researchers use their authorized workspace; multiple writable workspaces require an explicit choice. Viewers cannot create projects or acquire elevated access. Account email is not collected again in the project form.
-3. Run discovery from the saved project and choose a proposed study. With no release notes, discovery inspects available app context and proposes exploratory tasks, or reports `cannot_assess` / `needs_setup` honestly. Project creation does not install the SDK, enable monitoring, run an agent or publish a study automatically.
-4. When GitHub issues or repairs are needed, connect GitHub through an installation scoped to selected repositories. The shared `repo_binding`
+3. A repository-only project is saved as `needs_setup` with `app_url_required`. Its dashboard explains that the project is saved, disables discovery and offers a live app URL form. Owners/admins/researchers can add a public HTTP(S) URL later; server-side tenant/role and destination checks apply, and empty origins are derived then. This setup action does not retarget an existing live app. Both discovery creation/processing and study publication reject missing app URLs. Once configured, run discovery and choose a proposed study. With no release notes, discovery proposes exploratory tasks or reports `cannot_assess` / `needs_setup` honestly. Saving does not install the SDK, enable monitoring, run an agent or publish a study automatically.
+4. When GitHub issues or repairs are needed, configure GitHub access through an installation scoped to selected repositories. The installation wizard is not yet implemented; onboarding reports the saved link as unverified with writes off. The shared `repo_binding`
    is validated as either `{ provider: "github", owner, repo, default_branch?, baseline_commit_sha? }`
    or `{ provider: "local", path, baseline_commit_sha? }`. A URL-only research setup remains usable,
    but repair modes are disabled until repository setup passes.
@@ -21,7 +21,9 @@ Let an owner describe and connect a product, have an agent identify useful UX ch
 6. Display proposed tasks as cards: neutral participant task, optional agent-designed scenario, research question, rationale, supporting candidates, eligibility, estimated duration and confidence/uncertainty.
 7. Owner edits/selects cards and chooses delivery, capture, recruitment and automation settings. Publish selected studies. Default to one task per study in the MVP.
 
-The optional section preserves richer onboarding without requiring founders to understand research inputs before saving. The HTTP API's `ProductConfig` shape and defaults are unchanged; origin derivation is specific to the onboarding form and does not widen explicit API allowlists or migrate existing products. No schema migration is required. The form validates on the server, retains submitted values on errors and disables resubmission while saving.
+The optional section preserves richer onboarding without requiring founders to understand research inputs before saving. `ProductConfig` v2 permits a null URL and marks its output with `schema_version: "2.0"`; unversioned API input with a live URL is still accepted. Product API responses also identify version 2.0. Migration `0012_github_onboarding.sql` drops only the URL's NOT NULL constraint; existing products keep their URLs and bindings. Origin derivation is specific to UI setup and does not widen explicit API allowlists. The form validates on the server, retains submitted values on errors and disables resubmission while saving.
+
+Email is collected only for account authentication. Already-signed-in users proceed to project setup and see their account identity. Demo entry is a separate, explicit choice using a shared account, preserves the owner's return path and labels the project form as a demo workspace. Local email mode says that no email is sent and opens the test inbox. Production email sign-in requires Resend configuration; without it, the page states that email sign-in is unavailable instead of pretending to deliver a link.
 
 ## Agent behavior
 
@@ -136,9 +138,11 @@ Additional acceptance criteria:
 ## Acceptance criteria
 
 - An owner can connect a product, inspect proposed tasks and publish only selected tasks.
-- A first-time signed-in founder can save a project with only name and URL, receives a private owner workspace, and lands on the saved project with discovery as the next action.
+- A first-time signed-in founder can save a project with only name and a GitHub repository link, receives a private owner workspace, and lands on the saved project with adding a live app URL as the next research step.
 - The default form shows two project inputs; optional context is keyboard-accessible through a disclosure. Multiple existing workspaces add a required authorized workspace choice.
-- The app origin is derived correctly for URLs containing paths, queries or ports; an explicit origin override is preserved and destination checks still apply.
+- A missing app URL never becomes a GitHub URL or placeholder research target. Research is blocked until one is added by an authorized user. The app origin is derived correctly for URLs containing paths, queries or ports; an explicit origin override is preserved and destination checks still apply.
+- Saving a repository link normalizes the owner/repo, keeps writes disabled and never claims that GitHub access has been authorized.
+- Signed-out, signed-in and shared-demo users reach the same project form with clear account state; return paths cannot redirect to an external site.
 - Invalid input preserves the form values and creates no workspace/product. Concurrent first submissions create only one owner workspace. Existing viewer and cross-tenant restrictions remain enforced.
 - Minimal context reaches exploratory discovery without fabricated release notes; no matching registered rules remains an explicit limitation.
 - A second tenant cannot read or modify that product or its source context.
@@ -158,7 +162,7 @@ publication (only `participant_prompt` and `time_limit_seconds` are overridable)
 after the first, and the `recruiting` transition, which belongs to VC-02. The product binding shape
 is validated at persistence boundaries and consumed by VC-03 publication.
 
-Live sign-in email delivery is not implemented: the current adapter writes magic links to the development test inbox. Saving arbitrary projects is supported, but registered success/eligibility rules remain demo-specific; a useful publishable study for an arbitrary app is not guaranteed by completing this form. Product context editing after creation is not yet implemented.
+The email adapter supports Resend for live sign-in and a development-only test inbox; real provider delivery still requires deployment credentials and a verified sender and has not been verified with a live call. Explicit shared-demo entry uses its own inbox context and sends no email. Saving arbitrary projects is supported, but registered success/eligibility rules remain demo-specific; a useful publishable study for an arbitrary app is not guaranteed by completing this form. Adding the missing live URL after creation is implemented; general context editing and changing an existing research target remain unimplemented.
 
 ## Open decisions / future changes
 

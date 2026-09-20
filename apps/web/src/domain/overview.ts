@@ -148,7 +148,11 @@ export async function productOverview(tenantIds: string[], productId: string) {
       baseline_sha: latestPlan?.baseline.commit_sha ?? null,
       connection:
         binding?.provider === "github"
-          ? { kind: "github" as const, healthy: hasGithubCredentials() }
+          ? {
+              kind: "github" as const,
+              healthy: binding.issues_enabled && hasGithubCredentials(),
+              writesEnabled: binding.issues_enabled,
+            }
           : binding?.provider === "local"
             ? { kind: "local" as const, healthy: Boolean(binding.path) }
             : { kind: "none" as const, healthy: false },

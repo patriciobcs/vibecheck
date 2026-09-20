@@ -10,9 +10,10 @@ const SourceItemSchema = z.object({
 
 /** Owner-supplied product configuration (VC-01). Imported material carries provenance and a sample flag. */
 export const ProductConfigSchema = z.object({
+  schema_version: z.literal("2.0").default("2.0"),
   name: z.string().min(1),
   description: z.string().default(""),
-  url: z.url(),
+  url: z.url().nullable().default(null),
   permitted_origins: z.array(z.url()).default([]),
   language: z.string().default("en"),
   audience: z.string().default(""),

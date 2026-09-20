@@ -70,7 +70,7 @@ export function LiveBoard({
 }: {
   productId: string;
   productName: string;
-  productUrl: string;
+  productUrl: string | null;
   ownerEmail: string;
   /** `?session=study:<id>` pins one session from the start (demo links, screenshots). */
   initial?: LiveSessionRef | null;
@@ -202,25 +202,31 @@ function Center({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Waiting({ data, productUrl }: { data: Board; productUrl: string }) {
+function Waiting({ data, productUrl }: { data: Board; productUrl: string | null }) {
   const p = data.product.policy;
   return (
     <div className="flex h-full flex-col items-center justify-center rounded-xl border border-border/70 bg-card px-8 text-center">
       <span className="live-pulse mb-5 size-3 rounded-full bg-brand" />
       <h2 className="text-xl font-semibold tracking-tight">Waiting for the first session</h2>
-      <p className="mt-2 max-w-md text-sm text-muted-foreground">
-        Open{" "}
-        <a
-          className="text-brand underline-offset-4 hover:underline"
-          href={productUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {productUrl}
-        </a>{" "}
-        with the SDK installed. A visitor who grants collection, or a participant who starts a study
-        task, appears here within {Math.max(1, Math.round(p.batchDelayMs / 1000))} s.
-      </p>
+      {productUrl ? (
+        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          Open{" "}
+          <a
+            className="text-brand underline-offset-4 hover:underline"
+            href={productUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {productUrl}
+          </a>{" "}
+          with the SDK installed. A visitor who grants collection, or a participant who starts a
+          study task, appears here within {Math.max(1, Math.round(p.batchDelayMs / 1000))} s.
+        </p>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Add a live app URL in your project before collecting sessions.
+        </p>
+      )}
       {!p.enabled ? (
         <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
           Passive collection is off for this product. Study sessions still show here.

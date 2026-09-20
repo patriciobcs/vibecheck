@@ -57,6 +57,16 @@ describe("AgentOutputSchema", () => {
 });
 
 describe("ProductConfigSchema", () => {
+  it("represents repository-only setup as v2 with no research target", () => {
+    const config = ProductConfigSchema.parse({
+      name: "Acme",
+      repo_binding: { provider: "github", owner: "acme", repo: "booking", issues_enabled: false },
+    });
+    expect(config.schema_version).toBe("2.0");
+    expect(config.url).toBeNull();
+    expect(config.permitted_origins).toEqual([]);
+  });
+
   it("applies defaults and requires a valid URL", () => {
     const cfg = ProductConfigSchema.parse({ name: "x", url: "https://example.com" });
     expect(cfg.release_notes).toEqual([]);

@@ -18,7 +18,9 @@ const CoreSchema = z.object({
   SUPABASE_STORAGE_BUCKET: z.string().min(1).default("session-media"),
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
   BETTER_AUTH_URL: z.url().optional(),
-  EMAIL_MODE: z.enum(["test_inbox"]).default("test_inbox"),
+  EMAIL_MODE: z.enum(["test_inbox", "resend"]).default("test_inbox"),
+  RESEND_API_KEY: optionalSecret,
+  EMAIL_FROM: optionalSecret,
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   WORKER_LEASE_SECONDS: z.coerce.number().int().positive().default(60),
   SEED_OWNER_EMAIL: z.email().default("owner@example.test"),
@@ -55,7 +57,7 @@ const CoreSchema = z.object({
   ISSUE_PUBLISHER: z.enum(["github", "memory"]).default("github"),
   ALLOW_LOCAL_TARGETS: z.enum(["true", "false"]).default("false"),
   DEV_API_KEY: optionalSecret,
-  /** Hides developer-only copy (seed hints, SDK snippets, test inbox) and enables one-click demo sign-in. Never in production. */
+  /** Hides setup hints and enables explicit sign-in to shared demo accounts. */
   DEMO_MODE: z.enum(["true", "false"]).default("false"),
   /** Second one-click identity for public demos: a participant who can claim marketplace studies. */
   DEMO_TESTER_EMAIL: z.email().default("tester@example.test"),

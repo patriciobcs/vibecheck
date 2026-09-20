@@ -12,16 +12,18 @@ export const POST = route(async (req) => {
   } & Record<string, unknown>;
   const tenantId = primaryTenant(actor, typeof tenant_id === "string" ? tenant_id : null);
   const product = await createProduct(tenantId, config);
-  return json(product, { status: 201 });
+  return json({ ...product, schema_version: "2.0" }, { status: 201 });
 });
 
 export const GET = route(async (req) => {
   const actor = await requireTenantActor(req);
   if (actor.tenantIds.length === 0) return json([]);
   return json(
-    await db.query.products.findMany({
-      where: inArray(schema.products.tenantId, actor.tenantIds),
-      orderBy: desc(schema.products.createdAt),
-    }),
+    (
+      await db.query.products.findMany({
+        where: inArray(schema.products.tenantId, actor.tenantIds),
+        orderBy: desc(schema.products.createdAt),
+      })
+    ).map((product) => ({ ...product, schema_version: "2.0" })),
   );
 });

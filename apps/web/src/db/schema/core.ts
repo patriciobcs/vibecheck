@@ -58,7 +58,7 @@ export const products = pgTable("products", {
     .notNull()
     .references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  url: text("url").notNull(),
+  url: text("url"),
   /** Explicit web origins allowed to load the embedded SDK. */
   permittedOrigins: jsonb("permitted_origins")
     .$type<string[]>()

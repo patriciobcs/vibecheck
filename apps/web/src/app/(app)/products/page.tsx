@@ -71,7 +71,9 @@ export default async function ProductsPage() {
                   {STATUS[p.status] ?? p.status}
                 </span>
               </div>
-              <p className="mt-1 truncate text-sm text-muted-foreground">{p.url}</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                {p.url ?? "Repository saved · add a live app URL when ready"}
+              </p>
               <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                 {p.sample ? <SampleBadge /> : null}
                 <span>

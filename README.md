@@ -137,7 +137,13 @@ Products can enable passive semantic telemetry (off by default) at `/products/:i
 
 ## Discovery (VC-01)
 
+Founder onboarding asks for project name and a GitHub repository link. A live app/preview URL can be added later from the project page and is required before discovery or studies. A saved repository link does not authorize GitHub access; issues and code changes stay off. Apply migrations with `pnpm db:migrate` before running the updated app (`0012_github_onboarding.sql` makes the live URL nullable).
+
 Discovery runs through a provider adapter: `fixture` returns labeled sample proposals for local development and tests; `devin` starts a Devin analysis session (`DEVIN_API_KEY`, `DISCOVERY_PROVIDER=devin`). A remote agent cannot reach `localhost`, so Devin discovery needs a publicly reachable target URL. Set `ALLOW_LOCAL_TARGETS=true` to accept loopback product URLs in development. Programmatic access to the product/discovery/study endpoints uses `Authorization: Bearer <api key>` (hashed at rest, seeded from `DEV_API_KEY`); the owner UI uses the signed-in session.
+
+## Account sign-in
+
+Local development uses `EMAIL_MODE=test_inbox`: links appear in `/dev/inbox`; no email is sent. To enable email sign-in on a deployment, set `EMAIL_MODE=resend`, create a sending key at [Resend API keys](https://resend.com/api-keys), and set `EMAIL_FROM` to an address on a [verified domain](https://resend.com/domains). Store the key in deployment secrets. Without configured delivery, production hides the email form and rejects email-link requests. `DEMO_MODE=true` adds an explicit shared-demo alternative, which sends no real email and grants access only to the seeded demo accounts. Already-signed-in users continue directly to their requested page.
 
 ## GitHub issue publication (VC-03)
 

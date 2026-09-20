@@ -19,7 +19,7 @@ Seamless UX organizes real-human usability research and turns evidence into issu
 ## Product decisions
 
 - Initial platform: web applications. Research can work against a URL; code changes additionally require repository access and a reproducible environment.
-- Founder onboarding requires only project name and app URL after email sign-in. Optional research context is disclosed on demand, the form derives the SDK origin, and first-project submission creates a private owner workspace when needed. `ProductConfig` and API defaults remain compatible; saving alone does not enable collection or automation. See VC-01 for current email delivery and demo-rule limitations.
+- Founder onboarding requires a project name and GitHub repository link after account sign-in. The live app URL is optional at creation and required before research; it can be added from the saved project. Saving a repository link does not authorize GitHub access: onboarding sets `issues_enabled: false`. First-project submission creates a private owner workspace when needed. Email belongs to account access; shared demo entry is explicitly labeled. See VC-01 for setup and demo-rule limitations.
 - The owner selects proposed tasks by default. Optional `auto_launch` can launch bounded studies under preconfigured rules. This supports both owner-directed research and the autonomous demo.
 - Once a study is launched, processing follows its snapshotted automation policy. No repeated owner approval is necessary for authorized issue creation or isolated prototypes.
 - Modes: `issues_only`, `draft_pr`, `prototype_and_retest`. No automatic merge or production deployment in the MVP.
@@ -83,7 +83,7 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 
 | Contract / table | Essential fields | Producer → consumers |
 | --- | --- | --- |
-| ProductConfig (contract) | URL/origins, repo binding, audience, credential refs, setup adapter, policies | VC-01/06 → all |
+| ProductConfig v2 (contract) | `schema_version: "2.0"`, nullable live URL/origins, repo binding, audience and research context | VC-01/06 → all |
 | DetectorDefinition (contract) | immutable questions, journey, required signals, app/build binding, policy ref | VC-01 → VC-02/03/06 |
 | ObservationWindow (table) | observation session/journey, event IDs, coverage, goal provenance, build, policy | VC-02/03 → Jev |
 | JevEvaluation (table) | window/detector refs, actual model, answers, usage, status | VC-03 → VC-01/06 |
@@ -103,6 +103,8 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | MonitoringPolicy (contract) | sampling, caps, retention and candidate thresholds | VC-02/03/06 → monitoring |
 | ObservationEvent / ObservationBatch (contracts) | bounded passive event payloads and batch metadata | VC-02 → monitoring |
 | EventEnvelope (contract) | tenant-scoped event identity, type, correlation and payload | all workflow services |
+
+`ProductConfig` v2 defaults an omitted `schema_version` to `"2.0"` and an omitted `url` to `null`. Existing unversioned inputs with a live URL remain accepted, including API-created URL-only research products. Product create/list/detail API responses also identify version `"2.0"`; clients must handle a null URL. Apply migration `0012_github_onboarding.sql` before deploying: it removes `products.url`'s NOT NULL constraint without changing existing values. Repository-only products remain `needs_setup` with `app_url_required`, no derived origins, and no discovery or study publication until an authorized user adds a live URL. Discovery output, study plans and event envelopes retain their separate `"1.0"` contracts.
 
 ### Study plan handoff
 
@@ -215,5 +217,5 @@ Add unresolved proposals under Open decisions until resolved. JSON schema versio
 - [x] Durable worker: a separate process leasing rows from a Postgres `jobs` table (`apps/web/src/worker`). Preview provider: Vercel Git integration, resolved by candidate SHA.
 - [ ] Verify Devin account/API capabilities, budgets and artifact retrieval with a real call.
 - [ ] Measure timestamp alignment tolerance between video, transcript and events, and verify Safari/Firefox screen share end to end. Vonage recording, signed callbacks and SLNG transcription are verified with real calls (2026-09-19); see VC-02's verification record.
-- [ ] Select notification provider; local development writes magic links and invitations to a database test inbox (`/dev/inbox`).
+- [ ] Verify production sign-in email delivery with a verified Resend sender. The adapter supports `EMAIL_MODE=resend`; local development uses `test_inbox`. Outbound invitations and general notification delivery remain separate future work.
 - [ ] Confirm hackathon eligibility of the selected third-party demo target; see VC-07.

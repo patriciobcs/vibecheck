@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
 import { currentSession } from "@/auth/current-user";
+import { ApiError } from "./api-error";
 
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message?: string,
-  ) {
-    super(message ?? code);
-  }
-}
+export { ApiError } from "./api-error";
 
 export function json<T>(data: T, init?: ResponseInit) {
   return NextResponse.json(data, init);

@@ -3,15 +3,13 @@ import Link from "next/link";
 import { currentSession } from "@/auth/current-user";
 import { NavLink, Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
-import { env } from "@/lib/env";
 import { HowItWorks, JourneyFigure } from "./landing-parts";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await currentSession().catch(() => null);
-  const demo = env().demo;
-  const enter = session ? "/products" : demo ? "/api/demo/enter?next=/products" : "/sign-in";
+  const enter = session ? "/products" : "/sign-in?next=/products";
   return (
     <Shell
       wide
@@ -25,7 +23,7 @@ export default async function Home() {
             href={enter}
             className="whitespace-nowrap rounded-full bg-foreground px-3 py-1.5 text-background transition-opacity hover:opacity-90"
           >
-            {session ? "Workspace" : demo ? "Enter demo" : "Sign in"}
+            {session ? "Workspace" : "Sign in"}
           </Link>
         </div>
       }
@@ -48,7 +46,7 @@ export default async function Home() {
             <Link href="/products/new">Add your project</Link>
           </Button>
           <p className="mt-3 text-sm text-muted-foreground">
-            Start with your project name and app URL.
+            Sign in, then add your project name and GitHub repository.
           </p>
         </div>
         <JourneyFigure />
