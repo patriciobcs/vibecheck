@@ -8,6 +8,7 @@ import { repairOutputSchema } from "./repairOutput";
 import { repairRunSchema, toRepairRunContract } from "./repairRun";
 import { participationEventSchema } from "./participation";
 import { summaryNarrativeOutputSchema } from "./experimentSummary";
+import { signalSchema } from "./signal";
 
 describe("contracts", () => {
   it("accepts the study plan handoff", () => {
@@ -141,6 +142,36 @@ describe("contracts", () => {
       repo: "repo",
       issues_enabled: true,
     });
+  });
+  it("compares signal windows by instant", () => {
+    expect(
+      signalSchema.safeParse({
+        schema_version: "1.0",
+        signal_id: "signal",
+        source: "jev",
+        title: "Toolbar hesitation",
+        description: "Repeated hesitation.",
+        severity: "low",
+        semantic_target: "toolbar",
+        window_start: "2025-01-01T01:00:00+01:00",
+        window_end: "2024-12-31T23:30:00Z",
+        evidence_ref: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      signalSchema.safeParse({
+        schema_version: "1.0",
+        signal_id: "signal",
+        source: "jev",
+        title: "Toolbar hesitation",
+        description: "Repeated hesitation.",
+        severity: "low",
+        semantic_target: "toolbar",
+        window_start: "2025-01-01T01:00:00+01:00",
+        window_end: "2025-01-01T00:00:00Z",
+        evidence_ref: null,
+      }).success,
+    ).toBe(true);
   });
   it("requires session IDs for started, completed, and abandoned participation", () => {
     const base = {

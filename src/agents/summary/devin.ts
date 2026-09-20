@@ -5,14 +5,13 @@ import type { SummaryProvider } from "./types";
 
 export const devinSummaryProvider: SummaryProvider = {
   name: "devin",
-  async summarize(input, run, onSession) {
+  async summarize(input, run) {
     const handle = await createDevinSession({
       prompt: buildSummaryPrompt(input),
       title: `VibeCheck experiment summary ${run.id}`,
       tags: ["vibecheck", "summary"],
       structuredOutputSchema: summaryNarrativeOutputJsonSchema,
     });
-    await onSession?.(handle);
     return pollDevinSession(handle);
   },
   async requestCorrection(handle, problems) {

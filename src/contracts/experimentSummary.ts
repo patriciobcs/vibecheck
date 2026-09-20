@@ -13,6 +13,7 @@ export const summaryExclusionReasonSchema = z.enum([
   "baseline_mismatch",
   "incomplete_capture",
   "analysis_failed",
+  "analysis_pending",
 ]);
 export const summaryOutcomeSchema = z.enum([
   "completed",

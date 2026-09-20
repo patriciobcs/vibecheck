@@ -48,7 +48,7 @@ export const discoveryOutcome = pgEnum("DiscoveryOutcome", [
   "needs_setup",
 ]);
 export const studyStatus = pgEnum("StudyStatus", ["draft", "published", "recruiting"]);
-export const jobStatus = pgEnum("JobStatus", ["pending", "running", "done", "failed"]);
+export const jobStatus = pgEnum("JobStatus", ["pending", "running", "done", "failed", "cancelled"]);
 export const analysisStatus = pgEnum("AnalysisStatus", [
   "queued",
   "analysing",
@@ -79,13 +79,32 @@ export const summaryStatus = pgEnum("SummaryStatus", [
   "insufficient_data",
   "failed",
 ]);
+export const signalSeverity = pgEnum("SignalSeverity", ["low", "medium", "high"]);
 
 export const tenant = pgTable("Tenant", {
   id: id(),
   name: text("name").notNull(),
+  pausedAt: timestamp("pausedAt", { mode: "date" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+export const auditEvent = pgTable(
+  "AuditEvent",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    actor: text("actor").notNull(),
+    action: text("action").notNull(),
+    targetType: text("targetType").notNull(),
+    targetId: text("targetId").notNull(),
+    details: jsonb("details").$type<unknown>().notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("AuditEvent_tenantId_idx").on(table.tenantId)],
+);
 
 export const apiKey = pgTable("ApiKey", {
   id: id(),
@@ -121,6 +140,35 @@ export const product = pgTable("Product", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+export const signal = pgTable(
+  "Signal",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    productId: text("productId")
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    signalId: text("signalId").notNull(),
+    source: text("source").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    severity: signalSeverity("severity").notNull(),
+    semanticTarget: text("semanticTarget").notNull(),
+    observedSessions: integer("observedSessions"),
+    windowStart: timestamp("windowStart", { mode: "date" }).notNull(),
+    windowEnd: timestamp("windowEnd", { mode: "date" }).notNull(),
+    evidenceRef: text("evidenceRef"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("Signal_tenantId_signalId_key").on(table.tenantId, table.signalId),
+    index("Signal_tenantId_productId_idx").on(table.tenantId, table.productId),
+  ],
+);
 
 export const discoveryRun = pgTable(
   "DiscoveryRun",

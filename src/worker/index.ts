@@ -2,7 +2,11 @@ import os from "node:os";
 import { z } from "zod";
 import { and, asc, eq, isNull, lte, lt, or } from "drizzle-orm";
 import { db } from "@/db";
-import { analysisRun as analysisRunTable, job as jobTable } from "@/db/schema";
+import {
+  analysisRun as analysisRunTable,
+  job as jobTable,
+  tenant as tenantTable,
+} from "@/db/schema";
 import { handleDiscoveryRun, markDiscoveryRunFailed, markDiscoveryRunQueued } from "./handler";
 import { handleAnalysisRun } from "./analysisHandler";
 import { publishFinding } from "@/services/issues";
@@ -50,15 +54,17 @@ const handlers: Record<string, JobHandler> = {
 };
 let shuttingDown = false;
 
-async function claim() {
+export async function claim() {
   return db.transaction(async (tx) => {
     const now = new Date();
     const [available] = await tx
       .select({ id: jobTable.id })
       .from(jobTable)
+      .innerJoin(tenantTable, eq(jobTable.tenantId, tenantTable.id))
       .where(
         and(
           eq(jobTable.status, "pending"),
+          isNull(tenantTable.pausedAt),
           lte(jobTable.nextRunAt, now),
           or(isNull(jobTable.leaseUntil), lt(jobTable.leaseUntil, now)),
         ),
@@ -172,4 +178,4 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   });
 }
 
-void main();
+if (process.env.NODE_ENV !== "test") void main();

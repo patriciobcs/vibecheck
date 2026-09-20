@@ -7,6 +7,9 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { AutoRefresh } from "./AutoRefresh";
 import { RunSection } from "./_components/RunSection";
+import { SignalsPanel } from "./_components/SignalsPanel";
+import { listSignals } from "@/services/signals";
+import { productOverview } from "@/services/overview";
 
 function readSourceItems(value: unknown) {
   if (!Array.isArray(value)) return [];
@@ -69,6 +72,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     ...readSourceItems(productRow.supportComplaints),
   ];
   const activeRuns = runs.some((run) => run.status === "queued" || run.status === "inspecting");
+  const [overview, signals] = await Promise.all([
+    productOverview(tenantId ?? "", productRow.id),
+    listSignals(tenantId ?? "", productRow.id),
+  ]);
+  const stages = overview.studies.flatMap((study) =>
+    study.stage.filter((stage) => stage.state === "active" || stage.state === "waiting"),
+  );
 
   return (
     <main>
@@ -77,6 +87,34 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <p>
         Status: <strong>{productRow.status}</strong>
       </p>
+      <section className="grid">
+        <article className="card">
+          <h2>Connection</h2>
+          <p>
+            {overview.product.connection.kind}:{" "}
+            {overview.product.connection.healthy ? "healthy" : "needs attention"}
+          </p>
+        </article>
+        <article className="card">
+          <h2>Experiments</h2>
+          <p>
+            {overview.studies.length} studies · {stages.length} active or waiting stages
+          </p>
+        </article>
+        <article className="card">
+          <h2>Findings</h2>
+          <p>{overview.findings_needing_attention} needing attention</p>
+        </article>
+        <article className="card">
+          <h2>Issues / PRs</h2>
+          <p>{overview.open_issues} open issues</p>
+        </article>
+        <article className="card">
+          <h2>Latest summary</h2>
+          <p>{overview.latest_summary?.headline ?? "No summary yet"}</p>
+          {overview.latest_summary && <small>{overview.latest_summary.status}</small>}
+        </article>
+      </section>
       {productRow.setupError && <p className="muted">{productRow.setupError}</p>}
       <AutoRefresh active={activeRuns} />
       <form action={runDiscovery} style={{ marginBottom: "2rem" }}>
@@ -96,6 +134,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         />
       ))}
       {!runs.length && <p>No discovery runs yet.</p>}
+      <SignalsPanel signals={signals} />
     </main>
   );
 }

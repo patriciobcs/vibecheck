@@ -7,6 +7,7 @@ export default function Layout({ children }: Readonly<{ children: React.ReactNod
       <nav>
         <strong>VibeCheck</strong>
         <Link href="/">Products</Link>
+        <Link href="/operations">Operations</Link>
       </nav>
       {children}
     </>

@@ -22,6 +22,7 @@ import {
 import { devinSummaryProvider } from "@/agents/summary/devin";
 import { fixtureSummaryProvider } from "@/agents/summary/fixture";
 import type { SummaryProvider, SummaryProviderInput } from "@/agents/summary/types";
+import { z } from "zod";
 
 const provenanceRank = { human_session: 0, simulated_session: 1, fixture: 2 } as const;
 const participationKinds = [
@@ -39,11 +40,14 @@ function asDate(value: Date | null | undefined) {
 }
 
 function strictestProvenance(values: string[]) {
-  return (values.sort(
-    (left, right) =>
-      provenanceRank[right as keyof typeof provenanceRank] -
-      provenanceRank[left as keyof typeof provenanceRank],
-  )[0] ?? "human_session") as ExperimentSummary["provenance"];
+  return values.reduce<string>(
+    (strictest, value) =>
+      provenanceRank[value as keyof typeof provenanceRank] >
+      provenanceRank[strictest as keyof typeof provenanceRank]
+        ? value
+        : strictest,
+    "human_session",
+  ) as ExperimentSummary["provenance"];
 }
 
 function emptyNarrative(): ExperimentSummary["narrative"] {
@@ -65,6 +69,11 @@ function inputHash(rows: Array<[string, string, string]>) {
     )
     .digest("hex");
 }
+
+const summaryJobPayloadSchema = z.object({
+  studyId: z.string().min(1),
+  studyRevision: z.number().int().positive(),
+});
 
 export async function computeDeterministic(
   tenantId: string,
@@ -139,13 +148,15 @@ export async function computeDeterministic(
   for (const run of runs) {
     if (run.status !== "completed" || !run.evidencePackage) {
       const reason =
-        run.error === "baseline_mismatch" || run.outcome === "baseline_mismatch"
-          ? "baseline_mismatch"
-          : run.error === "incomplete_session" ||
-              run.error === "incomplete_capture" ||
-              run.evidencePackage?.completeness !== "complete"
-            ? "incomplete_capture"
-            : "analysis_failed";
+        run.status === "queued" || run.status === "analysing"
+          ? "analysis_pending"
+          : run.error === "baseline_mismatch" || run.outcome === "baseline_mismatch"
+            ? "baseline_mismatch"
+            : run.error === "incomplete_session" ||
+                run.error === "incomplete_capture" ||
+                (run.evidencePackage !== null && run.evidencePackage.completeness !== "complete")
+              ? "incomplete_capture"
+              : "analysis_failed";
       excluded.push({ session_id: run.sessionId, reason });
       continue;
     }
@@ -249,15 +260,14 @@ export async function enqueueSummary(
       ),
     );
   if (
-    existing.some(
-      (row) =>
-        typeof row.payload === "object" &&
-        row.payload !== null &&
-        "studyId" in row.payload &&
-        "studyRevision" in row.payload &&
-        (row.payload as { studyId?: unknown }).studyId === studyId &&
-        (row.payload as { studyRevision?: unknown }).studyRevision === studyRevision,
-    )
+    existing.some((row) => {
+      const parsed = summaryJobPayloadSchema.safeParse(row.payload);
+      return (
+        parsed.success &&
+        parsed.data.studyId === studyId &&
+        parsed.data.studyRevision === studyRevision
+      );
+    })
   )
     return;
   await tx.insert(job).values({
@@ -329,12 +339,10 @@ export async function generateSummary(
         certainty: theme.certainty,
       })),
     };
-    const handleSession = async (handle: { sessionId?: string; url?: string }) => {
-      providerSessionId = handle.sessionId ?? null;
-      providerSessionUrl = handle.url ?? null;
-    };
-    let result = await provider.summarize(providerInput, { id: randomUUID() }, handleSession);
+    let result = await provider.summarize(providerInput, { id: randomUUID() });
     narrativeRaw.push(result.raw);
+    providerSessionId = result.handle.sessionId ?? null;
+    providerSessionUrl = result.handle.url ?? null;
     let parsed = summaryNarrativeOutputSchema.safeParse(result.raw);
     const validate = (candidate: SummaryNarrativeOutput | undefined) =>
       candidate?.study_id === studyId &&
@@ -349,6 +357,8 @@ export async function generateSummary(
         : "narrative cited an unknown finding_id or study_id";
       result = await provider.requestCorrection(result.handle, problems);
       narrativeRaw.push(result.raw);
+      providerSessionId = result.handle.sessionId ?? providerSessionId;
+      providerSessionUrl = result.handle.url ?? providerSessionUrl;
       parsed = summaryNarrativeOutputSchema.safeParse(result.raw);
     }
     if (!parsed.success || !validate(parsed.data)) {

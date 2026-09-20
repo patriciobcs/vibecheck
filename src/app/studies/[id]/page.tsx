@@ -3,12 +3,14 @@ import { tenantFromEnvironment } from "@/lib/auth";
 import { db } from "@/db";
 import {
   experimentSummary,
+  participationEvent,
   outboxEvent,
   repairRun,
   checkRun,
   preview,
   study,
   studyPlanRevision,
+  tenant,
 } from "@/db/schema";
 import { analysisRun, finding } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
@@ -16,6 +18,8 @@ import { AnalysesSection } from "./_components/AnalysesSection";
 import { FindingsSection } from "./_components/FindingsSection";
 import { RepairSection } from "./_components/RepairSection";
 import { SummarySection } from "./_components/SummarySection";
+import { TimelineSection } from "./_components/TimelineSection";
+import { studyStage } from "@/services/timeline";
 
 export default async function StudyPage({ params }: { params: Promise<{ id: string }> }) {
   const tenantId = await tenantFromEnvironment();
@@ -71,6 +75,21 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
     .select()
     .from(repairRun)
     .where(and(eq(repairRun.studyId, studyRow.id), eq(repairRun.tenantId, tenantId)));
+  const [tenantRow] = await db
+    .select({ pausedAt: tenant.pausedAt })
+    .from(tenant)
+    .where(eq(tenant.id, tenantId))
+    .limit(1);
+  const participation = await db
+    .select()
+    .from(participationEvent)
+    .where(
+      and(
+        eq(participationEvent.studyId, studyRow.id),
+        eq(participationEvent.tenantId, tenantId),
+        eq(participationEvent.studyRevision, studyRow.currentRevision),
+      ),
+    );
   const checks = repairs.length
     ? await db
         .select()
@@ -87,6 +106,19 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
     <main>
       <h1>Study {studyRow.id}</h1>
       <p>Status: {studyRow.status}</p>
+      {tenantRow?.pausedAt && <p className="card">Tenant paused; new external work is waiting.</p>}
+      {revision && (
+        <TimelineSection
+          stages={studyStage(studyRow, revision.plan, {
+            analysisRuns: runs,
+            participation,
+            findings,
+            summary: latestSummary ? { status: latestSummary.status } : null,
+            repairs,
+            paused: Boolean(tenantRow?.pausedAt),
+          })}
+        />
+      )}
       <h2>Plan</h2>
       <pre>{JSON.stringify(revision?.plan, null, 2)}</pre>
       <h2>Outbox event</h2>

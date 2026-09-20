@@ -9,6 +9,9 @@ export const EVENT_TYPES = [
   "analysis.completed",
   "participation.recorded",
   "summary.generated",
+  "signal.flagged",
+  "tenant.paused",
+  "tenant.resumed",
   "issue.created",
   "issue.updated",
   "finding.ready_for_repair",
@@ -41,6 +44,20 @@ export const summaryGeneratedPayloadSchema = z.object({
   revision: z.number().int().positive(),
   status: z.enum(["collecting", "summarized", "insufficient_data", "failed"]),
 });
+
+export const signalFlaggedPayloadSchema = z.object({
+  product_id: z.string().min(1),
+  signal_id: z.string().min(1),
+  severity: z.enum(["low", "medium", "high"]),
+});
+
+export const tenantPausedPayloadSchema = z.object({
+  tenant_id: z.string().min(1),
+  actor: z.literal("api_key"),
+  reason: z.string().nullable(),
+});
+
+export const tenantResumedPayloadSchema = tenantPausedPayloadSchema;
 
 export const repairCandidateReadyPayload = z.object({
   repair_run_id: z.string().min(1),

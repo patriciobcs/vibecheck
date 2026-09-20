@@ -91,6 +91,7 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
 | ParticipationEvent | study revision, opaque participant ref, kind, session id | VC-02 (SDK) → VC-05 |
 | ExperimentSummary | study revision, participation funnel, session outcomes, themes, narrative with finding citations, provenance, inputs hash | VC-05 → VC-06 |
+| Signal | product, source (`jev`), title, severity, semantic target, observed window, opaque evidence ref | spec-2 pipeline → VC-06 |
 | ValidationSummary (deferred) | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
 
 ### Study plan handoff

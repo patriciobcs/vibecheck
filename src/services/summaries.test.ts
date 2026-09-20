@@ -211,6 +211,37 @@ describe.skipIf(!process.env.DATABASE_URL)("experiment summaries", () => {
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });
 
+  it("distinguishes pending analysis from failed analysis", async () => {
+    const data = await fixture();
+    await db.insert(analysisRun).values([
+      {
+        tenantId: data.tenantRow.id,
+        studyId: data.studyRow.id,
+        sessionId: "pending-session",
+        status: "queued",
+        provider: "fixture",
+        rawResponses: [],
+      },
+      {
+        tenantId: data.tenantRow.id,
+        studyId: data.studyRow.id,
+        sessionId: "failed-session",
+        status: "failed",
+        provider: "fixture",
+        rawResponses: [],
+        error: "provider_failed",
+      },
+    ]);
+    const result = await computeDeterministic(data.tenantRow.id, data.studyRow.id, 1);
+    expect(result.summary.sessions.excluded).toEqual(
+      expect.arrayContaining([
+        { session_id: "failed-session", reason: "analysis_failed" },
+        { session_id: "pending-session", reason: "analysis_pending" },
+      ]),
+    );
+    await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+  });
+
   it("summarizes fixture findings with funnel counts and sorted themes", async () => {
     const data = await fixture();
     await addAnalysis(data, "session-1");
@@ -320,6 +351,39 @@ describe.skipIf(!process.env.DATABASE_URL)("experiment summaries", () => {
       corrections,
       themes: summary.summary.themes.map((theme) => theme.finding_id),
     }).toEqual({ status: "failed", corrections: 1, themes: [row.id] });
+    await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
+  });
+
+  it("stores the provider handle returned by the final narrative response", async () => {
+    const data = await fixture();
+    await addAnalysis(data, "session-handle");
+    const row = await addFinding(data, "Toolbar: provider handle", 1);
+    const provider: SummaryProvider = {
+      name: "handle-test",
+      async summarize() {
+        return {
+          raw: {
+            schema_version: "1.0",
+            study_id: data.studyRow.id,
+            headline: "Handle stored",
+            observations: [{ text: "Observed.", finding_ids: [row.id] }],
+            limitations: [],
+          },
+          handle: { sessionId: "summary-session", url: "https://provider.example/summary" },
+        };
+      },
+      async requestCorrection(handle) {
+        return { raw: null, handle };
+      },
+    };
+    const summary = await generateSummary(data.tenantRow.id, data.studyRow.id, 1, { provider });
+    expect({
+      providerSessionId: summary.providerSessionId,
+      providerSessionUrl: summary.providerSessionUrl,
+    }).toEqual({
+      providerSessionId: "summary-session",
+      providerSessionUrl: "https://provider.example/summary",
+    });
     await db.delete(tenant).where(eq(tenant.id, data.tenantRow.id));
   });
 
