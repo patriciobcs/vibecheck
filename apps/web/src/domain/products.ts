@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { type ProductConfig, ProductConfigSchema } from "@vibecheck/contracts";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db/client";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api-error";
 import { assertAllowedDestination } from "@/lib/destination";
 import { newId, newToken } from "@/lib/ids";
 import type { DiscoveryProviderName } from "@/providers/discovery/types";

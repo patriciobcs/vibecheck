@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { PublishInputSchema, type StudyPlan, StudyPlanSchema } from "@vibecheck/contracts";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db/client";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api-error";
 import { newId } from "@/lib/ids";
 import { emitEvent } from "./events";
 
