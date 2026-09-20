@@ -228,6 +228,7 @@ export const analysisRuns = pgTable(
     sessionId: text("session_id").notNull(),
     status: text("status", { enum: ["queued", "analysing", "completed", "failed"] }).notNull(),
     provider: text("provider", { enum: ["fixture", "devin"] }).notNull(),
+    evidenceSource: text("evidence_source", { enum: ["persisted", "fixture"] }).notNull(),
     outcome: text("outcome"),
     evidencePackage: jsonb("evidence_package").$type<EvidencePackage | null>(),
     rawResponses: jsonb("raw_responses").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),

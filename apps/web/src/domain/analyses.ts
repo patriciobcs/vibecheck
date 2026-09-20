@@ -7,7 +7,7 @@ import {
   StudyPlanSchema,
 } from "@vibecheck/contracts";
 import { and, eq, sql } from "drizzle-orm";
-import { db, schema } from "@/db/client";
+import { db, schema, type Tx } from "@/db/client";
 import { env } from "@/lib/env";
 import { newId } from "@/lib/ids";
 import { createDevinAnalysisProvider } from "@/providers/analysis/devin";
@@ -130,7 +130,7 @@ async function buildEvidencePackage(
     transcript: boundedTranscript.values,
     transcript_truncated: boundedTranscript.truncated,
     media: manifest.assets,
-    provenance: run.sessionId.startsWith("sample_") ? "fixture" : "human_session",
+    provenance: run.evidenceSource === "fixture" ? "fixture" : "human_session",
   });
 }
 
@@ -149,44 +149,78 @@ export async function startAnalysis(
   tenantId: string,
   studyId: string,
   sessionId: string,
-  providerName: "fixture" | "devin" = env().DISCOVERY_PROVIDER,
+  providerName: "fixture" | "devin" = env().ANALYSIS_PROVIDER,
+  source: "persisted" | "fixture" = "persisted",
 ) {
   const study = await db.query.studies.findFirst({
     where: and(eq(schema.studies.id, studyId), eq(schema.studies.tenantId, tenantId)),
   });
   if (!study || study.status === "draft") return null;
-  const provider = providerName;
-  const [run] = await db
-    .insert(schema.analysisRuns)
-    .values({
-      id: newId("analysis"),
+  const existing = await db.query.analysisRuns.findFirst({
+    where: and(
+      eq(schema.analysisRuns.tenantId, tenantId),
+      eq(schema.analysisRuns.studyId, studyId),
+      eq(schema.analysisRuns.sessionId, sessionId),
+    ),
+  });
+  const run = await db.transaction((tx) =>
+    enqueueAnalysisForSession(tx, {
       tenantId,
       studyId,
       sessionId,
+      provider: providerName,
+      source,
+    }),
+  );
+  if (!run) throw new Error("analysis_run_insert_failed");
+  return { status: existing ? (200 as const) : (201 as const), run };
+}
+
+export async function enqueueAnalysisForSession(
+  tx: Tx,
+  input: {
+    tenantId: string;
+    studyId: string;
+    sessionId: string;
+    provider: "fixture" | "devin";
+    source: "persisted" | "fixture";
+  },
+) {
+  const [created] = await tx
+    .insert(schema.analysisRuns)
+    .values({
+      id: newId("analysis"),
+      tenantId: input.tenantId,
+      studyId: input.studyId,
+      sessionId: input.sessionId,
       status: "queued",
-      provider,
+      provider: input.provider,
+      evidenceSource: input.source,
       rawResponses: [],
     })
     .onConflictDoNothing()
     .returning();
-  const existing =
-    run ??
-    (await db.query.analysisRuns.findFirst({
+  const run =
+    created ??
+    (await tx.query.analysisRuns.findFirst({
       where: and(
-        eq(schema.analysisRuns.tenantId, tenantId),
-        eq(schema.analysisRuns.studyId, studyId),
-        eq(schema.analysisRuns.sessionId, sessionId),
+        eq(schema.analysisRuns.tenantId, input.tenantId),
+        eq(schema.analysisRuns.studyId, input.studyId),
+        eq(schema.analysisRuns.sessionId, input.sessionId),
       ),
     }));
-  if (!existing) throw new Error("analysis_run_insert_failed");
-  if (run)
-    await enqueueJob({
-      type: "analysis.run",
-      payload: { analysisRunId: run.id, tenantId },
-      dedupeKey: `analysis.run:${run.id}`,
-      maxAttempts: 3,
-    });
-  return { status: run ? (201 as const) : (200 as const), run: existing };
+  if (created) {
+    await enqueueJob(
+      {
+        type: "analysis.run",
+        payload: { analysisRunId: created.id, tenantId: input.tenantId },
+        dedupeKey: `analysis.run:${created.id}`,
+        maxAttempts: 3,
+      },
+      tx,
+    );
+  }
+  return run;
 }
 
 export async function handleAnalysisRun(runId: string, deps: AnalysisDeps = {}, tenantId?: string) {
@@ -216,7 +250,7 @@ export async function handleAnalysisRun(runId: string, deps: AnalysisDeps = {}, 
   try {
     evidence = await buildEvidencePackage(
       deps.source ??
-        (run.sessionId.startsWith("sample_") ? fixtureEvidenceSource : persistedEvidenceSource),
+        (run.evidenceSource === "fixture" ? fixtureEvidenceSource : persistedEvidenceSource),
       run,
       study,
       revision,

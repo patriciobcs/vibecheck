@@ -1,5 +1,5 @@
 {
-  "id": "595aec9a-755e-410c-8b36-7b83615c4828",
+  "id": "f3f601a6-0f32-4585-9353-d1c2aa08e65b",
   "prevId": "6020e4d6-4e69-4097-87fc-8834bd6abd7a",
   "version": "7",
   "dialect": "postgresql",
@@ -397,6 +397,12 @@
         },
         "provider": {
           "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence_source": {
+          "name": "evidence_source",
           "type": "text",
           "primaryKey": false,
           "notNull": true

@@ -25,7 +25,8 @@ The target monorepo persists `analysis_runs`, `findings`, and `issue_publish_req
 session emits `session.analysis_ready` and enqueues durable `analysis.run` work. Fixture evidence is
 explicitly labeled `fixture`; persisted sessions are labeled `human_session`. Provider session handles
 and raw responses are retained in restricted database fields, while only bounded, validated evidence
-citations reach the provider.
+citations reach the provider. Requests with `source: fixture` use the labeled fixture evidence source
+and are refused in production; persisted session requests use `source: persisted`.
 
 ## Finding model
 
@@ -70,9 +71,10 @@ Issue publication is idempotent. A repeat with no increase in observed sessions 
 change records `unchanged`, posts no comment, and emits no update or repair-readiness event.
 When evidence changes, an open issue receives one concise human-readable “Observed again” comment.
 GitHub App authentication resolves an installation per repository, exchanges a short-lived token with
-Issues write permission, caches it in memory, and never stores the token. A development/test PAT
-fallback is supported. Installation-token search uses the GitHub search API, with repository
-pagination fallback for 403/422 responses.
+Issues write permission, caches it in memory, and never stores the token. `GITHUB_ISSUES_TOKEN` is
+used only when App credentials are absent and is intended for local development; production
+publication uses the GitHub App. Installation-token search uses the GitHub search API, with
+repository pagination fallback for 403/422 responses.
 
 The orchestrator, not an unconstrained analysis prompt, performs issue publication with an idempotency record. Reconcile uncertain API responses before retries. Developers must use the demo fork, never the upstream open-source issue tracker for demo findings.
 

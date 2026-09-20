@@ -5,6 +5,7 @@ CREATE TABLE "analysis_runs" (
 	"session_id" text NOT NULL,
 	"status" text NOT NULL,
 	"provider" text NOT NULL,
+	"evidence_source" text NOT NULL,
 	"outcome" text,
 	"evidence_package" jsonb,
 	"raw_responses" jsonb DEFAULT '[]'::jsonb NOT NULL,

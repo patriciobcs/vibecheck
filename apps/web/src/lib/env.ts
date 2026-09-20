@@ -33,6 +33,7 @@ const CoreSchema = z.object({
   SLNG_STT_LANGUAGE: z.string().default("en"),
   // VC-01 discovery
   DISCOVERY_PROVIDER: z.enum(["fixture", "devin"]).default("fixture"),
+  ANALYSIS_PROVIDER: z.enum(["fixture", "devin"]).optional(),
   DEVIN_API_KEY: optionalSecret,
   DEVIN_API_BASE: z.url().default("https://api.devin.ai/v1"),
   DEVIN_POLL_MS: z.coerce.number().int().positive().default(10_000),
@@ -78,7 +79,8 @@ export type JevEnvConfig = {
   priceMicrosPer1k: { input: number; output: number } | null;
 };
 
-export type Env = z.infer<typeof CoreSchema> & {
+export type Env = Omit<z.infer<typeof CoreSchema>, "ANALYSIS_PROVIDER"> & {
+  ANALYSIS_PROVIDER: "fixture" | "devin";
   appUrl: string;
   /** DEMO_MODE=true outside production: developer copy hidden, one-click demo sign-in. */
   demo: boolean;
@@ -105,6 +107,7 @@ export function parseEnv(
     throw new Error(`Invalid environment:\n${lines.join("\n")}`);
   }
   const core = parsed.data;
+  const analysisProvider = core.ANALYSIS_PROVIDER ?? core.DISCOVERY_PROVIDER;
 
   let vonage: VonageConfig | null = null;
   if (core.VONAGE_APPLICATION_ID) {
@@ -159,6 +162,7 @@ export function parseEnv(
 
   return {
     ...core,
+    ANALYSIS_PROVIDER: analysisProvider,
     devin,
     jev,
     appUrl: core.NEXT_PUBLIC_APP_URL,
