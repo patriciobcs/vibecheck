@@ -62,10 +62,16 @@ Use the shared envelope and schema validation. Initial events:
 - `discovery.completed`, `study.published`, `assignment.claimed`
 - `session.upload_verified`, `session.analysis_ready`, `analysis.completed`
 - `issue.created`, `issue.updated`, `finding.ready_for_repair`
-- `repair.candidate_ready`, `checks.completed`, `preview.ready`
+- `repair.candidate_ready`, `repair.draft_pr_ready`, `checks.completed`, `preview.ready`
 - `retest.requested`, `validation.updated`, `workflow.blocked`
 
 `study.published` is written to `OutboxEvent` in the publish transaction with idempotency key `<study_id>:revision_<n>:publish`; `discovery.completed` is not yet emitted (run completion is read from `DiscoveryRun.status`). Use transactions plus an outbox for jobs and notifications. Each transition checks current state/revision and permissions. Consumers deduplicate; scheduled reconciliation resolves lost webhooks. Progress subscriptions via SSE or polling read the persisted state, not simulated timers.
+
+VC-04 adds a durable `repair.run` job. Fixture adapters are deterministic
+local implementations; the worker stores provider session IDs before polling,
+persists independent CheckRuns, and records Preview rows only after a healthy
+deployment response. GitHub repair operations require Contents read, Pull
+requests write and Issues write permissions.
 
 ## Policy precedence
 

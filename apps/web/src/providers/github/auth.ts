@@ -55,7 +55,9 @@ export async function getGithubToken(repo: IssueRepository): Promise<string | nu
     {
       method: "POST",
       headers: { ...appHeaders, "content-type": "application/json" },
-      body: JSON.stringify({ permissions: { issues: "write" } }),
+      body: JSON.stringify({
+        permissions: { contents: "read", pull_requests: "write", issues: "write" },
+      }),
     },
   );
   if (!tokenResponse.ok) throw new Error(`github_app_auth_${tokenResponse.status}`);

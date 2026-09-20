@@ -6,6 +6,7 @@ import { AutoRefresh } from "@/app/(app)/products/[id]/auto-refresh";
 import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { db, schema } from "@/db/client";
 import { ownerContext } from "@/domain/owner-products";
+import { RepairSection } from "./_components/RepairSection";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,22 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
     where: eq(schema.findings.studyId, study.id),
     orderBy: schema.findings.createdAt,
   });
+  const repairs = await db.query.repairRuns.findMany({
+    where: eq(schema.repairRuns.studyId, study.id),
+    orderBy: schema.repairRuns.createdAt,
+  });
+  const checks = repairs.length
+    ? await db.query.checkRuns.findMany({
+        where: eq(schema.checkRuns.repairRunId, repairs[0]?.id ?? ""),
+        orderBy: schema.checkRuns.createdAt,
+      })
+    : [];
+  const previews = repairs.length
+    ? await db.query.previews.findMany({
+        where: eq(schema.previews.repairRunId, repairs[0]?.id ?? ""),
+        orderBy: schema.previews.createdAt,
+      })
+    : [];
   const activeAnalysis = analyses.some(
     (run) => run.status === "queued" || run.status === "analysing",
   );
@@ -120,6 +137,11 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
               ))}
             </div>
           )}
+          <RepairSection
+            repair={repairs[0] ?? null}
+            checks={checks}
+            preview={previews[0] ?? null}
+          />
         </section>
         <section className="surface p-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

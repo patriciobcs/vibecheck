@@ -108,3 +108,8 @@ A remote agent cannot reach `localhost`, so Devin discovery needs a publicly rea
 Set `ALLOW_LOCAL_TARGETS=true` to accept loopback product URLs in development. Programmatic access to
 the product/discovery/study endpoints uses `Authorization: Bearer <api key>` (hashed at rest, seeded
 from `DEV_API_KEY`); the owner UI uses the signed-in session.
+
+VC-04 repair runs default to deterministic local adapters. Set `REPAIR_PROVIDER`,
+`VALIDATOR`, and `PREVIEW_PROVIDER` to `fixture` for local development; the
+Devin repair adapter requires `REPAIR_PROVIDER=devin` and the existing Devin
+credentials.

@@ -22,6 +22,10 @@ VibeCheck organizes real-human usability research and turns evidence into issues
 - The owner selects proposed tasks by default. Optional `auto_launch` can launch bounded studies under preconfigured rules. This supports both owner-directed research and the autonomous demo.
 - Once a study is launched, processing follows its snapshotted automation policy. No repeated owner approval is necessary for authorized issue creation or isolated prototypes.
 - Modes: `issues_only`, `draft_pr`, `prototype_and_retest`. No automatic merge or production deployment in the MVP.
+- Repair runs persist explicit states from `queued` through validation and
+  preview/PR readiness, with deterministic blocked reasons and bounded retries.
+  Fixture adapters are labeled simulation and do not establish human evidence
+  or real deployment validation.
 - Devin is the initial agent provider for planning, analysis, and implementation. Jev screens bounded telemetry windows for possible friction; Devin generates detector questions and plans research. The Jev adapter and screening loop are implemented and tested with stubbed answers; a real Jev call and accuracy remain unverified until `JEV_API_KEY` is supplied. Nebius is not required.
 - Ordinary application code owns assignments, credit transactions, workflow state, validation execution and access control. Devin does not replace those services.
 - Vonage is the planned media provider; SLNG is the planned STT provider. Verify recording capabilities, access, and supported browser behavior during integration.

@@ -1,5 +1,6 @@
 export * from "./agent-output";
 export * from "./analysis-output";
+export * from "./check-run";
 export * from "./detector";
 export * from "./embed-messages";
 export * from "./envelope";
@@ -10,6 +11,8 @@ export * from "./monitoring-policy";
 export * from "./observation";
 export * from "./product-config";
 export * from "./publish-input";
+export * from "./repair-output";
+export * from "./repair-run";
 export * from "./repo-binding";
 export * from "./rules";
 export * from "./sample-plan";

@@ -103,3 +103,23 @@ A draft PR may be retained for a blocked run, clearly marked with failed checks.
 - [ ] Define the first supported repository adapter; general stack detection comes later.
 - [ ] Multi-variant execution and owner-controlled production rollout are future scope.
 
+## Current implementation status
+
+VC-04 currently includes tenant-scoped repair runs, check runs and previews,
+durable `repair.run` jobs, retry accounting, draft PR orchestration, and
+deterministic fixture adapters for repair, validation and preview. The fixture
+provider returns a candidate-shaped response but does not modify a repository or
+claim a real PR or deployment. The Devin adapter uses the existing session API
+and structured output contract.
+
+The fixture validator currently enforces only allowed diff paths. The
+production Excalidraw acceptance validator and Vercel deployment adapter remain
+pending. The demo policy currently owns allowed paths and the five VC-07
+invariants; moving those values onto repository bindings is an open decision.
+GitHub App repair operations require Contents read, Pull requests write and
+Issues write permissions.
+
+Blocked reasons include `not_reproduced`, `out_of_scope`, `checks_failed`,
+`preview_unhealthy` and `github_permissions`; missing base or candidate
+artifacts are terminal failures. Draft PRs use `Refs #N`, not auto-closing
+references, and separate functional checks from human evidence.
