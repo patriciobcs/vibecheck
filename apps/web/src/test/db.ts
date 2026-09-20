@@ -14,6 +14,8 @@ const TABLES = [
   "evaluation_budget_ledger",
   "publish_requests",
   "issue_publish_requests",
+  "experiment_summaries",
+  "participation_events",
   "findings",
   "analysis_runs",
   "proposals",

@@ -12,7 +12,7 @@ VibeCheck organizes real-human usability research and turns evidence into issues
 | VC-02 | [Test delivery and recording](02-test-delivery-and-recording.md) | Passive semantic telemetry, invitations, assignment, consent, configurable recording and uploads. |
 | VC-03 | [Evidence and GitHub issues](03-evidence-analysis-and-github-issues.md) | Trigger Jev screening, propose research candidates, analyze human sessions through Devin, deduplicate findings and issues. |
 | VC-04 | [Prototypes and verification](04-prototypes-and-verification.md) | Isolated changes, independent checks, retries, previews, draft PRs. |
-| VC-05 | [Retesting and validation](05-retesting-and-validation.md) | Invitations, fresh/repeat participants, comparison, commit-bound PR evidence. |
+| VC-05 | [Experiment summary](05-retesting-and-validation.md) | Participation funnel, cross-participant summary per experiment for the product team; retesting deferred. |
 | VC-06 | [Dashboard and orchestration](06-owner-dashboard-and-orchestration.md) | Owner views, settings, tenancy, durable jobs, audit trail and integrations. |
 | VC-07 | [Demo target app](07-demo-target-app.md) | Open-source candidate, reproducible fixture, checks and honest three-minute demo. |
 
@@ -27,6 +27,7 @@ VibeCheck organizes real-human usability research and turns evidence into issues
   Fixture adapters are labeled simulation and do not establish human evidence
   or real deployment validation.
 - Devin is the initial agent provider for planning, analysis, and implementation. Jev screens bounded telemetry windows for possible friction; Devin generates detector questions and plans research. The Jev adapter and screening loop are implemented and tested with stubbed answers; a real Jev call and accuracy remain unverified until `JEV_API_KEY` is supplied. Nebius is not required.
+- Devin is the initial agent provider for planning, analysis, implementation and summaries. Jev screens bounded telemetry windows for possible friction; Devin generates detector questions and plans research. The Jev adapter and screening loop are implemented and tested with stubbed answers; a real Jev call and accuracy remain unverified until `JEV_API_KEY` is supplied. Nebius is not required.
 - Ordinary application code owns assignments, credit transactions, workflow state, validation execution and access control. Devin does not replace those services.
 - Vonage is the planned media provider; SLNG is the planned STT provider. Verify recording capabilities, access, and supported browser behavior during integration.
 - Branches/worktrees in an authorized repository are the default prototype mechanism. Forks are supported as an alternative, not required per variant.
@@ -47,8 +48,11 @@ Product configuration → discovery run → proposed tasks → selection/auto-la
        ├─ issues_only: stop
        ├─ draft_pr: implement → validate → draft PR, no human retest
        └─ prototype_and_retest: implement → validate → preview → draft PR
-            → retest invitation → human session → comparison → update PR evidence
+            → (deferred) retest invitation → human session → comparison
+    every analysed session → experiment summary for the product team (VC-05)
 ```
+
+The invitation popup, interview delivery, recording and continuous activity tracking (Jev) are built by the spec-2 team; VibeCheck consumes them through the contracts in VC-02 and VC-05.
 
 No finding is a valid result. No participant, missing media, setup failure, exhausted agent budget, or inconclusive retesting must remain visible outcomes; none is silently converted to success.
 
@@ -93,7 +97,9 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | Finding | title, observation, hypothesis, evidence refs, uncertainty, fingerprint, provenance | VC-03 → VC-04/06 |
 | RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version | VC-04 → VC-05/06 |
 | Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
-| ValidationSummary | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
+| ParticipationEvent | study revision, opaque participant ref, kind, session id | VC-02 (SDK) → VC-05 |
+| ExperimentSummary | study revision, participation funnel, session outcomes, themes with repair status, narrative with finding citations, provenance, inputs hash including repair runs | VC-05 → VC-06 |
+| ValidationSummary (deferred) | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
 
 ### Study plan handoff
 

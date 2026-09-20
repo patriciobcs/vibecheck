@@ -1,4 +1,10 @@
-import type { CheckResult, EvidencePackage, Finding, SourceItem } from "@vibecheck/contracts";
+import type {
+  CheckResult,
+  EvidencePackage,
+  ExperimentSummary,
+  Finding,
+  SourceItem,
+} from "@vibecheck/contracts";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -418,7 +424,71 @@ export const previews = pgTable(
   },
   (t) => [index("previews_repair_run_idx").on(t.repairRunId)],
 );
+/* ---------------- VC-05 participation and summaries ---------------- */
 
+export const participationEvents = pgTable(
+  "participation_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    studyRevision: integer("study_revision").notNull(),
+    eventId: text("event_id").notNull(),
+    participantRef: text("participant_ref").notNull(),
+    kind: text("kind", {
+      enum: ["invited", "accepted", "dismissed", "started", "completed", "abandoned"] as const,
+    }).notNull(),
+    sessionId: text("session_id"),
+    occurredAt: ts("occurred_at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("participation_events_tenant_event_uq").on(t.tenantId, t.eventId),
+    index("participation_events_study_rev_idx").on(t.studyId, t.studyRevision),
+  ],
+);
+
+export const experimentSummaries = pgTable(
+  "experiment_summaries",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    studyRevision: integer("study_revision").notNull(),
+    revision: integer("revision").notNull(),
+    status: text("status", {
+      enum: ["collecting", "summarized", "insufficient_data", "failed"],
+    }).notNull(),
+    inputsHash: text("inputs_hash").notNull(),
+    summary: jsonb("summary").$type<ExperimentSummary>().notNull(),
+    narrativeRaw: jsonb("narrative_raw").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    provider: text("provider"),
+    providerSessionId: text("provider_session_id"),
+    providerSessionUrl: text("provider_session_url"),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("experiment_summaries_study_rev_hash_uq").on(
+      t.studyId,
+      t.studyRevision,
+      t.inputsHash,
+    ),
+    uniqueIndex("experiment_summaries_study_rev_revision_uq").on(
+      t.studyId,
+      t.studyRevision,
+      t.revision,
+    ),
+  ],
+);
 /* ---------------- Participants and invitations ---------------- */
 
 export const participants = pgTable(
