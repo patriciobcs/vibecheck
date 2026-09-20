@@ -41,6 +41,14 @@ const CoreSchema = z.object({
   DEV_API_KEY: optionalSecret,
   /** Hides developer-only copy (seed hints, SDK snippets, test inbox) and enables one-click demo sign-in. Never in production. */
   DEMO_MODE: z.enum(["true", "false"]).default("false"),
+  /** Second one-click identity for public demos: a participant who can claim marketplace studies. */
+  DEMO_TESTER_EMAIL: z.email().default("tester@example.test"),
+  /** Where the instrumented Excalidraw clone runs; seeded as the demo product's URL and permitted origin. */
+  EXCALIDRAW_DEMO_URL: z.url().default("http://localhost:3200/"),
+  /** Serverless deployments: run queued jobs right after the request that enqueued them (no worker). */
+  INLINE_JOBS: z.enum(["true", "false"]).default("false"),
+  /** Bearer secret for /api/internal/drain (Vercel Cron sends it automatically as CRON_SECRET). */
+  CRON_SECRET: optionalSecret,
   // Jev screening (typesafe.ai)
   JEV_API_KEY: optionalSecret,
   JEV_BASE_URL: z.url().default("https://api.typesafe.ai"),
@@ -75,7 +83,7 @@ export type JevEnvConfig = {
 
 export type Env = z.infer<typeof CoreSchema> & {
   appUrl: string;
-  /** DEMO_MODE=true outside production: developer copy hidden, one-click demo sign-in. */
+  /** DEMO_MODE=true: developer copy hidden, one-click demo sign-in as seeded accounts. Explicit opt-in, also in production. */
   demo: boolean;
   webhookBaseUrl: string;
   vonage: VonageConfig | null;
@@ -157,7 +165,7 @@ export function parseEnv(
     devin,
     jev,
     appUrl: core.NEXT_PUBLIC_APP_URL,
-    demo: core.DEMO_MODE === "true" && process.env.NODE_ENV !== "production",
+    demo: core.DEMO_MODE === "true",
     webhookBaseUrl: core.PUBLIC_WEBHOOK_BASE_URL ?? core.NEXT_PUBLIC_APP_URL,
     vonage,
     slng,

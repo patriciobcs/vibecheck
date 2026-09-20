@@ -17,17 +17,23 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
         <p className="mt-2 text-muted-foreground">We will send a one-time link. No passwords.</p>
         {demo ? (
           <div className="surface mt-8 p-6">
-            <p className="text-sm font-medium">Demo workspace</p>
+            <p className="text-sm font-medium">Try the demo without an account</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Enter as the demo owner. The sample product and studies are labeled as demo data.
+              Two seeded identities. The product owner runs the Excalidraw workspace; the tester
+              takes studies. Demo data is labeled as such.
             </p>
-            <Button asChild className="mt-4 w-full rounded-full">
-              <Link
-                href={`/api/demo/enter?next=${encodeURIComponent(next === "/" ? "/products" : next)}`}
-              >
-                Enter the demo
-              </Link>
-            </Button>
+            <div className="mt-4 grid gap-2">
+              <Button asChild className="w-full rounded-full">
+                <Link
+                  href={`/api/demo/enter?as=owner${next !== "/" ? `&next=${encodeURIComponent(next)}` : ""}`}
+                >
+                  Enter as product owner
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full rounded-full">
+                <Link href="/api/demo/enter?as=tester">Enter as tester</Link>
+              </Button>
+            </div>
           </div>
         ) : null}
         <div className="surface mt-6 p-6">

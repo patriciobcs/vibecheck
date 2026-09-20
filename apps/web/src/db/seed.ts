@@ -15,6 +15,9 @@ import { db, schema, sql } from "./client";
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 const EXCALIDRAW_PRODUCT_ID = "product_excalidraw_local";
+/** The instrumented clone: local by default, the deployed fork in production (EXCALIDRAW_DEMO_URL). */
+const EXCALIDRAW_URL = process.env.EXCALIDRAW_DEMO_URL ?? "http://localhost:3200/";
+const EXCALIDRAW_ORIGINS = [...new Set([new URL(EXCALIDRAW_URL).origin, "http://localhost:3200"])];
 
 /** SAMPLE discovery context for the Excalidraw target: release notes from upstream commit subjects, sample complaints. */
 const EXCALIDRAW_RELEASE_NOTES = (
@@ -105,6 +108,25 @@ async function main() {
       .values({ id: newId("membership"), tenantId, userId: owner.id, role: "owner" })
       .onConflictDoNothing();
 
+    // Demo tester: a signed-in participant for the marketplace and direct-link channels.
+    const testerEmail = process.env.DEMO_TESTER_EMAIL ?? "tester@example.test";
+    let tester = await tx.query.user.findFirst({ where: eq(schema.user.email, testerEmail) });
+    if (!tester) {
+      const [created] = await tx
+        .insert(schema.user)
+        .values({ id: newId("user"), name: "Demo tester", email: testerEmail, emailVerified: true })
+        .returning();
+      tester = created;
+    }
+    if (!tester) throw new Error("tester insert failed");
+    const participant = await tx.query.participants.findFirst({
+      where: eq(schema.participants.userId, tester.id),
+    });
+    if (!participant)
+      await tx
+        .insert(schema.participants)
+        .values({ id: newId("participant"), userId: tester.id, invitationsOptIn: true });
+
     await tx
       .insert(schema.products)
       .values({
@@ -135,8 +157,8 @@ async function main() {
         id: EXCALIDRAW_PRODUCT_ID,
         tenantId,
         name: "Excalidraw",
-        url: "http://localhost:3200/",
-        permittedOrigins: ["http://localhost:3200"],
+        url: EXCALIDRAW_URL,
+        permittedOrigins: EXCALIDRAW_ORIGINS,
         publishableKey: `pk_excalidraw_${newToken(12)}`,
         invitationCooldownDays: 0,
         embedMode: "sdk",
@@ -154,8 +176,8 @@ async function main() {
         target: schema.products.id,
         set: {
           embedMode: "sdk",
-          url: "http://localhost:3200/",
-          permittedOrigins: ["http://localhost:3200"],
+          url: EXCALIDRAW_URL,
+          permittedOrigins: EXCALIDRAW_ORIGINS,
           releaseNotes: EXCALIDRAW_RELEASE_NOTES,
           supportComplaints: EXCALIDRAW_COMPLAINTS,
           knownJourneys: EXCALIDRAW_JOURNEYS,

@@ -32,12 +32,36 @@ export async function enqueueJob(
     })
     .onConflictDoNothing({ target: schema.jobs.dedupeKey })
     .returning();
-  if (inserted) return inserted;
+  if (inserted) {
+    scheduleInlineDrain(inserted.nextRunAt);
+    return inserted;
+  }
   const existing = await executor.query.jobs.findFirst({
     where: eq(schema.jobs.dedupeKey, input.dedupeKey ?? ""),
   });
   if (!existing) throw new Error("job insert conflict without existing row");
   return existing;
+}
+
+/**
+ * Serverless deployments have no worker process. With INLINE_JOBS=true, a request that enqueues a
+ * job also runs the queue after its response is sent (Next's `after`), waiting out short batch
+ * delays. Outside a request (worker, tests) this is a no-op; a cron drain catches stragglers.
+ */
+function scheduleInlineDrain(runAt: Date) {
+  if (process.env.INLINE_JOBS !== "true") return;
+  const delay = Math.min(8000, Math.max(0, runAt.getTime() - Date.now()));
+  import("next/server")
+    .then(({ after }) => {
+      after(async () => {
+        if (delay > 0) await new Promise((r) => setTimeout(r, delay + 200));
+        const { drain } = await import("@/worker/runner");
+        await drain("inline", 10);
+      });
+    })
+    .catch(() => {
+      /* not inside a request: the cron drain will pick it up */
+    });
 }
 
 /** Atomically leases the next runnable job (queued and due, or running with an expired lease). */
