@@ -23,6 +23,7 @@ export default defineConfig({
     permissions: ["microphone"],
     launchOptions: {
       args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
     },
   },
   // Next.js allows one dev server per directory: set E2E_BASE_URL=http://localhost:3000 to run

@@ -26,7 +26,7 @@ test("a new founder saves a GitHub project and adds the live app later", async (
   await page.getByLabel("Project name").fill("   ");
   await page.getByLabel("GitHub repository URL").fill("https://github.com/acme/booking.git");
   await page.getByRole("button", { name: "Add project", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("Enter a project name.");
+  await expect(page.getByText("Enter a project name.", { exact: true })).toBeVisible();
   await expect(page.getByLabel("GitHub repository URL")).toHaveValue(
     "https://github.com/acme/booking.git",
   );

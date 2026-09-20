@@ -246,7 +246,7 @@ async function main() {
       .onConflictDoUpdate({ target: schema.studyRevisions.id, set: { plan: SAMPLE_STUDY_PLAN } });
   });
 
-  await storage().ensureBucket();
+  if (process.env.SKIP_STORAGE_SETUP !== "true") await storage().ensureBucket();
 
   // DEMO ONLY: passive monitoring is disabled by default for real products. The local Excalidraw
   // target gets an enabled policy and a fixture detector so the screening loop can be exercised.
