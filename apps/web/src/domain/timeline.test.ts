@@ -1,4 +1,6 @@
+import { ExperimentSummarySchema } from "@vibecheck/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
+import { db, schema } from "@/db/client";
 import { resetDb } from "@/test/db";
 import { seedStudy } from "@/test/fixtures";
 import { studyStages, studyTimeline } from "./timeline";
@@ -72,5 +74,51 @@ describe("studyTimeline", () => {
       "preview",
     ]);
     expect(await studyTimeline(["tenant_other"], studyId)).toBeNull();
+  });
+
+  it("marks Summarized done from a persisted summary", async () => {
+    const { tenantId, studyId, plan } = await seedStudy();
+    await db.insert(schema.experimentSummaries).values({
+      id: "summary-timeline",
+      tenantId,
+      studyId,
+      studyRevision: 1,
+      revision: 1,
+      status: "summarized",
+      inputsHash: "timeline-summary-inputs",
+      summary: ExperimentSummarySchema.parse({
+        schema_version: "1.0",
+        summary_id: "summary-timeline",
+        study_id: studyId,
+        study_revision: 1,
+        revision: 1,
+        status: "summarized",
+        baseline_commit_sha: plan.baseline.commit_sha,
+        participation: {
+          invited: 0,
+          accepted: 0,
+          dismissed: 0,
+          started: 0,
+          completed: 0,
+          abandoned: 0,
+          unknown: false,
+        },
+        sessions: {
+          eligible: 0,
+          excluded: [],
+          outcomes: { completed: 0, stuck: 0, gave_up: 0, withdrew: 0, unknown: 0 },
+        },
+        themes: [],
+        narrative: { headline: "", observations: [], limitations: [] },
+        provenance: "fixture",
+        inputs_hash: "timeline-summary-inputs",
+        generated_at: "2026-01-01T00:00:00.000Z",
+      }),
+      narrativeRaw: [],
+    });
+    const timeline = await studyTimeline([tenantId], studyId);
+    expect(timeline?.stages.find((stage) => stage.key === "summarized")).toMatchObject({
+      state: "done",
+    });
   });
 });

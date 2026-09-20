@@ -2,7 +2,7 @@ import { RepoBindingSchema, StudyPlanSchema } from "@vibecheck/contracts";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { hasGithubCredentials } from "@/providers/github/auth";
-import { studyStages } from "./timeline";
+import { type RepairSource, studyStages } from "./timeline";
 
 /**
  * VC-06 product overview: everything derived from persisted rows — repo binding and credential
@@ -19,43 +19,74 @@ export async function productOverview(tenantIds: string[], productId: string) {
     : null;
   const binding = parsedBinding?.success ? parsedBinding.data : null;
   const studies = await db.query.studies.findMany({
-    where: eq(schema.studies.productId, product.id),
+    where: and(
+      eq(schema.studies.productId, product.id),
+      inArray(schema.studies.tenantId, tenantIds),
+    ),
     orderBy: desc(schema.studies.createdAt),
   });
   const studyIds = studies.map((s) => s.id);
-  const [revisions, assignments, analysisRuns, findings, signals, tenant] = await Promise.all([
-    studyIds.length
-      ? db.query.studyRevisions.findMany({
-          where: inArray(schema.studyRevisions.studyId, studyIds),
-        })
-      : [],
-    studyIds.length
-      ? db.query.assignments.findMany({
-          where: inArray(schema.assignments.studyId, studyIds),
-          columns: { id: true, studyId: true },
-        })
-      : [],
-    studyIds.length
-      ? db.query.analysisRuns.findMany({
-          where: inArray(schema.analysisRuns.studyId, studyIds),
-          columns: { studyId: true, status: true },
-        })
-      : [],
-    studyIds.length
-      ? db.query.findings.findMany({
-          where: inArray(schema.findings.studyId, studyIds),
-          columns: { studyId: true, certainty: true, issueUrl: true },
-        })
-      : [],
-    db.query.signals.findMany({
-      where: eq(schema.signals.productId, product.id),
-      columns: { severity: true },
-    }),
-    db.query.tenants.findFirst({
-      where: eq(schema.tenants.id, product.tenantId),
-      columns: { paused: true },
-    }),
-  ]);
+  const [revisions, assignments, analysisRuns, findings, summaries, repairs, signals, tenant] =
+    await Promise.all([
+      studyIds.length
+        ? db.query.studyRevisions.findMany({
+            where: inArray(schema.studyRevisions.studyId, studyIds),
+          })
+        : [],
+      studyIds.length
+        ? db.query.assignments.findMany({
+            where: inArray(schema.assignments.studyId, studyIds),
+            columns: { id: true, studyId: true },
+          })
+        : [],
+      studyIds.length
+        ? db.query.analysisRuns.findMany({
+            where: inArray(schema.analysisRuns.studyId, studyIds),
+            columns: { studyId: true, status: true },
+          })
+        : [],
+      studyIds.length
+        ? db.query.findings.findMany({
+            where: inArray(schema.findings.studyId, studyIds),
+            columns: { studyId: true, certainty: true, issueUrl: true },
+          })
+        : [],
+      studyIds.length
+        ? db.query.experimentSummaries.findMany({
+            where: and(
+              eq(schema.experimentSummaries.tenantId, product.tenantId),
+              inArray(schema.experimentSummaries.studyId, studyIds),
+            ),
+            orderBy: desc(schema.experimentSummaries.revision),
+            columns: {
+              studyId: true,
+              status: true,
+              revision: true,
+              createdAt: true,
+            },
+          })
+        : [],
+      studyIds.length
+        ? db.query.repairRuns.findMany({
+            where: and(
+              eq(schema.repairRuns.tenantId, product.tenantId),
+              inArray(schema.repairRuns.studyId, studyIds),
+            ),
+            columns: { status: true, blockedReason: true, studyId: true, findingId: true },
+          })
+        : [],
+      db.query.signals.findMany({
+        where: and(
+          eq(schema.signals.productId, product.id),
+          eq(schema.signals.tenantId, product.tenantId),
+        ),
+        columns: { severity: true },
+      }),
+      db.query.tenants.findFirst({
+        where: eq(schema.tenants.id, product.tenantId),
+        columns: { paused: true },
+      }),
+    ]);
   const endedSessions = assignments.length
     ? await db.query.sessions.findMany({
         where: and(
@@ -75,6 +106,27 @@ export async function productOverview(tenantIds: string[], productId: string) {
     if (studyId) sessionsByStudy.set(studyId, (sessionsByStudy.get(studyId) ?? 0) + 1);
   }
   const paused = tenant?.paused ?? false;
+  const latestSummaryByStudy = new Map<string, (typeof summaries)[number]>();
+  for (const summary of summaries) {
+    const previous = latestSummaryByStudy.get(summary.studyId);
+    if (!previous || summary.revision > previous.revision) {
+      latestSummaryByStudy.set(summary.studyId, summary);
+    }
+  }
+  const latestSummary = [...latestSummaryByStudy.values()].sort(
+    (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+  )[0];
+  const repairsByStudy = new Map<string, RepairSource[]>();
+  const repairsByStatus: Record<string, number> = {};
+  for (const repair of repairs) {
+    repairsByStatus[repair.status] = (repairsByStatus[repair.status] ?? 0) + 1;
+    const studyRepairs = repairsByStudy.get(repair.studyId) ?? [];
+    studyRepairs.push({
+      status: repair.status,
+      blockedReason: repair.blockedReason,
+    });
+    repairsByStudy.set(repair.studyId, studyRepairs);
+  }
   const planFor = (studyId: string, revision: number) => {
     const row = revisions.find((r) => r.studyId === studyId && r.revision === revision);
     if (!row) return null;
@@ -112,10 +164,10 @@ export async function productOverview(tenantIds: string[], productId: string) {
               sessions: sessionsByStudy.get(study.id) ?? 0,
               analysisRuns: analysisRuns.filter((r) => r.studyId === study.id),
               findings: findings.filter((f) => f.studyId === study.id),
-              // TODO(VC-05): latest experiment summary once PR #6's port lands on main.
-              summary: null,
-              // TODO(VC-04): repair runs once PR #5's port lands on main.
-              repairs: [],
+              summary: latestSummaryByStudy.get(study.id)
+                ? { status: latestSummaryByStudy.get(study.id)?.status ?? "collecting" }
+                : null,
+              repairs: repairsByStudy.get(study.id) ?? [],
               paused,
             })
           : [],
@@ -125,10 +177,15 @@ export async function productOverview(tenantIds: string[], productId: string) {
       (f) => f.certainty === "preliminary" || f.certainty === "contradictory" || !f.issueUrl,
     ).length,
     open_issues: findings.filter((f) => f.issueUrl).length,
-    // TODO(VC-05): latest experiment summary once PR #6's port lands on main.
-    latest_summary: null,
-    // TODO(VC-04): repair runs once PR #5's port lands on main.
-    repairs_by_status: {},
+    latest_summary: latestSummary
+      ? {
+          study_id: latestSummary.studyId,
+          status: latestSummary.status,
+          revision: latestSummary.revision,
+          generated_at: latestSummary.createdAt.toISOString(),
+        }
+      : null,
+    repairs_by_status: repairsByStatus,
     signals_by_severity: {
       low: signals.filter((s) => s.severity === "low").length,
       medium: signals.filter((s) => s.severity === "medium").length,

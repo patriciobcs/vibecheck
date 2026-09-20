@@ -1,5 +1,6 @@
+import type { RepairRunContract, SummaryStatus } from "@vibecheck/contracts";
 import { StudyPlanSchema } from "@vibecheck/contracts";
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 
 export type StageState = "done" | "active" | "waiting" | "skipped" | "blocked";
@@ -12,12 +13,13 @@ export type TimelineStage = {
   waitingReason?: string;
 };
 
-// TODO(VC-05): wire to experiment summaries once PR #6's port lands on main.
 export type SummarySource = {
-  status: "summarized" | "insufficient_data" | "failed" | "pending";
+  status: SummaryStatus;
 } | null;
-// TODO(VC-04): wire to repair runs once PR #5's port lands on main.
-export type RepairSource = { status: string; blockedReason?: string | null };
+export type RepairSource = {
+  status: RepairRunContract["status"];
+  blockedReason: string | null;
+};
 
 export type TimelineInputs = {
   /** Completed study sessions (VC-02 session rows that ended/uploaded successfully). */
@@ -178,7 +180,7 @@ export async function studyTimeline(tenantIds: string[], studyId: string) {
     where: eq(schema.tenants.id, study.tenantId),
     columns: { paused: true },
   });
-  const [sessions, analysisRuns, findings] = await Promise.all([
+  const [sessions, analysisRuns, findings, summary, repairs] = await Promise.all([
     completedSessionCount(study.id),
     db.query.analysisRuns.findMany({
       where: eq(schema.analysisRuns.studyId, study.id),
@@ -188,7 +190,26 @@ export async function studyTimeline(tenantIds: string[], studyId: string) {
       where: eq(schema.findings.studyId, study.id),
       columns: { issueUrl: true },
     }),
+    db.query.experimentSummaries.findFirst({
+      where: and(
+        eq(schema.experimentSummaries.tenantId, study.tenantId),
+        eq(schema.experimentSummaries.studyId, study.id),
+      ),
+      orderBy: desc(schema.experimentSummaries.revision),
+      columns: { status: true },
+    }),
+    db.query.repairRuns.findMany({
+      where: and(
+        eq(schema.repairRuns.tenantId, study.tenantId),
+        eq(schema.repairRuns.studyId, study.id),
+      ),
+      columns: { status: true, blockedReason: true, studyId: true, findingId: true },
+    }),
   ]);
+  const repairSources: RepairSource[] = repairs.map((repair) => ({
+    status: repair.status,
+    blockedReason: repair.blockedReason,
+  }));
   return {
     study_id: study.id,
     mode: parsed.data.automation.mode,
@@ -196,10 +217,8 @@ export async function studyTimeline(tenantIds: string[], studyId: string) {
       sessions,
       analysisRuns,
       findings,
-      // TODO(VC-05): latest experiment summary once PR #6's port lands on main.
-      summary: null,
-      // TODO(VC-04): repair runs once PR #5's port lands on main.
-      repairs: [],
+      summary: summary ? { status: summary.status } : null,
+      repairs: repairSources,
       paused: tenant?.paused ?? false,
     }),
   };

@@ -41,7 +41,7 @@ Cards include participant-facing task, rationale/evidence, audience, duration an
 
 ### Study detail
 
-Use a clear timeline derived from persisted state: Proposed → Published → Collecting → Summarized → Issues → Draft PR (→ Preview). Stages after Summarized depend on the automation mode: `issues_only` ends successfully at Issues, `draft_pr` at Draft PR, `prototype_and_retest` at Preview (retesting is deferred, VC-05). A mode that stops early ends with a completed label, not an unfinished one. Each stage shows its count (completed sessions, findings, issues) and the reason it is waiting (no sessions yet, analysis running, agent running, checks failed, blocked by permissions, paused).
+Use a clear timeline derived from persisted state: Proposed → Published → Collecting → Summarized → Issues → Draft PR (→ Preview). The Summarized stage reads the latest persisted experiment summary for the study. Draft PR and Preview read persisted repair runs. Stages after Summarized depend on the automation mode: `issues_only` ends successfully at Issues, `draft_pr` at Draft PR, `prototype_and_retest` at Preview (retesting is deferred, VC-05). A mode that stops early ends with a completed label, not an unfinished one. Each stage shows its count (completed sessions, findings, issues) and the reason it is waiting (no sessions yet, analysis running, agent running, checks failed, blocked by permissions, paused).
 
 ### Evidence review
 
@@ -157,7 +157,6 @@ Additional acceptance criteria:
 - [ ] Marketplace ranking, paid credits and participant quality appeals after MVP.
 - [ ] Team invitation and SSO requirements from actual customers.
 - [ ] Additional observability, retention export and provider-deletion guarantees.
-- [ ] Summarized stage and Draft PR/Preview panels read from local `SummarySource`/`RepairSource` stubs until the VC-04 (PR #5) and VC-05 (PR #6) ports land; tenant-level events carry the tenant id in `product_id`.
 - [ ] Authentication of inbound `signal.flagged` posts from the SDK/Jev pipeline (currently the tenant API key or session).
 - [ ] "Propose an experiment from a signal": feeding VC-01 discovery with signals as labeled inputs.
 
