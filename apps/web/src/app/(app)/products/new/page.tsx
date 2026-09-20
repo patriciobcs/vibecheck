@@ -8,6 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ownerContext } from "@/domain/owner-products";
 import { createProduct } from "@/domain/products";
 
+/** Reads env and the database at request time; never prerendered at build. */
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Connect product" };
 
 async function submit(formData: FormData) {

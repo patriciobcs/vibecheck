@@ -1,3 +1,4 @@
+import { kickInlineDrain } from "@/domain/jobs";
 import { type LiveSessionRef, liveBoard } from "@/domain/monitoring/live";
 import { ownerProduct } from "@/domain/owner-products";
 import { fail, json, route } from "@/lib/api";
@@ -14,6 +15,7 @@ export const GET = route(async (req, ctx: RouteContext<"/api/owner/products/[id]
   const sessionId = params.get("session");
   let selected: LiveSessionRef | null = null;
   if (sessionId && (kind === "observation" || kind === "study")) selected = { kind, id: sessionId };
+  kickInlineDrain();
   return json(await liveBoard(product.id, selected), {
     headers: { "cache-control": "no-store" },
   });

@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db/client";
 import { env } from "@/lib/env";
@@ -95,6 +95,128 @@ export async function handleArchiveCallback(
     }
     return { ok: true, duplicate: false, action: "status_recorded" };
   });
+}
+
+/* ---------------- Reconciliation: no webhook required ---------------- */
+
+/** Seconds between provider checks; a short archive is usually available within a few of them. */
+export const RECONCILE_DELAY_MS = 6_000;
+/** After this many checks the daily sweep takes over. */
+export const RECONCILE_MAX_ATTEMPTS = 12;
+/** An uploaded asset that heard nothing for this long is reconciled by the sweep. */
+export const RECONCILE_GRACE_MS = 30_000;
+
+export type ReconcileDeps = { media: MediaClient; enqueue?: typeof enqueueJob };
+export type ReconcileResult =
+  | {
+      action:
+        | "fetch_enqueued"
+        | "marked_failed"
+        | "unknown_archive"
+        | "already_handled"
+        | "gave_up";
+    }
+  | { action: "requeued"; attempt: number };
+
+/**
+ * Asks the provider for the archive's status instead of waiting for its callback (serverless
+ * deployments cannot rely on one arriving). Shares the fetch job's dedupe key with the callback
+ * path, so whichever arrives first wins and the other is a no-op.
+ */
+export async function reconcileArchive(
+  archiveId: string,
+  attempt: number,
+  deps: ReconcileDeps,
+): Promise<ReconcileResult> {
+  const enqueue = deps.enqueue ?? enqueueJob;
+  const asset = await db.query.assets.findFirst({
+    where: eq(schema.assets.providerArchiveId, archiveId),
+  });
+  if (!asset) return { action: "unknown_archive" };
+  if (asset.status !== "uploaded" && asset.status !== "recording") {
+    return { action: "already_handled" };
+  }
+  const info = await deps.media.getArchive(archiveId);
+  if (info.status === "failed") {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.assets)
+        .set({
+          status: "failed",
+          providerStatus: info.status,
+          failureReason: info.reason ?? "provider reported failure",
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.assets.id, asset.id));
+      await tx
+        .update(schema.sessions)
+        .set({ completeness: "incomplete" })
+        .where(eq(schema.sessions.id, asset.sessionId));
+    });
+    return { action: "marked_failed" };
+  }
+  await db
+    .update(schema.assets)
+    .set({ providerStatus: info.status, updatedAt: new Date() })
+    .where(eq(schema.assets.id, asset.id));
+  if (info.status === "available") {
+    await enqueue({
+      type: "archive.fetch",
+      payload: { archiveId },
+      dedupeKey: `archive.fetch:${archiveId}`,
+    });
+    return { action: "fetch_enqueued" };
+  }
+  if (attempt >= RECONCILE_MAX_ATTEMPTS) return { action: "gave_up" };
+  const next = attempt + 1;
+  await enqueue({
+    type: "archive.reconcile",
+    payload: { archiveId, attempt: next },
+    dedupeKey: `archive.reconcile:${archiveId}:${next}`,
+    runAt: new Date(Date.now() + RECONCILE_DELAY_MS),
+  });
+  return { action: "requeued", attempt: next };
+}
+
+export async function reconcileArchiveJob(
+  payload: { archiveId: string; attempt?: number },
+  deps: ReconcileDeps,
+): Promise<ReconcileResult> {
+  return reconcileArchive(payload.archiveId, payload.attempt ?? 0, deps);
+}
+
+/** Queued right after a recording stops; the first check runs once the provider had time to close the file. */
+export async function scheduleArchiveReconcile(
+  archiveId: string,
+  executor?: Parameters<typeof enqueueJob>[1],
+) {
+  return enqueueJob(
+    {
+      type: "archive.reconcile",
+      payload: { archiveId, attempt: 0 },
+      dedupeKey: `archive.reconcile:${archiveId}:0`,
+      runAt: new Date(Date.now() + RECONCILE_DELAY_MS),
+    },
+    executor,
+  );
+}
+
+/** Sweep half: one provider check for every uploaded asset that heard nothing for a while. */
+export async function reconcileStaleArchives(deps: ReconcileDeps) {
+  const stale = await db.query.assets.findMany({
+    where: and(
+      inArray(schema.assets.status, ["uploaded", "recording"]),
+      lt(schema.assets.updatedAt, new Date(Date.now() - RECONCILE_GRACE_MS)),
+    ),
+    columns: { providerArchiveId: true },
+  });
+  const out: Array<{ archiveId: string; action: ReconcileResult["action"] }> = [];
+  for (const a of stale) {
+    if (!a.providerArchiveId) continue;
+    const r = await reconcileArchive(a.providerArchiveId, RECONCILE_MAX_ATTEMPTS, deps);
+    out.push({ archiveId: a.providerArchiveId, action: r.action });
+  }
+  return out;
 }
 
 /* ---------------- Job: fetch + verify archive ---------------- */

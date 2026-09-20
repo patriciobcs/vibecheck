@@ -6,7 +6,13 @@ import type { StorageClient } from "@/providers/storage";
 import type { MediaClient } from "@/providers/vonage";
 import { resetDb } from "@/test/db";
 import { seedParticipant, seedStudy } from "@/test/fixtures";
-import { fetchArchiveJob, handleArchiveCallback, transcribeAssetJob } from "./archive-pipeline";
+import {
+  fetchArchiveJob,
+  handleArchiveCallback,
+  reconcileArchiveJob,
+  reconcileStaleArchives,
+  transcribeAssetJob,
+} from "./archive-pipeline";
 import { claimAssignment } from "./assignments";
 import { finishRecording, recordConsent, startArchive, startRecording } from "./sessions";
 
@@ -87,6 +93,103 @@ async function finishedSession() {
   return { sessionId: started.sessionId };
 }
 
+const jobsOfType = (type: string) => db.query.jobs.findMany({ where: eq(schema.jobs.type, type) });
+
+const stopping: MediaClient = {
+  ...media,
+  getArchive: async (id) => ({
+    id,
+    status: "stopping",
+    durationSeconds: null,
+    sizeBytes: null,
+    url: null,
+    reason: null,
+  }),
+};
+
+describe("archive reconciliation (no webhook needed)", () => {
+  it("finishing a recording queues a reconcile job for the archive", async () => {
+    await finishedSession();
+    const jobs = await jobsOfType("archive.reconcile");
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.payload).toEqual({ archiveId: "arch_1", attempt: 0 });
+    expect(jobs[0]?.nextRunAt.getTime()).toBeGreaterThan(Date.now() + 2000);
+  });
+
+  it("enqueues the fetch once the provider reports the archive available", async () => {
+    await finishedSession();
+    const r = await reconcileArchiveJob({ archiveId: "arch_1", attempt: 0 }, { media });
+    expect(r).toEqual({ action: "fetch_enqueued" });
+    expect(await jobsOfType("archive.fetch")).toHaveLength(1);
+    const asset = await db.query.assets.findFirst();
+    expect(asset?.providerStatus).toBe("available");
+    // a later webhook for the same archive is harmless: same dedupe key
+    await handleArchiveCallback({ id: "arch_1", event: "archive", status: "available" });
+    expect(await jobsOfType("archive.fetch")).toHaveLength(1);
+  });
+
+  it("checks again a little later while the archive is still stopping, up to a limit", async () => {
+    await finishedSession();
+    const r = await reconcileArchiveJob({ archiveId: "arch_1", attempt: 0 }, { media: stopping });
+    expect(r).toEqual({ action: "requeued", attempt: 1 });
+    const again = (await jobsOfType("archive.reconcile")).find(
+      (j) => (j.payload as { attempt: number }).attempt === 1,
+    );
+    expect(again?.nextRunAt.getTime()).toBeGreaterThan(Date.now() + 2000);
+    expect(await jobsOfType("archive.fetch")).toHaveLength(0);
+    const last = await reconcileArchiveJob(
+      { archiveId: "arch_1", attempt: 99 },
+      { media: stopping },
+    );
+    expect(last).toEqual({ action: "gave_up" });
+  });
+
+  it("marks the asset failed when the provider reports failure", async () => {
+    await finishedSession();
+    const failed: MediaClient = {
+      ...media,
+      getArchive: async (id) => ({
+        id,
+        status: "failed",
+        durationSeconds: null,
+        sizeBytes: null,
+        url: null,
+        reason: "no streams",
+      }),
+    };
+    expect(
+      await reconcileArchiveJob({ archiveId: "arch_1", attempt: 0 }, { media: failed }),
+    ).toEqual({ action: "marked_failed" });
+    const asset = await db.query.assets.findFirst();
+    expect(asset?.status).toBe("failed");
+    expect(asset?.failureReason).toBe("no streams");
+    const session = await db.query.sessions.findFirst();
+    expect(session?.completeness).toBe("incomplete");
+  });
+
+  it("does nothing for archives we do not know or assets already past upload", async () => {
+    await finishedSession();
+    expect(await reconcileArchiveJob({ archiveId: "nope", attempt: 0 }, { media })).toEqual({
+      action: "unknown_archive",
+    });
+    await db.update(schema.assets).set({ status: "verified" });
+    expect(await reconcileArchiveJob({ archiveId: "arch_1", attempt: 0 }, { media })).toEqual({
+      action: "already_handled",
+    });
+    expect(await jobsOfType("archive.fetch")).toHaveLength(0);
+  });
+
+  it("the drain sweep reconciles uploaded assets that stayed silent past the grace period", async () => {
+    await finishedSession();
+    expect(await reconcileStaleArchives({ media })).toEqual([]);
+    await db.update(schema.assets).set({ updatedAt: new Date(Date.now() - 120_000) });
+    expect(await reconcileStaleArchives({ media })).toEqual([
+      { archiveId: "arch_1", action: "fetch_enqueued" },
+    ]);
+    expect(await jobsOfType("archive.fetch")).toHaveLength(1);
+  });
+});
+
 describe("handleArchiveCallback", () => {
   it("records the receipt once and enqueues a fetch job when the archive is available", async () => {
     await finishedSession();
@@ -103,7 +206,7 @@ describe("handleArchiveCallback", () => {
     const r2 = await handleArchiveCallback(body);
     expect(r1).toEqual({ ok: true, duplicate: false, action: "fetch_enqueued" });
     expect(r2).toEqual({ ok: true, duplicate: true });
-    expect(await db.$count(schema.jobs)).toBe(1);
+    expect(await jobsOfType("archive.fetch")).toHaveLength(1);
     const asset = await db.query.assets.findFirst();
     expect(asset?.providerStatus).toBe("available");
   });
@@ -124,7 +227,7 @@ describe("handleArchiveCallback", () => {
       duplicate: false,
       action: "fetch_enqueued",
     });
-    expect(await db.$count(schema.jobs)).toBe(1);
+    expect(await jobsOfType("archive.fetch")).toHaveLength(1);
   });
 
   it("marks the asset failed on a failed status", async () => {
