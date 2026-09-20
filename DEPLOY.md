@@ -1,6 +1,6 @@
 # Deploying the public demo
 
-Two deployments: the Seamless UX app at `vibecheck.patriciobcs.com` (Vercel, Next.js) and the
+Two deployments: the Seamless UX app at `seamlessux.patriciobcs.com` (Vercel, Next.js) and the
 instrumented Excalidraw clone at `excalidraw.patriciobcs.com` (Vercel, static Vite build). Both are
 plain Vercel projects; nothing here needs a long-running server. Cloudflare Pages/Workers is the
 fallback (notes at the end), but Vercel needs no adapter for Next 16.
@@ -36,7 +36,7 @@ Environment variables (Production):
 
 | Variable | Value |
 |---|---|
-| `NEXT_PUBLIC_APP_URL`, `BETTER_AUTH_URL`, `PUBLIC_WEBHOOK_BASE_URL` | `https://vibecheck.patriciobcs.com` |
+| `NEXT_PUBLIC_APP_URL`, `BETTER_AUTH_URL`, `PUBLIC_WEBHOOK_BASE_URL` | `https://seamlessux.patriciobcs.com` |
 | `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | from step 1 |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 48` |
 | `DEMO_MODE` | `true` (enables "Enter as product owner / tester"; also hides developer copy) |
@@ -52,7 +52,7 @@ Environment variables (Production):
 sweeps idle journeys, retries deferred evaluations and runs any job the inline path missed. Inline
 execution handles the demo flow on its own; for a per-minute sweep either use `* * * * *` on the Pro
 plan or point a free scheduler (cron-job.org) at
-`GET https://vibecheck.patriciobcs.com/api/internal/drain` with `Authorization: Bearer <CRON_SECRET>`.
+`GET https://seamlessux.patriciobcs.com/api/internal/drain` with `Authorization: Bearer <CRON_SECRET>`.
 
 Archive callbacks are optional: after a recording stops, an `archive.reconcile` job asks Vonage for
 the archive's status every few seconds (inside the same `after()` window) and queues the download as
@@ -71,7 +71,7 @@ instead, which returns a verification record:
 ```sh
 curl -X POST "https://api.vercel.com/v10/projects/$PROJECT_ID/domains?teamId=$TEAM_ID" \
   -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"vibecheck.patriciobcs.com"}'
+  -d '{"name":"seamlessux.patriciobcs.com"}'
 ```
 
 Add the returned `vc-domain-verify=…` value as a TXT record at `_vercel` (one per subdomain; they
@@ -80,13 +80,13 @@ coexist), then `POST .../domains/<name>/verify`. TLS is issued once the CNAME is
 Point the Vonage archive callback at the deployment once (uses the account key/secret in `.env.local`):
 
 ```sh
-cd apps/web && pnpm vonage:callback https://vibecheck.patriciobcs.com
+cd apps/web && pnpm vonage:callback https://seamlessux.patriciobcs.com
 ```
 
 ## 3. Excalidraw clone on Vercel
 
 The clone lives in `~/Projects/excalidraw` on branch `vibecheck-demo`. It has no remote yet: create a
-repository (`gh repo create patriciobcs/excalidraw-vibecheck --private --source . --push`, or push to
+repository (`gh repo create seamlessux/excalidraw-seamlessux --private --source . --push`, or push to
 a fork) and import it into Vercel. `vercel.json` in the repo root already sets install/build/output
 (`yarn install`, `yarn build:app`, `excalidraw-app/build`).
 
@@ -94,7 +94,7 @@ Environment variables (Production):
 
 | Variable | Value |
 |---|---|
-| `VITE_APP_VIBECHECK_ORIGIN` | `https://vibecheck.patriciobcs.com` |
+| `VITE_APP_VIBECHECK_ORIGIN` | `https://seamlessux.patriciobcs.com` |
 | `VITE_APP_VIBECHECK_KEY` | the `pk_excalidraw_…` key printed by the seed in step 1 |
 
 Domain: same procedure as the app, with `CNAME excalidraw → cname.vercel-dns.com` (DNS only) and its
@@ -103,8 +103,8 @@ toast, passive observation and the participant dialog work from it.
 
 ## 4. Check
 
-- `https://vibecheck.patriciobcs.com/api/health` shows the configured providers.
-- `https://vibecheck.patriciobcs.com/` → "Enter as product owner" lands on Products; "Enter as
+- `https://seamlessux.patriciobcs.com/api/health` shows the configured providers.
+- `https://seamlessux.patriciobcs.com/` → "Enter as product owner" lands on Products; "Enter as
   tester" lands on Studies. Both are seeded accounts; nobody types an email.
 - `https://excalidraw.patriciobcs.com/` shows the study toast after a few seconds; the live console at
   `/products/product_excalidraw_local/monitoring/live` follows the session.
