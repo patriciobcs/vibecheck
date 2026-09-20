@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
 import path from "node:path";
 import { chromium, type Page } from "@playwright/test";
-import { eq } from "drizzle-orm";
-import { db, schema, sql } from "../src/db/client";
+import { sql } from "../src/db/client";
+import { DEMO_PRODUCT_ID, resetDemoProduct } from "../src/db/demo-reset";
 
 /**
  * Records the two-window demo as a narrated prototype video: the visitor on the instrumented
@@ -19,8 +19,6 @@ import { db, schema, sql } from "../src/db/client";
  */
 const APP = process.env.DEMO_APP_URL ?? "http://localhost:3000";
 const TARGET = process.env.DEMO_TARGET_URL ?? "http://localhost:3200/";
-const PRODUCT_ID = "product_excalidraw_local";
-const STUDY_ID = "study_excalidraw_export";
 const OUT = path.resolve("demo-recordings");
 const RAW = path.join(OUT, "raw");
 const VOICE = path.join(OUT, "voice");
@@ -29,17 +27,6 @@ const SIZE = { width: 1280, height: 800 };
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const log = (m: string) =>
   process.stdout.write(`[demo ${new Date().toISOString().slice(11, 19)}] ${m}\n`);
-
-/** Start from a clean slate for this product: no earlier visitors or participants on the board. */
-async function resetDemoProduct() {
-  await db
-    .delete(schema.observationSessions)
-    .where(eq(schema.observationSessions.productId, PRODUCT_ID));
-  await db.delete(schema.assignments).where(eq(schema.assignments.studyId, STUDY_ID));
-  await db
-    .delete(schema.researchCandidates)
-    .where(eq(schema.researchCandidates.productId, PRODUCT_ID));
-}
 
 async function drag(page: Page, tool: string, from: [number, number], to: [number, number]) {
   await page.keyboard.press(tool);
@@ -144,7 +131,7 @@ async function main() {
     .waitFor({ timeout: 60_000 });
   mark("intro");
   await wait(4500);
-  await ownerPage.goto(`${APP}/api/demo/enter?next=/products/${PRODUCT_ID}/monitoring/live`);
+  await ownerPage.goto(`${APP}/api/demo/enter?next=/products/${DEMO_PRODUCT_ID}/monitoring/live`);
   await ownerPage.getByText("Waiting for the first session").waitFor({ timeout: 30_000 });
   await wait(2500);
 

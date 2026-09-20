@@ -87,7 +87,7 @@ pnpm dev                 # http://localhost:3000
 pnpm worker              # archive fetch, transcription, monitoring scans, Jev evaluations, Devin jobs (separate terminal; restart after pulling)
 ```
 
-`pnpm db:reset-sample` clears assignments on the sample studies so they recruit again.
+`pnpm db:reset-sample` clears assignments on the sample studies so they recruit again. `pnpm demo:reset` (`demo:reset:prod` against `.env.production.local`) empties the Excalidraw demo product's live console: its sessions, media, passive observations and candidates, nothing else.
 
 ## Testing
 

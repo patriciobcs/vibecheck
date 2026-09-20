@@ -108,6 +108,9 @@ toast, passive observation and the participant dialog work from it.
   tester" lands on Studies. Both are seeded accounts; nobody types an email.
 - `https://excalidraw.patriciobcs.com/` shows the study toast after a few seconds; the live console at
   `/products/product_excalidraw_local/monitoring/live` follows the session.
+- Before a live demo run `pnpm demo:reset:prod` (in apps/web) so the console starts at "Waiting for
+  the first session"; it deletes that product's sessions, media, passive observations and
+  candidates only.
 
 Both domains are live. A macOS resolver that cached the name before the record existed keeps failing
 to resolve it while `dig` succeeds; `sudo dscacheutil -flushcache` fixes that locally.
