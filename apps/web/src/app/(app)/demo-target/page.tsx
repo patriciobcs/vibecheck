@@ -60,7 +60,7 @@ export default async function DemoTarget() {
           />
         </form>
         <p className="mt-8 text-xs text-[#6e6e73]">
-          This page loads the VibeCheck SDK. Opened from the recorder, it streams safe events;
+          This page loads the Seamless UX SDK. Opened from the recorder, it streams safe events;
           opened directly, it may show an invitation toast.
         </p>
       </div>

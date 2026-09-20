@@ -34,7 +34,7 @@ function createAuth() {
         sendMagicLink: async ({ email, url }) => {
           await sendEmail({
             to: email,
-            subject: "Your VibeCheck sign-in link",
+            subject: "Your Seamless UX sign-in link",
             text: `Open this link to sign in (valid 15 minutes):\n${url}`,
             actionUrl: url,
           });

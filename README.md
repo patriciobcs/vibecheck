@@ -1,10 +1,10 @@
-# VibeCheck
+# Seamless UX
 
 [![CI](https://github.com/patriciobcs/vibecheck/actions/workflows/ci.yml/badge.svg)](https://github.com/patriciobcs/vibecheck/actions/workflows/ci.yml)
 
 **Your users are already telling you what is broken.**
 
-VibeCheck helps founders and product teams discover where users struggle, and turns those findings into working design alternatives — backed by real usability sessions, not just analytics.
+Seamless UX helps founders and product teams discover where users struggle, and turns those findings into working design alternatives — backed by real usability sessions, not just analytics.
 
 > **Status:** under active development. See [Project status](#project-status) for what is implemented, stubbed, or unverified.
 
@@ -147,4 +147,4 @@ See [AGENTS.md](AGENTS.md) for repository conventions and the required process f
 
 ## License
 
-No public license is granted; this repository is private (`"private": true` in `package.json`) while VibeCheck is under development.
+No public license is granted; this repository is private (`"private": true` in `package.json`) while Seamless UX is under development.

@@ -1,4 +1,4 @@
-# Agent instructions for VibeCheck
+# Agent instructions for Seamless UX
 
 Read `specs/README.md` and the relevant workflow specs before changing product behavior.
 

@@ -9,7 +9,7 @@ export function Wordmark({ className }: { className?: string }) {
       className={cn("inline-flex items-center gap-2 font-semibold tracking-tight", className)}
     >
       <span className="inline-block size-2.5 rounded-full bg-brand" aria-hidden />
-      VibeCheck
+      Seamless UX
     </Link>
   );
 }

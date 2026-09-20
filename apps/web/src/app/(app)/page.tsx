@@ -52,8 +52,8 @@ export default async function Home() {
           Find the friction. Then ask real people.
         </h1>
         <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-          VibeCheck listens to semantic signals from your product, screens them with Jev, and turns
-          the strongest into short studies with real users. Evidence, not opinions.
+          Seamless UX listens to semantic signals from your product, screens them with Jev, and
+          turns the strongest into short studies with real users. Evidence, not opinions.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild size="lg" className="rounded-full px-6">

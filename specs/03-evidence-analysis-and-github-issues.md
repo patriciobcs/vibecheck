@@ -49,7 +49,7 @@ Certainty states: `insufficient_evidence`, `preliminary`, `repeated_observation`
 
 ## Deduplication and publication
 
-Compute a stable local fingerprint from product, journey, normalized problem type and semantic target; store baseline identity separately so observations can accumulate across versions. Search GitHub for the persisted issue mapping and a hidden VibeCheck finding marker before creating anything. Match close candidates cautiously; do not merge distinct symptoms solely because an agent says they sound similar.
+Compute a stable local fingerprint from product, journey, normalized problem type and semantic target; store baseline identity separately so observations can accumulate across versions. Search GitHub for the persisted issue mapping and a hidden Seamless UX finding marker before creating anything. Match close candidates cautiously; do not merge distinct symptoms solely because an agent says they sound similar.
 
 For an existing open issue, append new sanitized evidence or update a managed evidence section. For a closed issue that recurs, preserve history and link a recurrence or reopen only under configured policy. MVP default: create a linked recurrence issue after confirming it is not a duplicate current run.
 

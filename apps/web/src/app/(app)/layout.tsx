@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "VibeCheck", template: "%s · VibeCheck" },
+  title: { default: "Seamless UX", template: "%s · Seamless UX" },
   description: "Real people. Honest feedback. Tested improvements.",
 };
 

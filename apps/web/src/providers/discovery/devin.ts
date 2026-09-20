@@ -49,7 +49,7 @@ export function createDevinDiscoveryProvider(
         headers,
         body: JSON.stringify({
           prompt: buildDiscoveryPrompt(context, run.id),
-          title: `VibeCheck discovery ${run.id}`,
+          title: `Seamless UX discovery ${run.id}`,
           tags: ["vibecheck", "discovery"],
           unlisted: true,
           structured_output_schema: agentOutputJsonSchema,

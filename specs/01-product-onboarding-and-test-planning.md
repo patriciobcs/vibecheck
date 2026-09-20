@@ -80,7 +80,7 @@ Publish requests carry an idempotency key scoped to the tenant. The first publis
 
 ## First simulation run
 
-The first end-to-end exercise of this spec runs against the demo target selected in [VC-07](07-demo-target-app.md). It simulates a product VibeCheck has already been monitoring, so discovery is scoped to recently shipped features instead of the whole application.
+The first end-to-end exercise of this spec runs against the demo target selected in [VC-07](07-demo-target-app.md). It simulates a product Seamless UX has already been monitoring, so discovery is scoped to recently shipped features instead of the whole application.
 
 Simulated `ProductConfig` inputs, all labeled as sample material with their provenance:
 
@@ -98,7 +98,7 @@ Expected discovery output: three proposals, one per scoped feature, each naming 
 - `task_match_colors` — make several shapes share an existing shape's fill; success rule `fill_match_v1`, satisfied when the target element IDs carry the reference background color.
 - `task_navigate_board` — bring an off-screen region of the board into view; success rule `viewport_reached_v1`, satisfied when the persisted scroll position covers the target region.
 
-Success rules are evaluated by the VibeCheck runner against a post-session snapshot of persisted scene state, never by the agent and never from claims made inside the page. Publishing this run must not require any capability listed as deferred in the MVP scope.
+Success rules are evaluated by the Seamless UX runner against a post-session snapshot of persisted scene state, never by the agent and never from claims made inside the page. Publishing this run must not require any capability listed as deferred in the MVP scope.
 
 ## States and failures
 

@@ -10,7 +10,7 @@ export function buildDiscoveryPrompt(context: DiscoveryContext, runId: string): 
   const candidates = context.sourceCandidates?.length
     ? `\nPassive-screening research candidates are included under source_candidates. Convert a suspected problem into a neutral task only when evidence supports it; cite candidate ids in source_candidate_refs; never expose the suspected failure or any score to participants.`
     : "";
-  return `You are performing read-only UX discovery for VibeCheck run ${runId}.
+  return `You are performing read-only UX discovery for Seamless UX run ${runId}.
 Echo this source_revision verbatim in your output: ${context.sourceRevision}.
 Propose tasks only for the recently shipped features listed in release notes, with at
 most ${MAX_PROPOSALS} proposals. Items marked isSample:true are sample data and must be described

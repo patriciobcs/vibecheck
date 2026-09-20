@@ -1,6 +1,6 @@
 "use client";
 
-/** Fetch helper for the participant dialog: bearer assignment token or, on VibeCheck pages, the cookie. */
+/** Fetch helper for the participant dialog: bearer assignment token or, on Seamless UX pages, the cookie. */
 export function makeApi(token: string | null) {
   const headers = (extra: Record<string, string> = {}) => ({
     "Content-Type": "application/json",

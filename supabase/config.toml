@@ -1,4 +1,4 @@
-# Local Supabase for VibeCheck development. Only Postgres, Storage and Studio are used.
+# Local Supabase for Seamless UX development. Only Postgres, Storage and Studio are used.
 # Better Auth handles application auth, so Supabase Auth, Realtime, Edge Runtime and
 # Inbucket are disabled to keep `supabase start` light.
 project_id = "vibecheck"
