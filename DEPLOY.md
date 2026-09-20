@@ -85,10 +85,13 @@ cd apps/web && pnpm vonage:callback https://seamlessux.patriciobcs.com
 
 ## 3. Excalidraw clone on Vercel
 
-The clone lives in `~/Projects/excalidraw` on branch `vibecheck-demo`. It has no remote yet: create a
-repository (`gh repo create seamlessux/excalidraw-seamlessux --private --source . --push`, or push to
-a fork) and import it into Vercel. `vercel.json` in the repo root already sets install/build/output
-(`yarn install`, `yarn build:app`, `excalidraw-app/build`).
+The instrumented clone is the private repository `seamlessux/excalidraw-seamlessux` (branch `main`,
+a squashed snapshot of the local `vibecheck-demo` branch). The Vercel project `excalidraw-vibecheck`
+must be linked to that repository (Settings → Git) so every pushed branch — including the repair
+branches behind draft PRs — gets an automatic preview; production branch is `main`. `vercel.json` in
+the repo root already sets install/build/output (`yarn install`, `yarn build:app`,
+`excalidraw-app/build`). The `seamlessuxbot` GitHub App (issues, draft PRs) must be installed on the
+`seamlessux` organization; the Devin GitHub App needs the same repositories for repair runs.
 
 Environment variables (Production):
 
