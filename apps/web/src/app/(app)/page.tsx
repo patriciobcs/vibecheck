@@ -45,10 +45,11 @@ export default async function Home() {
             </Link>
           </p>
           <Button asChild size="lg" className="mt-8 rounded-full px-7">
-            <Link href={enter}>
-              {session ? "Open workspace" : demo ? "Open the demo" : "Sign in"}
-            </Link>
+            <Link href="/products/new">Add your project</Link>
           </Button>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Start with your project name and app URL.
+          </p>
         </div>
         <JourneyFigure />
       </section>
@@ -66,9 +67,7 @@ export default async function Home() {
           verified recording. Model estimates are labeled as estimates, sample data as sample.
         </p>
         <Button asChild size="lg" className="mt-8 rounded-full px-7">
-          <Link href={enter}>
-            {session ? "Open workspace" : demo ? "Open the demo" : "Sign in"}
-          </Link>
+          <Link href="/products/new">Add your project</Link>
         </Button>
       </section>
     </Shell>

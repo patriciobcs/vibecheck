@@ -11,12 +11,13 @@ test("VC-01: connect a product, run fixture discovery, publish one proposal, han
 
   // Connect a product with labeled sample material.
   await page.goto("/products/new");
-  await page.getByLabel("Name").fill(`E2E Product ${Date.now()}`);
+  await page.getByLabel("Project name").fill(`E2E Product ${Date.now()}`);
   await page.getByLabel("URL").fill("http://localhost:3200/");
+  await page.getByText("Add context or adjust settings (optional)", { exact: true }).click();
   await page.getByLabel("Release notes").fill("Sticky notes\nBucket fill");
   await page.getByLabel("Support complaints").fill("Sample complaint: could not find export");
   await page.getByLabel("Mark imported items as sample data").click();
-  await page.getByRole("button", { name: "Connect product" }).click();
+  await page.getByRole("button", { name: "Add project", exact: true }).click();
   await expect(page).toHaveURL(/\/products\/product_/);
   await expect(page.getByRole("heading", { name: /E2E Product/ })).toBeVisible();
   await expect(page.getByText("Needs setup")).toHaveCount(0);
