@@ -69,7 +69,7 @@ const EXCALIDRAW_STUDY_PLAN: StudyPlan = {
   },
   recruitment: {
     source: "embedded",
-    target_count: 3,
+    target_count: 500, // public demo: every visitor of the clone can take part
     cohort: "fresh",
     eligibility_rule_ref: "any_visitor_v1",
   },
