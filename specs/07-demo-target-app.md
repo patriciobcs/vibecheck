@@ -28,6 +28,8 @@ Trade-off accepted: success is observed from persisted client scene state rather
 
 ## Scoped feature set
 
+The demo automation default is `draft_pr`; preview and retest remain deferred. The Excalidraw clone is an SDK-instrumented demo modification, labeled as such rather than presented as an upstream behavior.
+
 Treat the demo as continuous research on a product VibeCheck already monitors, so discovery covers only recently merged editor features rather than the whole editor. Scope for the first study, taken from the commit range ending at the pinned SHA:
 
 | Feature | Upstream PR | Reachability verified |
@@ -85,11 +87,11 @@ Use a team-owned fork for modifications, issues and PRs. MIT permits this; prese
 | --- | --- |
 | 0:00–0:20 | Short founder problem scene; no-budget line; no claim that staged dialogue is customer research. |
 | 0:20–0:35 | Roasty introduction and real product/repository setup. |
-| 0:35–0:55 | Task discovery from labeled inputs and automatic launch under configured policy. |
-| 0:55–1:25 | Genuine human attempt with screen and voice; preserve actual outcome. |
-| 1:25–1:45 | Dashboard recording/transcript/events linked to a finding. |
-| 1:45–2:20 | Real API-created Devin run, candidate diff, independent checks and preview; label elapsed-time cuts. |
-| 2:20–2:45 | Fresh human retest on the candidate, with actual result. |
+| 0:35–0:55 | Task discovery from labeled inputs and an agent-designed scenario. |
+| 0:55–1:25 | SDK popup, scenario, genuine human recording; preserve actual outcome. |
+| 1:25–1:45 | Dashboard recording/transcript/events linked to a finding and summary. |
+| 1:45–2:20 | Real API-created Devin run, candidate diff, independent checks and draft PR; label elapsed-time cuts. |
+| 2:20–2:45 | Show issue, draft PR state and the Vercel preview resolved from its candidate SHA; retest remains deferred. |
 | 2:45–3:00 | PR/evidence summary, tested SHA and preliminary outcome. |
 
 Record the full run first, then edit waiting time. Never fabricate provider screens, participants, check results or speed. Team members can participate but disclose prior familiarity; a knowledgeable returning tester is not a fresh participant. Roasty narrates recorded backend events and does not imply stronger conclusions than the evidence supports.
@@ -115,11 +117,21 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 | Baseline commit | TBD; pin when the fork is created |
 | Setup verified | `yarn install` 4m24s; `yarn --cwd ./excalidraw-app vite --port 3200` with `.env.development.local` holding `VITE_APP_PORT` and `VITE_APP_VIBECHECK_KEY`, HTTP 200 |
 | Reset command | Not implemented; a blank canvas needs no reset, local storage reset plus scene re-seed is the intended mechanism for seeded tasks |
-| Preview runtime | TBD; a static Vite build is sufficient because there is no backend |
+| Preview runtime | Vercel Git-integrated preview for each repair branch; static Vite build is sufficient because there is no backend |
 | Organizer confirmation for third-party target | Pending |
 | Measured baseline friction | No human sessions yet |
 
 Update this record with measured facts during implementation; do not infer completion from the presence of this spec.
+
+## VC-04 demo policy
+
+The first repair slice uses deterministic fixture repair and validation adapters,
+then resolves the Vercel preview created by the target repository's GitHub
+integration. The demo policy allows only `packages/excalidraw/` and
+`excalidraw-app/` and preserves the five required functional invariants. It
+does not trigger deployments; Vercel builds the Devin repair branch and
+VibeCheck resolves the preview by candidate SHA. Real repository modification
+and Excalidraw acceptance checks remain pending.
 
 ## Demo journey (2026-09-21)
 

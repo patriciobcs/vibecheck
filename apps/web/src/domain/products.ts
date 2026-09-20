@@ -105,6 +105,7 @@ export async function createDiscoveryRun(
   if (!run) throw new Error("discovery run insert failed");
   await enqueueJob({
     type: "discovery.run",
+    tenantId,
     payload: { runId: run.id, tenantId },
     dedupeKey: `discovery.run:${run.id}`,
     maxAttempts: 3,

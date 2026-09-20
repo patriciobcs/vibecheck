@@ -133,6 +133,8 @@ describe("embedded eligibility", () => {
       participantId,
     });
     expect(res.ok && res.study?.studyId !== undefined).toBe(true);
+    expect(res.ok && res.study?.scenario?.intro).toBe(SAMPLE_STUDY_PLAN.task.scenario?.intro);
+    expect(res.ok && res.study?.scenario?.steps).toEqual(SAMPLE_STUDY_PLAN.task.scenario?.steps);
   });
 
   it("rejects a non-permitted origin", async () => {

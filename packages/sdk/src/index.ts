@@ -25,12 +25,20 @@ export type VibeCheckConfig = {
   quietPaths?: RegExp[];
 };
 
-type Offer = {
+export type OfferScenario = {
+  intro: string;
+  steps: { order: number; instruction: string }[];
+  think_aloud_cues: string[];
+  estimated_minutes: number;
+};
+
+export type Offer = {
   studyId: string;
   productId: string;
   participantPrompt: string;
   estimatedSeconds: number;
   capture: { screen: string; microphone: string };
+  scenario?: OfferScenario;
 };
 
 type DialogMode = "modal" | "panel" | "hidden";

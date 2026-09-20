@@ -17,6 +17,16 @@ export const SAMPLE_STUDY_PLAN: StudyPlan = {
     time_limit_seconds: 300,
     success_rule_ref: "booking_time_changed_v1",
     fixture_ref: "booking_fixture_v1",
+    scenario: {
+      intro: "Help reschedule the appointment shown on screen.",
+      steps: [
+        { order: 1, instruction: "Review the appointment details." },
+        { order: 2, instruction: "Choose the available date and time you prefer." },
+        { order: 3, instruction: "Complete the rescheduling flow." },
+      ],
+      think_aloud_cues: ["What are you looking for?", "What do you expect to happen next?"],
+      estimated_minutes: 5,
+    },
   },
   baseline: {
     commit_sha: "0000000000000000000000000000000000000000",
@@ -38,7 +48,7 @@ export const SAMPLE_STUDY_PLAN: StudyPlan = {
     retention_days: 30,
   },
   automation: {
-    mode: "prototype_and_retest",
+    mode: "draft_pr",
     max_variants: 1,
     max_repair_attempts: 2,
     agent_budget_ref: "demo_budget",

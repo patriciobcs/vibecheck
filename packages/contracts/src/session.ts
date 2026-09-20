@@ -146,3 +146,23 @@ export const SessionManifestSchema = z.object({
 });
 
 export type SessionManifest = z.infer<typeof SessionManifestSchema>;
+
+export const ClockMapSchema = z.object({
+  schema_version: z.literal("1.0"),
+  session_started_at: z.iso.datetime({ offset: true }),
+  media: z.array(
+    z.object({
+      asset_ref: z.string().min(1),
+      session_offset_ms: z.number().int().nonnegative(),
+      duration_ms: z.number().int().nonnegative().nullable(),
+    }),
+  ),
+  pauses: z.array(
+    z.object({
+      start_ms: z.number().int().nonnegative(),
+      end_ms: z.number().int().nonnegative().nullable(),
+    }),
+  ),
+});
+
+export type ClockMap = z.infer<typeof ClockMapSchema>;

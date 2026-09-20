@@ -1,4 +1,10 @@
-import type { SourceItem } from "@vibecheck/contracts";
+import type {
+  CheckResult,
+  EvidencePackage,
+  ExperimentSummary,
+  Finding,
+  SourceItem,
+} from "@vibecheck/contracts";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -6,6 +12,7 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -15,6 +22,7 @@ import { user } from "./auth";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 const createdAt = () => ts("created_at").defaultNow().notNull();
+export const checkStatus = pgEnum("check_status", ["passed", "failed", "error"]);
 
 /* ---------------- Tenancy ---------------- */
 
@@ -23,6 +31,8 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   /** Global pause: blocks new invitations and side effects (VC-01/06). */
   paused: boolean("paused").default(false).notNull(),
+  /** When the pause took effect; `paused` stays the source of truth, this is display/audit. */
+  pausedAt: ts("paused_at"),
   createdAt: createdAt(),
 });
 
@@ -154,6 +164,12 @@ export const proposals = pgTable(
       .$type<string[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    scenario: jsonb("scenario").$type<{
+      intro: string;
+      steps: { order: number; instruction: string }[];
+      think_aloud_cues: string[];
+      estimated_minutes: number;
+    } | null>(),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("proposals_run_task_uq").on(t.discoveryRunId, t.taskId)],
@@ -215,6 +231,272 @@ export const studyRevisions = pgTable(
   (t) => [uniqueIndex("study_revisions_study_rev_uq").on(t.studyId, t.revision)],
 );
 
+export const analysisRuns = pgTable(
+  "analysis_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    status: text("status", { enum: ["queued", "analysing", "completed", "failed"] }).notNull(),
+    provider: text("provider", { enum: ["fixture", "devin"] }).notNull(),
+    evidenceSource: text("evidence_source", { enum: ["persisted", "fixture"] }).notNull(),
+    outcome: text("outcome"),
+    evidencePackage: jsonb("evidence_package").$type<EvidencePackage | null>(),
+    rawResponses: jsonb("raw_responses").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    providerSessionId: text("provider_session_id"),
+    providerSessionUrl: text("provider_session_url"),
+    error: text("error"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("analysis_runs_study_session_uq").on(t.studyId, t.sessionId),
+    index("analysis_runs_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const findings = pgTable(
+  "findings",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    studyRevision: integer("study_revision").notNull(),
+    baselineCommitSha: text("baseline_commit_sha").notNull(),
+    title: text("title").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    category: text("category").notNull(),
+    semanticTarget: text("semantic_target").notNull(),
+    observation: text("observation").notNull(),
+    hypothesis: text("hypothesis").notNull(),
+    impact: text("impact").notNull(),
+    certainty: text("certainty", {
+      enum: ["insufficient_evidence", "preliminary", "repeated_observation", "contradictory"],
+    }).notNull(),
+    limitations: jsonb("limitations").$type<string[]>().notNull(),
+    suggestedExperiment: text("suggested_experiment"),
+    evidence: jsonb("evidence").$type<Finding["evidence"]>().notNull(),
+    observedSessionCount: integer("observed_session_count").notNull(),
+    eligibleSessionCount: integer("eligible_session_count").notNull(),
+    provenance: text("provenance").notNull(),
+    issueRepo: text("issue_repo"),
+    issueNumber: integer("issue_number"),
+    issueUrl: text("issue_url"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("findings_study_fingerprint_uq").on(t.studyId, t.fingerprint),
+    index("findings_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const issuePublishRequests = pgTable(
+  "issue_publish_requests",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    findingId: text("finding_id")
+      .notNull()
+      .references(() => findings.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    action: text("action", { enum: ["created", "updated", "unchanged", "skipped"] }).notNull(),
+    skipReason: text("skip_reason"),
+    issueNumber: integer("issue_number"),
+    issueUrl: text("issue_url"),
+    observedSessionCount: integer("observed_session_count"),
+    certainty: text("certainty"),
+    repoOwner: text("repo_owner"),
+    repoName: text("repo_name"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("issue_publish_requests_tenant_key_uq").on(t.tenantId, t.idempotencyKey),
+    index("issue_publish_requests_issue_repo_idx").on(t.issueNumber, t.repoOwner, t.repoName),
+  ],
+);
+
+export const repairRuns = pgTable(
+  "repair_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    findingId: text("finding_id")
+      .notNull()
+      .references(() => findings.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    studyRevision: integer("study_revision").notNull(),
+    issueRepo: text("issue_repo").notNull(),
+    issueNumber: integer("issue_number").notNull(),
+    mode: text("mode", { enum: ["issues_only", "draft_pr", "prototype_and_retest"] }).notNull(),
+    baseCommitSha: text("base_commit_sha").notNull(),
+    candidateCommitSha: text("candidate_commit_sha"),
+    branch: text("branch"),
+    devinSessionId: text("devin_session_id"),
+    devinSessionUrl: text("devin_session_url"),
+    attempt: integer("attempt").notNull().default(1),
+    maxAttempts: integer("max_attempts").notNull(),
+    validatorVersion: text("validator_version").notNull(),
+    pullRequestNumber: integer("pull_request_number"),
+    pullRequestUrl: text("pull_request_url"),
+    previewId: text("preview_id"),
+    status: text("status", {
+      enum: [
+        "queued",
+        "preparing",
+        "reproducing",
+        "implementing",
+        "validating",
+        "retrying",
+        "deploying",
+        "draft_pr_ready",
+        "preview_ready",
+        "blocked",
+        "failed",
+        "cancelled",
+      ],
+    })
+      .notNull()
+      .default("queued"),
+    blockedReason: text("blocked_reason"),
+    lastOutput: jsonb("last_output"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("repair_runs_finding_uq").on(t.findingId),
+    index("repair_runs_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const checkRuns = pgTable(
+  "check_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    repairRunId: text("repair_run_id")
+      .notNull()
+      .references(() => repairRuns.id, { onDelete: "cascade" }),
+    attempt: integer("attempt").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    validatorVersion: text("validator_version").notNull(),
+    status: checkStatus("status").notNull(),
+    results: jsonb("results").$type<CheckResult[]>().notNull(),
+    diagnostics: text("diagnostics"),
+    startedAt: ts("started_at").notNull(),
+    finishedAt: ts("finished_at").notNull(),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("check_runs_repair_run_idx").on(t.repairRunId)],
+);
+
+export const previews = pgTable(
+  "previews",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    repairRunId: text("repair_run_id")
+      .notNull()
+      .references(() => repairRuns.id, { onDelete: "cascade" }),
+    candidateCommitSha: text("candidate_commit_sha").notNull(),
+    provider: text("provider").notNull(),
+    deploymentId: text("deployment_id").notNull(),
+    url: text("url").notNull(),
+    healthStatus: text("health_status").notNull(),
+    fixtureRef: text("fixture_ref").notNull(),
+    accessPolicy: text("access_policy").notNull().default("assigned_only"),
+    expiresAt: ts("expires_at"),
+    cleanupStatus: text("cleanup_status").notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("previews_repair_run_idx").on(t.repairRunId)],
+);
+/* ---------------- VC-05 participation and summaries ---------------- */
+
+export const participationEvents = pgTable(
+  "participation_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    studyRevision: integer("study_revision").notNull(),
+    eventId: text("event_id").notNull(),
+    participantRef: text("participant_ref").notNull(),
+    kind: text("kind", {
+      enum: ["invited", "accepted", "dismissed", "started", "completed", "abandoned"] as const,
+    }).notNull(),
+    sessionId: text("session_id"),
+    occurredAt: ts("occurred_at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("participation_events_tenant_event_uq").on(t.tenantId, t.eventId),
+    index("participation_events_study_rev_idx").on(t.studyId, t.studyRevision),
+  ],
+);
+
+export const experimentSummaries = pgTable(
+  "experiment_summaries",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    studyId: text("study_id")
+      .notNull()
+      .references(() => studies.id, { onDelete: "cascade" }),
+    studyRevision: integer("study_revision").notNull(),
+    revision: integer("revision").notNull(),
+    status: text("status", {
+      enum: ["collecting", "summarized", "insufficient_data", "failed"],
+    }).notNull(),
+    inputsHash: text("inputs_hash").notNull(),
+    summary: jsonb("summary").$type<ExperimentSummary>().notNull(),
+    narrativeRaw: jsonb("narrative_raw").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    provider: text("provider"),
+    providerSessionId: text("provider_session_id"),
+    providerSessionUrl: text("provider_session_url"),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("experiment_summaries_study_rev_hash_uq").on(
+      t.studyId,
+      t.studyRevision,
+      t.inputsHash,
+    ),
+    uniqueIndex("experiment_summaries_study_rev_revision_uq").on(
+      t.studyId,
+      t.studyRevision,
+      t.revision,
+    ),
+  ],
+);
 /* ---------------- Participants and invitations ---------------- */
 
 export const participants = pgTable(
@@ -472,7 +754,9 @@ export const jobs = pgTable(
     payload: jsonb("payload").notNull(),
     /** Business key: enqueueing the same key twice is a no-op. */
     dedupeKey: text("dedupe_key").unique(),
-    status: text("status", { enum: ["queued", "running", "done", "failed", "dead"] })
+    /** Tenant that owns the work; null for tenant-agnostic jobs. Paused tenants' jobs are not leased. */
+    tenantId: text("tenant_id"),
+    status: text("status", { enum: ["queued", "running", "done", "failed", "dead", "cancelled"] })
       .notNull()
       .default("queued"),
     attempts: integer("attempts").default(0).notNull(),
@@ -484,7 +768,10 @@ export const jobs = pgTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").defaultNow().notNull(),
   },
-  (t) => [index("jobs_status_next_run_idx").on(t.status, t.nextRunAt)],
+  (t) => [
+    index("jobs_status_next_run_idx").on(t.status, t.nextRunAt),
+    index("jobs_tenant_idx").on(t.tenantId),
+  ],
 );
 
 /** Domain events emitted with the shared envelope (specs/README.md). */

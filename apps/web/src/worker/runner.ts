@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/db/client";
+import { handleAnalysisRun } from "@/domain/analyses";
 import {
   fetchArchiveJob,
   reconcileArchiveJob,
@@ -9,6 +12,7 @@ import {
   markDiscoveryRunFailed,
   markDiscoveryRunQueued,
 } from "@/domain/discovery";
+import { publishFinding } from "@/domain/issues";
 import { completeJob, failJob, heartbeatJob, leaseNextJob } from "@/domain/jobs";
 import { detectorGeneratorFor, generateDetector } from "@/domain/monitoring/detectors";
 import { evaluateJob } from "@/domain/monitoring/evaluate";
@@ -17,6 +21,8 @@ import {
   scanJourney,
   sweepIdleJourneys,
 } from "@/domain/monitoring/screening";
+import { runRepair } from "@/domain/repairs";
+import { generateSummary } from "@/domain/summaries";
 import { env } from "@/lib/env";
 import { jevClient, mediaClient, sttClient } from "@/providers";
 import { storage } from "@/providers/storage";
@@ -42,6 +48,16 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     }
     case "discovery.run":
       return handleDiscoveryRun((payload as { runId: string }).runId);
+    case "analysis.run":
+      return handleAnalysisRun((payload as { analysisRunId: string }).analysisRunId);
+    case "issue.publish":
+      return publishFinding((payload as { findingId: string }).findingId);
+    case "repair.run":
+      return runRepair((payload as { repairRunId: string }).repairRunId);
+    case "summary.generate": {
+      const p = payload as { tenantId: string; studyId: string; studyRevision: number };
+      return generateSummary(p.tenantId, p.studyId, p.studyRevision);
+    }
     case "monitoring.scan": {
       const p = payload as {
         journeyInstanceId: string;
@@ -93,6 +109,20 @@ async function onJobFailure(
   job: { type: string; payload: unknown; attempts: number; maxAttempts: number },
   err: unknown,
 ) {
+  if (job.type === "analysis.run") {
+    const runId = (job.payload as { analysisRunId?: string }).analysisRunId;
+    if (!runId) return;
+    const terminal = job.attempts + 1 >= job.maxAttempts;
+    await db
+      .update(schema.analysisRuns)
+      .set({
+        status: terminal ? "failed" : "queued",
+        error: terminal ? (err instanceof Error ? err.message : "job_failed") : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.analysisRuns.id, runId));
+    return;
+  }
   if (job.type !== "discovery.run") return;
   const runId = (job.payload as { runId?: string }).runId;
   if (!runId) return;
