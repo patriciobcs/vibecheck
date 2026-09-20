@@ -15,6 +15,7 @@ import type { EvidencePackage } from "@/contracts/evidencePackage";
 import type { Finding as FindingContract } from "@/contracts/finding";
 import { REPAIR_STATES } from "@/contracts/repairRun";
 import type { CheckRun } from "@/contracts/checkRun";
+import type { ExperimentSummary } from "@/contracts/experimentSummary";
 
 const id = () =>
   text()
@@ -64,6 +65,20 @@ export const issueAction = pgEnum("IssueAction", ["created", "updated", "unchang
 export const repairStatus = pgEnum("RepairStatus", REPAIR_STATES);
 export const repairMode = pgEnum("RepairMode", ["issues_only", "draft_pr", "prototype_and_retest"]);
 export const checkStatus = pgEnum("CheckStatus", ["passed", "failed", "error"]);
+export const participationKind = pgEnum("ParticipationKind", [
+  "invited",
+  "accepted",
+  "dismissed",
+  "started",
+  "completed",
+  "abandoned",
+]);
+export const summaryStatus = pgEnum("SummaryStatus", [
+  "collecting",
+  "summarized",
+  "insufficient_data",
+  "failed",
+]);
 
 export const tenant = pgTable("Tenant", {
   id: id(),
@@ -170,6 +185,7 @@ export const study = pgTable("Study", {
     .references(() => tenant.id, { onDelete: "cascade" }),
   status: studyStatus("status").notNull(),
   currentRevision: integer("currentRevision").notNull(),
+  latestSummaryId: text("latestSummaryId"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -338,6 +354,73 @@ export const issuePublishRequest = pgTable(
       table.tenantId,
       table.idempotencyKey,
     ),
+  ],
+);
+
+export const participationEvent = pgTable(
+  "ParticipationEvent",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    studyId: text("studyId")
+      .notNull()
+      .references(() => study.id, { onDelete: "cascade" }),
+    studyRevision: integer("studyRevision").notNull(),
+    eventId: text("eventId").notNull(),
+    participantRef: text("participantRef").notNull(),
+    kind: participationKind("kind").notNull(),
+    sessionId: text("sessionId"),
+    occurredAt: timestamp("occurredAt", { mode: "date" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    unique("ParticipationEvent_tenantId_eventId_key").on(table.tenantId, table.eventId),
+    unique("ParticipationEvent_studyId_revision_participant_kind_key").on(
+      table.studyId,
+      table.studyRevision,
+      table.participantRef,
+      table.kind,
+    ),
+    index("ParticipationEvent_tenantId_idx").on(table.tenantId),
+  ],
+);
+
+export const experimentSummary = pgTable(
+  "ExperimentSummary",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    studyId: text("studyId")
+      .notNull()
+      .references(() => study.id, { onDelete: "cascade" }),
+    studyRevision: integer("studyRevision").notNull(),
+    revision: integer("revision").notNull(),
+    status: summaryStatus("status").notNull(),
+    inputsHash: text("inputsHash").notNull(),
+    summary: jsonb("summary").$type<ExperimentSummary>().notNull(),
+    narrativeRaw: jsonb("narrativeRaw").$type<unknown[]>().notNull(),
+    provider: text("provider"),
+    providerSessionId: text("providerSessionId"),
+    providerSessionUrl: text("providerSessionUrl"),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    unique("ExperimentSummary_studyId_revision_key").on(
+      table.studyId,
+      table.studyRevision,
+      table.revision,
+    ),
+    unique("ExperimentSummary_studyId_inputsHash_key").on(
+      table.studyId,
+      table.studyRevision,
+      table.inputsHash,
+    ),
+    index("ExperimentSummary_tenantId_idx").on(table.tenantId),
   ],
 );
 

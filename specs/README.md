@@ -12,7 +12,7 @@ VibeCheck organizes real-human usability research and turns evidence into issues
 | VC-02 | [Test delivery and recording](02-test-delivery-and-recording.md) | Invitations, assignment, consent, tasks, configurable recording and uploads. |
 | VC-03 | [Evidence and GitHub issues](03-evidence-analysis-and-github-issues.md) | Analyze sessions through Devin, deduplicate findings, create/update issues. |
 | VC-04 | [Prototypes and verification](04-prototypes-and-verification.md) | Isolated changes, independent checks, retries, previews, draft PRs. |
-| VC-05 | [Retesting and validation](05-retesting-and-validation.md) | Invitations, fresh/repeat participants, comparison, commit-bound PR evidence. |
+| VC-05 | [Experiment summary](05-retesting-and-validation.md) | Participation funnel, cross-participant summary per experiment for the product team; retesting deferred. |
 | VC-06 | [Dashboard and orchestration](06-owner-dashboard-and-orchestration.md) | Owner views, settings, tenancy, durable jobs, audit trail and integrations. |
 | VC-07 | [Demo target app](07-demo-target-app.md) | Open-source candidate, reproducible fixture, checks and honest three-minute demo. |
 
@@ -22,7 +22,7 @@ VibeCheck organizes real-human usability research and turns evidence into issues
 - The owner selects proposed tasks by default. Optional `auto_launch` can launch bounded studies under preconfigured rules. This supports both owner-directed research and the autonomous demo.
 - Once a study is launched, processing follows its snapshotted automation policy. No repeated owner approval is necessary for authorized issue creation or isolated prototypes.
 - Modes: `issues_only`, `draft_pr`, `prototype_and_retest`. No automatic merge or production deployment in the MVP.
-- Devin is the initial agent provider for planning, analysis, and implementation. Jev is unavailable; Nebius is not required. Provider adapters may be added later.
+- Devin is the agent provider for planning, analysis, implementation and summaries. Jev (typesafe.ai) analyses continuously tracked activity and flags potential UX issues (spec-2 scope); its flags surface in the dashboard Signals panel. Nebius is not required.
 - Ordinary application code owns assignments, credit transactions, workflow state, validation execution and access control. Devin does not replace those services.
 - Vonage is the planned media provider; SLNG is the planned STT provider. Verify recording capabilities, access, and supported browser behavior during integration.
 - Branches/worktrees in an authorized repository are the default prototype mechanism. Forks are supported as an alternative, not required per variant.
@@ -43,8 +43,11 @@ Product configuration → discovery run → proposed tasks → selection/auto-la
        ├─ issues_only: stop
        ├─ draft_pr: implement → validate → draft PR, no human retest
        └─ prototype_and_retest: implement → validate → preview → draft PR
-            → retest invitation → human session → comparison → update PR evidence
+            → (deferred) retest invitation → human session → comparison
+    every analysed session → experiment summary for the product team (VC-05)
 ```
+
+The invitation popup, interview delivery, recording and continuous activity tracking (Jev) are built by the spec-2 team; VibeCheck consumes them through the contracts in VC-02 and VC-05.
 
 No finding is a valid result. No participant, missing media, setup failure, exhausted agent budget, or inconclusive retesting must remain visible outcomes; none is silently converted to success.
 
@@ -86,7 +89,9 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version, status | VC-04 → VC-05/06 |
 | CheckRun | exact candidate SHA, validator version, results, diagnostics | VC-04 → VC-06 |
 | Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
-| ValidationSummary | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
+| ParticipationEvent | study revision, opaque participant ref, kind, session id | VC-02 (SDK) → VC-05 |
+| ExperimentSummary | study revision, participation funnel, session outcomes, themes, narrative with finding citations, provenance, inputs hash | VC-05 → VC-06 |
+| ValidationSummary (deferred) | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
 
 ### Study plan handoff
 

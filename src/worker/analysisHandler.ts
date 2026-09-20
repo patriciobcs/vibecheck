@@ -11,6 +11,7 @@ import {
   study,
   studyPlanRevision,
 } from "@/db/schema";
+import { enqueueSummary } from "@/services/summaries";
 import { analysisOutputSchema, type AnalysisOutput } from "@/contracts/analysisOutput";
 import { evidencePackageSchema, type EvidencePackage } from "@/contracts/evidencePackage";
 import { repoBindingSchema } from "@/contracts/repoBinding";
@@ -332,6 +333,7 @@ async function persistAnalysis(
         occurredAt: new Date(),
       })
       .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
+    await enqueueSummary(tx, run.tenantId, run.studyId, studyRow.currentRevision);
     if (
       binding.success &&
       (binding.data.provider === "local" ||

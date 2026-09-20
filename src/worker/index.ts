@@ -7,6 +7,7 @@ import { handleDiscoveryRun, markDiscoveryRunFailed, markDiscoveryRunQueued } fr
 import { handleAnalysisRun } from "./analysisHandler";
 import { publishFinding } from "@/services/issues";
 import { runRepair } from "@/services/repairs";
+import { generateSummary } from "@/services/summaries";
 
 const workerId = `${os.hostname()}:${process.pid}`;
 const leaseMs = 5 * 60 * 1000;
@@ -14,11 +15,16 @@ const discoveryPayloadSchema = z.object({ runId: z.string().min(1) });
 const analysisPayloadSchema = z.object({ analysisRunId: z.string().min(1) });
 const issuePayloadSchema = z.object({ findingId: z.string().min(1) });
 const repairPayloadSchema = z.object({ repairRunId: z.string().min(1) });
+const summaryPayloadSchema = z.object({
+  studyId: z.string().min(1),
+  studyRevision: z.number().int().positive(),
+});
 type JobPayload =
   | z.infer<typeof discoveryPayloadSchema>
   | z.infer<typeof analysisPayloadSchema>
   | z.infer<typeof issuePayloadSchema>
-  | z.infer<typeof repairPayloadSchema>;
+  | z.infer<typeof repairPayloadSchema>
+  | z.infer<typeof summaryPayloadSchema>;
 type JobHandler = (payload: JobPayload, tenantId: string) => Promise<void>;
 const handlers: Record<string, JobHandler> = {
   "discovery.run": async (payload, tenantId) => {
@@ -36,6 +42,10 @@ const handlers: Record<string, JobHandler> = {
   "repair.run": async (payload, tenantId) => {
     const parsed = repairPayloadSchema.parse(payload);
     await runRepair(parsed.repairRunId, {}, tenantId);
+  },
+  "summary.generate": async (payload, tenantId) => {
+    const parsed = summaryPayloadSchema.parse(payload);
+    await generateSummary(tenantId, parsed.studyId, parsed.studyRevision);
   },
 };
 let shuttingDown = false;
@@ -86,9 +96,11 @@ async function processJob(job: Awaited<ReturnType<typeof claim>>) {
             ? issuePayloadSchema.parse(job.payload)
             : job.type === "repair.run"
               ? repairPayloadSchema.parse(job.payload)
-              : (() => {
-                  throw new Error("unknown_job_type");
-                })();
+              : job.type === "summary.generate"
+                ? summaryPayloadSchema.parse(job.payload)
+                : (() => {
+                    throw new Error("unknown_job_type");
+                  })();
     await handler(payload, job.tenantId);
     await db
       .update(jobTable)
@@ -98,7 +110,10 @@ async function processJob(job: Awaited<ReturnType<typeof claim>>) {
     const attempts = job.attempts + 1;
     const payload = discoveryPayloadSchema.safeParse(job.payload);
     const terminal =
-      (error instanceof Error && error.message === "unknown_job_type") ||
+      (error instanceof Error &&
+        (error.message === "unknown_job_type" ||
+          (job.type === "summary.generate" &&
+            ["study_not_found", "study_plan_not_found"].includes(error.message)))) ||
       attempts >= job.maxAttempts;
     if (job.type === "discovery.run" && payload.success) {
       if (terminal) {

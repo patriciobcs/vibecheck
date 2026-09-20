@@ -6,6 +6,7 @@ export const findingCertaintySchema = z.enum([
   "repeated_observation",
   "contradictory",
 ]);
+export const findingProvenanceSchema = z.enum(["human_session", "simulated_session", "fixture"]);
 export const findingIssueRefSchema = z
   .object({
     provider: z.literal("github"),
@@ -41,7 +42,7 @@ export const findingSchema = z.object({
   suggested_experiment: z.string().nullable(),
   fingerprint: z.string().min(1),
   issue_ref: findingIssueRefSchema,
-  provenance: z.enum(["human_session", "simulated_session", "fixture"]),
+  provenance: findingProvenanceSchema,
 });
 
 export type Finding = z.infer<typeof findingSchema>;

@@ -7,6 +7,8 @@ export const EVENT_TYPES = [
   "session.upload_verified",
   "session.analysis_ready",
   "analysis.completed",
+  "participation.recorded",
+  "summary.generated",
   "issue.created",
   "issue.updated",
   "finding.ready_for_repair",
@@ -23,6 +25,21 @@ export const studyPublishedPayloadSchema = z.object({
   study_id: z.string(),
   study_revision: z.number().int().positive(),
   plan_ref: z.string(),
+});
+
+export const participationRecordedPayloadSchema = z.object({
+  study_id: z.string().min(1),
+  study_revision: z.number().int().positive(),
+  participant_ref: z.string().min(1),
+  kind: z.enum(["invited", "accepted", "dismissed", "started", "completed", "abandoned"]),
+});
+
+export const summaryGeneratedPayloadSchema = z.object({
+  study_id: z.string().min(1),
+  study_revision: z.number().int().positive(),
+  summary_id: z.string().min(1),
+  revision: z.number().int().positive(),
+  status: z.enum(["collecting", "summarized", "insufficient_data", "failed"]),
 });
 
 export const repairCandidateReadyPayload = z.object({

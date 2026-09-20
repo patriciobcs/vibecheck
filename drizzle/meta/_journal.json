@@ -43,6 +43,13 @@
       "when": 1789865490086,
       "tag": "0005_pretty_blonde_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789868814794,
+      "tag": "0006_soft_lily_hollister",
+      "breakpoints": true
     }
   ]
 }

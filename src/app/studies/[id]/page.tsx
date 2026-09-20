@@ -1,12 +1,21 @@
 import { notFound } from "next/navigation";
 import { tenantFromEnvironment } from "@/lib/auth";
 import { db } from "@/db";
-import { outboxEvent, repairRun, checkRun, preview, study, studyPlanRevision } from "@/db/schema";
+import {
+  experimentSummary,
+  outboxEvent,
+  repairRun,
+  checkRun,
+  preview,
+  study,
+  studyPlanRevision,
+} from "@/db/schema";
 import { analysisRun, finding } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { AnalysesSection } from "./_components/AnalysesSection";
 import { FindingsSection } from "./_components/FindingsSection";
 import { RepairSection } from "./_components/RepairSection";
+import { SummarySection } from "./_components/SummarySection";
 
 export default async function StudyPage({ params }: { params: Promise<{ id: string }> }) {
   const tenantId = await tenantFromEnvironment();
@@ -40,6 +49,24 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
     .select()
     .from(finding)
     .where(and(eq(finding.studyId, studyRow.id), eq(finding.tenantId, tenantId)));
+  const [latestSummary] = await db
+    .select()
+    .from(experimentSummary)
+    .where(
+      and(eq(experimentSummary.studyId, studyRow.id), eq(experimentSummary.tenantId, tenantId)),
+    )
+    .orderBy(desc(experimentSummary.revision))
+    .limit(1);
+  const summaryRevisions = await db
+    .select({
+      revision: experimentSummary.revision,
+      status: experimentSummary.status,
+      generated_at: experimentSummary.createdAt,
+    })
+    .from(experimentSummary)
+    .where(
+      and(eq(experimentSummary.studyId, studyRow.id), eq(experimentSummary.tenantId, tenantId)),
+    );
   const repairs = await db
     .select()
     .from(repairRun)
@@ -66,6 +93,15 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
       <pre>{JSON.stringify(event, null, 2)}</pre>
       <AnalysesSection studyId={studyRow.id} runs={runs} />
       <FindingsSection findings={findings} />
+      <SummarySection
+        studyId={studyRow.id}
+        summary={latestSummary?.summary ?? null}
+        revisions={summaryRevisions.map((row) => ({
+          ...row,
+          generated_at: row.generated_at.toISOString(),
+        }))}
+        findingTitles={Object.fromEntries(findings.map((finding) => [finding.id, finding.title]))}
+      />
       <RepairSection repair={repairs[0] ?? null} checks={checks} preview={previews[0] ?? null} />
     </main>
   );

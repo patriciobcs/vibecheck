@@ -6,6 +6,8 @@ import { sessionManifestSchema } from "./session";
 import { repoBindingSchema } from "./repoBinding";
 import { repairOutputSchema } from "./repairOutput";
 import { repairRunSchema, toRepairRunContract } from "./repairRun";
+import { participationEventSchema } from "./participation";
+import { summaryNarrativeOutputSchema } from "./experimentSummary";
 
 describe("contracts", () => {
   it("accepts the study plan handoff", () => {
@@ -139,6 +141,47 @@ describe("contracts", () => {
       repo: "repo",
       issues_enabled: true,
     });
+  });
+  it("requires session IDs for started, completed, and abandoned participation", () => {
+    const base = {
+      schema_version: "1.0" as const,
+      event_id: "event",
+      study_id: "study",
+      study_revision: 1,
+      participant_ref: "opaque",
+      occurred_at: new Date().toISOString(),
+    };
+    expect(
+      participationEventSchema.safeParse({ ...base, kind: "invited", session_id: null }).success,
+    ).toBe(true);
+    expect(
+      participationEventSchema.safeParse({ ...base, kind: "completed", session_id: null }).success,
+    ).toBe(false);
+    expect(
+      participationEventSchema.safeParse({ ...base, kind: "completed", session_id: "session" })
+        .success,
+    ).toBe(true);
+  });
+  it("requires three to five cited observations in summary narrative output", () => {
+    const base = {
+      schema_version: "1.0" as const,
+      study_id: "study",
+      headline: "A useful summary headline",
+      limitations: [],
+    };
+    expect(
+      summaryNarrativeOutputSchema.safeParse({
+        ...base,
+        observations: [
+          { text: "one", finding_ids: ["finding"] },
+          { text: "two", finding_ids: ["finding"] },
+          { text: "three", finding_ids: ["finding"] },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(summaryNarrativeOutputSchema.safeParse({ ...base, observations: [] }).success).toBe(
+      false,
+    );
   });
   it("enforces repair output refinement rules", () => {
     const base = {
