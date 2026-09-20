@@ -76,7 +76,9 @@ export async function getGithubToken(repo: IssueRepository): Promise<string | nu
     await fetch(`${apiBase}/app/installations/${installation.id}/access_tokens`, {
       method: "POST",
       headers: { ...appHeaders, "content-type": "application/json" },
-      body: JSON.stringify({ permissions: { issues: "write" } }),
+      body: JSON.stringify({
+        permissions: { contents: "read", pull_requests: "write", issues: "write" },
+      }),
     }),
   );
   const token = (await tokenResponse.json()) as { token?: string; expires_at?: string };

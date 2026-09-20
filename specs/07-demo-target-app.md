@@ -87,12 +87,16 @@ choice.
 
 VC-03 uses the local source clone for read-only repository context and publishes
 findings only to the plain-copy repository `minasrc/excalidraw-demo`, never to
-upstream Excalidraw. The plain copy is not a fork. A write-authorized
-repository is still required before VC-04 creates modifications, issues or
-PRs. MIT permits this; preserve upstream copyright and license notices. Record
-the pinned upstream SHA and every demo-specific modification. Do not submit
-deliberately introduced demo defects to upstream or portray them as flaws
-independently discovered in the original project.
+upstream Excalidraw. The plain copy is not a fork. VC-04 slice 1 keeps repair,
+validation and preview adapters on deterministic fixtures; real repository
+modification, Excalidraw acceptance checks and Vercel deployment remain
+pending. The demo repair policy currently allows only `packages/excalidraw/`
+and `excalidraw-app/` and preserves the five required functional invariants.
+MIT permits this;
+preserve upstream copyright and license notices. Record the pinned upstream SHA
+and every demo-specific modification. Do not submit deliberately introduced
+demo defects to upstream or portray them as flaws independently discovered in
+the original project.
 
 ## Three-minute capture plan
 

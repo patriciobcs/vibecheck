@@ -4,6 +4,8 @@ import { studyPlanSchema } from "./studyPlan";
 import { analysisOutputSchema, titleSchema } from "./analysisOutput";
 import { sessionManifestSchema } from "./session";
 import { repoBindingSchema } from "./repoBinding";
+import { repairOutputSchema } from "./repairOutput";
+import { repairRunSchema, toRepairRunContract } from "./repairRun";
 
 describe("contracts", () => {
   it("accepts the study plan handoff", () => {
@@ -136,6 +138,63 @@ describe("contracts", () => {
       owner: "owner",
       repo: "repo",
       issues_enabled: true,
+    });
+  });
+  it("enforces repair output refinement rules", () => {
+    const base = {
+      schema_version: "1.0" as const,
+      repair_run_id: "run",
+      reproduced: true,
+      reproduction_notes: "reproduced",
+      summary: "candidate",
+      changed_paths: ["packages/excalidraw/components/Toolbar.tsx"],
+      limitations: [],
+    };
+    expect(
+      repairOutputSchema.safeParse({
+        ...base,
+        outcome: "candidate",
+        branch: "vibecheck/repair-run",
+      }).success,
+    ).toBe(true);
+    expect(
+      repairOutputSchema.safeParse({
+        ...base,
+        outcome: "candidate",
+        branch: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      repairOutputSchema.safeParse({
+        ...base,
+        outcome: "cannot_reproduce",
+        branch: "unexpected",
+      }).success,
+    ).toBe(false);
+  });
+  it("maps a repair run to the shared contract", () => {
+    const contract = toRepairRunContract({
+      id: "run",
+      findingId: "finding",
+      issueRepo: "owner/repo",
+      issueNumber: 4,
+      mode: "draft_pr",
+      baseCommitSha: "base",
+      candidateCommitSha: "candidate",
+      devinSessionId: "session",
+      devinSessionUrl: "https://devin.example/session",
+      attempt: 1,
+      validatorVersion: "fixture_validator_v1",
+      checkRunId: "check",
+      previewId: null,
+      pullRequestNumber: 5,
+      pullRequestUrl: "https://github.com/owner/repo/pull/5",
+      status: "draft_pr_ready",
+    });
+    expect(repairRunSchema.parse(contract)).toMatchObject({
+      issue_ref: "owner/repo#4",
+      checks_ref: "check",
+      pull_request_ref: "#5|https://github.com/owner/repo/pull/5",
     });
   });
 });

@@ -47,6 +47,11 @@ Set `ALLOW_LOCAL_TARGETS=true` for localhost demo targets. Set a non-empty
 it is missing, and the same key authenticates the UI. Run the worker in a
 second terminal. Database-backed tests require `DATABASE_URL`.
 Set `DISCOVERY_PROVIDER=devin` and `DEVIN_API_KEY` to use the Devin provider.
+VC-04 defaults to fixture repair, validation, and preview adapters:
+`REPAIR_PROVIDER=fixture`, `VALIDATOR=fixture`, and `PREVIEW_PROVIDER=fixture`.
+The fixture repair pipeline creates no branches, pull requests, or deployments.
+Set `REPAIR_PROVIDER=devin` only when Devin credentials and an authorized
+repository are configured. Independent checks remain platform-owned.
 
 The fixture discovery provider returns clearly labelled sample output from the
 VC-07 demo target. It is not agent inference or human research evidence.
@@ -74,3 +79,13 @@ sanitized issues are published only to that demo repository. A `local` binding
 is the no-GitHub path and records `github_disconnected` while retaining the
 finding. The local clone at `/Users/devin/repos/excalidraw` remains the source
 for future VC-04 work.
+
+## VC-04 repair pipeline
+
+Findings from `draft_pr` and `prototype_and_retest` studies enqueue one
+tenant-scoped `RepairRun` per finding. The durable worker persists each state
+transition, validates candidate paths with the selected validator, and records
+checks, draft PRs, and previews. `issues_only` findings stop after issue
+publication and never enqueue repair work. Fixture adapters are explicitly
+simulated and are intended for local tests and the repair workflow skeleton;
+they do not claim a code change, human evidence, or a deployed application.

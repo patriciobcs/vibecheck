@@ -13,6 +13,8 @@ import type { ProductConfig } from "@/contracts/productConfig";
 import type { StudyPlan } from "@/contracts/studyPlan";
 import type { EvidencePackage } from "@/contracts/evidencePackage";
 import type { Finding as FindingContract } from "@/contracts/finding";
+import { REPAIR_STATES } from "@/contracts/repairRun";
+import type { CheckRun } from "@/contracts/checkRun";
 
 const id = () =>
   text()
@@ -59,6 +61,8 @@ export const findingCertainty = pgEnum("FindingCertainty", [
   "contradictory",
 ]);
 export const issueAction = pgEnum("IssueAction", ["created", "updated", "unchanged", "skipped"]);
+export const repairStatus = pgEnum("RepairStatus", REPAIR_STATES);
+export const repairMode = pgEnum("RepairMode", ["issues_only", "draft_pr", "prototype_and_retest"]);
 
 export const tenant = pgTable("Tenant", {
   id: id(),
@@ -336,6 +340,93 @@ export const issuePublishRequest = pgTable(
   ],
 );
 
+export const repairRun = pgTable(
+  "RepairRun",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    findingId: text("findingId")
+      .notNull()
+      .references(() => finding.id, { onDelete: "cascade" }),
+    studyId: text("studyId")
+      .notNull()
+      .references(() => study.id, { onDelete: "cascade" }),
+    studyRevision: integer("studyRevision").notNull(),
+    issueRepo: text("issueRepo").notNull(),
+    issueNumber: integer("issueNumber").notNull(),
+    mode: repairMode("mode").notNull(),
+    baseCommitSha: text("baseCommitSha").notNull(),
+    candidateCommitSha: text("candidateCommitSha"),
+    branch: text("branch"),
+    devinSessionId: text("devinSessionId"),
+    devinSessionUrl: text("devinSessionUrl"),
+    attempt: integer("attempt").notNull().default(1),
+    maxAttempts: integer("maxAttempts").notNull(),
+    validatorVersion: text("validatorVersion").notNull(),
+    pullRequestNumber: integer("pullRequestNumber"),
+    pullRequestUrl: text("pullRequestUrl"),
+    previewId: text("previewId"),
+    status: repairStatus("status").notNull().default("queued"),
+    blockedReason: text("blockedReason"),
+    lastOutput: jsonb("lastOutput").$type<unknown>(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("RepairRun_findingId_key").on(table.findingId),
+    index("RepairRun_tenantId_idx").on(table.tenantId),
+  ],
+);
+
+export const checkRun = pgTable(
+  "CheckRun",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    repairRunId: text("repairRunId")
+      .notNull()
+      .references(() => repairRun.id, { onDelete: "cascade" }),
+    attempt: integer("attempt").notNull(),
+    commitSha: text("commitSha").notNull(),
+    validatorVersion: text("validatorVersion").notNull(),
+    status: text("status").notNull(),
+    results: jsonb("results").$type<CheckRun["results"]>().notNull(),
+    diagnostics: text("diagnostics"),
+    startedAt: timestamp("startedAt", { mode: "date" }).notNull(),
+    finishedAt: timestamp("finishedAt", { mode: "date" }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("CheckRun_repairRunId_idx").on(table.repairRunId)],
+);
+
+export const preview = pgTable(
+  "Preview",
+  {
+    id: id(),
+    tenantId: text("tenantId")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    repairRunId: text("repairRunId").notNull(),
+    candidateCommitSha: text("candidateCommitSha").notNull(),
+    provider: text("provider").notNull(),
+    deploymentId: text("deploymentId").notNull(),
+    url: text("url").notNull(),
+    healthStatus: text("healthStatus").notNull(),
+    fixtureRef: text("fixtureRef").notNull(),
+    accessPolicy: text("accessPolicy").notNull().default("assigned_only"),
+    expiresAt: timestamp("expiresAt", { mode: "date" }),
+    cleanupStatus: text("cleanupStatus").notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("Preview_repairRunId_idx").on(table.repairRunId)],
+);
+
 export type Tenant = typeof tenant.$inferSelect;
 export type ApiKey = typeof apiKey.$inferSelect;
 export type Product = typeof product.$inferSelect;
@@ -349,3 +440,6 @@ export type Job = typeof job.$inferSelect;
 export type AnalysisRun = typeof analysisRun.$inferSelect;
 export type Finding = typeof finding.$inferSelect;
 export type IssuePublishRequest = typeof issuePublishRequest.$inferSelect;
+export type RepairRun = typeof repairRun.$inferSelect;
+export type CheckRunRow = typeof checkRun.$inferSelect;
+export type Preview = typeof preview.$inferSelect;

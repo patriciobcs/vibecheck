@@ -297,6 +297,17 @@ export async function publishFinding(
             occurredAt: new Date(),
           })
           .onConflictDoNothing({ target: outboxEvent.idempotencyKey });
+        const { enqueueRepair } = await import("./repairs");
+        await enqueueRepair(
+          tx,
+          row,
+          {
+            repo: `${githubBinding.owner}/${githubBinding.repo}`,
+            number: issueNumber,
+            url: issueUrl,
+          },
+          planRow.plan,
+        );
       }
     }
   });

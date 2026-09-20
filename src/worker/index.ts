@@ -6,16 +6,19 @@ import { analysisRun as analysisRunTable, job as jobTable } from "@/db/schema";
 import { handleDiscoveryRun, markDiscoveryRunFailed, markDiscoveryRunQueued } from "./handler";
 import { handleAnalysisRun } from "./analysisHandler";
 import { publishFinding } from "@/services/issues";
+import { runRepair } from "@/services/repairs";
 
 const workerId = `${os.hostname()}:${process.pid}`;
 const leaseMs = 5 * 60 * 1000;
 const discoveryPayloadSchema = z.object({ runId: z.string().min(1) });
 const analysisPayloadSchema = z.object({ analysisRunId: z.string().min(1) });
 const issuePayloadSchema = z.object({ findingId: z.string().min(1) });
+const repairPayloadSchema = z.object({ repairRunId: z.string().min(1) });
 type JobPayload =
   | z.infer<typeof discoveryPayloadSchema>
   | z.infer<typeof analysisPayloadSchema>
-  | z.infer<typeof issuePayloadSchema>;
+  | z.infer<typeof issuePayloadSchema>
+  | z.infer<typeof repairPayloadSchema>;
 type JobHandler = (payload: JobPayload, tenantId: string) => Promise<void>;
 const handlers: Record<string, JobHandler> = {
   "discovery.run": async (payload, tenantId) => {
@@ -29,6 +32,10 @@ const handlers: Record<string, JobHandler> = {
   "issue.publish": async (payload, tenantId) => {
     const parsed = issuePayloadSchema.parse(payload);
     await publishFinding(parsed.findingId, undefined, tenantId);
+  },
+  "repair.run": async (payload, tenantId) => {
+    const parsed = repairPayloadSchema.parse(payload);
+    await runRepair(parsed.repairRunId, {}, tenantId);
   },
 };
 let shuttingDown = false;
@@ -77,9 +84,11 @@ async function processJob(job: Awaited<ReturnType<typeof claim>>) {
           ? analysisPayloadSchema.parse(job.payload)
           : job.type === "issue.publish"
             ? issuePayloadSchema.parse(job.payload)
-            : (() => {
-                throw new Error("unknown_job_type");
-              })();
+            : job.type === "repair.run"
+              ? repairPayloadSchema.parse(job.payload)
+              : (() => {
+                  throw new Error("unknown_job_type");
+                })();
     await handler(payload, job.tenantId);
     await db
       .update(jobTable)

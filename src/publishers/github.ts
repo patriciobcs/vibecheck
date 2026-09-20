@@ -1,4 +1,4 @@
-import type { IssuePublisher, IssueRepository, PublishedIssue } from "./types";
+import type { IssueRepository, IssuePublisher, PublishedIssue, RepoPublisher } from "./types";
 import { getGithubToken } from "./githubAuth";
 
 const apiBase = "https://api.github.com";
@@ -14,7 +14,7 @@ async function headers(repo: IssueRepository) {
   };
 }
 
-export const githubIssuePublisher: IssuePublisher = {
+export const githubIssuePublisher: RepoPublisher = {
   async findByMarker(repo, marker) {
     const query = encodeURIComponent(`repo:${repo.owner}/${repo.repo} "${marker}" in:body`);
     const requestHeaders = await headers(repo);
@@ -92,5 +92,64 @@ export const githubIssuePublisher: IssuePublisher = {
       },
     );
     if (!response.ok) throw new Error(`github_api_${response.status}`);
+  },
+  async getBranchSha(repo, branch) {
+    const response = await fetch(
+      `${apiBase}/repos/${repo.owner}/${repo.repo}/branches/${encodeURIComponent(branch)}`,
+      { headers: await headers(repo) },
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`github_api_${response.status}`);
+    const body = (await response.json()) as { commit?: { sha?: string } };
+    return body.commit?.sha ?? null;
+  },
+  async getCommit(repo, commitSha) {
+    const response = await fetch(
+      `${apiBase}/repos/${repo.owner}/${repo.repo}/commits/${encodeURIComponent(commitSha)}`,
+      { headers: await headers(repo) },
+    );
+    if (response.status === 404) return false;
+    if (!response.ok) throw new Error(`github_api_${response.status}`);
+    return true;
+  },
+  async compareFiles(repo, base, head) {
+    const files: string[] = [];
+    for (let page = 1; page <= 3; page += 1) {
+      const response = await fetch(
+        `${apiBase}/repos/${repo.owner}/${repo.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=100&page=${page}`,
+        { headers: await headers(repo) },
+      );
+      if (!response.ok) throw new Error(`github_api_${response.status}`);
+      const body = (await response.json()) as {
+        files?: Array<{ filename?: string }>;
+      };
+      const pageFiles = (body.files ?? [])
+        .map((file) => file.filename)
+        .filter((filename): filename is string => Boolean(filename));
+      files.push(...pageFiles);
+      if (pageFiles.length < 100) break;
+    }
+    return files;
+  },
+  async createDraftPullRequest(repo, input) {
+    const head = `${repo.owner}:${input.head}`;
+    const existingResponse = await fetch(
+      `${apiBase}/repos/${repo.owner}/${repo.repo}/pulls?head=${encodeURIComponent(head)}&state=all&per_page=100`,
+      { headers: await headers(repo) },
+    );
+    if (!existingResponse.ok) throw new Error(`github_api_${existingResponse.status}`);
+    const existing = (await existingResponse.json()) as Array<{
+      number: number;
+      html_url: string;
+    }>;
+    if (existing[0]) return { number: existing[0].number, url: existing[0].html_url };
+    const response = await fetch(`${apiBase}/repos/${repo.owner}/${repo.repo}/pulls`, {
+      method: "POST",
+      headers: await headers(repo),
+      body: JSON.stringify({ ...input, draft: true }),
+    });
+    if (!response.ok) throw new Error(`github_api_${response.status}`);
+    const body = (await response.json()) as { number: number; html_url: string };
+    return { number: body.number, url: body.html_url };
   },
 };

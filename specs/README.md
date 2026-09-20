@@ -83,7 +83,8 @@ Events may arrive more than once or out of order. Deduplicate by event ID and bu
 | Assignment | participant, cohort, study revision, version/SHA, expiry, fixture ref | VC-02/05 → VC-03/06 |
 | SessionManifest | assignment, clocks, capture provenance, media/event refs, completeness | VC-02 → VC-03/05 |
 | Finding | observation, hypothesis, evidence refs, uncertainty, fingerprint | VC-03 → VC-04/06 |
-| RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version | VC-04 → VC-05/06 |
+| RepairRun | issue, base/candidate SHA, Devin session, attempt/budget, validator version, status | VC-04 → VC-05/06 |
+| CheckRun | exact candidate SHA, validator version, results, diagnostics | VC-04 → VC-06 |
 | Preview | candidate SHA, URL, fixture revision, checks, lifecycle/expiry | VC-04 → VC-05 |
 | ValidationSummary | exact SHA, task revision, cohort, observations, checks, limitations | VC-05 → GitHub/VC-06 |
 

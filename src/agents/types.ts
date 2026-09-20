@@ -11,6 +11,7 @@ export type ProviderHandle = {
   url?: string;
   runId?: string;
   sourceRevision?: string;
+  branchName?: string;
 };
 export type ProviderResult = { raw: unknown; handle: ProviderHandle };
 export interface DiscoveryProvider {

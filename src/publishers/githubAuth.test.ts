@@ -101,7 +101,11 @@ describe("GitHub App authentication", () => {
       "https://api.github.com/app/installations/99/access_tokens",
     );
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
-      permissions: { issues: "write" },
+      permissions: {
+        contents: "read",
+        pull_requests: "write",
+        issues: "write",
+      },
     });
     expect(fetchMock.mock.calls[2][1].headers.authorization).toBe("Bearer installation-token");
   });

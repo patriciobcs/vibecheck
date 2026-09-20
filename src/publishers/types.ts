@@ -8,6 +8,7 @@ export type ExistingIssue = {
   state: "open" | "closed";
   body: string;
 };
+export type DraftPullRequest = { number: number; url: string };
 
 export interface IssuePublisher {
   findByMarker(repo: IssueRepository, marker: string): Promise<ExistingIssue | null>;
@@ -16,4 +17,14 @@ export interface IssuePublisher {
     input: { title: string; body: string; labels: string[] },
   ): Promise<PublishedIssue>;
   comment(repo: IssueRepository, number: number, body: string): Promise<void>;
+}
+
+export interface RepoPublisher extends IssuePublisher {
+  getBranchSha(repo: IssueRepository, branch: string): Promise<string | null>;
+  getCommit?(repo: IssueRepository, commitSha: string): Promise<boolean>;
+  compareFiles(repo: IssueRepository, base: string, head: string): Promise<string[]>;
+  createDraftPullRequest(
+    repo: IssueRepository,
+    input: { title: string; head: string; base: string; body: string },
+  ): Promise<DraftPullRequest>;
 }

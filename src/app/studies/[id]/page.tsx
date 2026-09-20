@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { tenantFromEnvironment } from "@/lib/auth";
 import { db } from "@/db";
-import { outboxEvent, study, studyPlanRevision } from "@/db/schema";
+import { outboxEvent, repairRun, checkRun, preview, study, studyPlanRevision } from "@/db/schema";
 import { analysisRun, finding } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { AnalysesSection } from "./_components/AnalysesSection";
 import { FindingsSection } from "./_components/FindingsSection";
+import { RepairSection } from "./_components/RepairSection";
 
 export default async function StudyPage({ params }: { params: Promise<{ id: string }> }) {
   const tenantId = await tenantFromEnvironment();
@@ -39,6 +40,22 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
     .select()
     .from(finding)
     .where(and(eq(finding.studyId, studyRow.id), eq(finding.tenantId, tenantId)));
+  const repairs = await db
+    .select()
+    .from(repairRun)
+    .where(and(eq(repairRun.studyId, studyRow.id), eq(repairRun.tenantId, tenantId)));
+  const checks = repairs.length
+    ? await db
+        .select()
+        .from(checkRun)
+        .where(and(eq(checkRun.repairRunId, repairs[0].id), eq(checkRun.tenantId, tenantId)))
+    : [];
+  const previews = repairs.length
+    ? await db
+        .select()
+        .from(preview)
+        .where(and(eq(preview.repairRunId, repairs[0].id), eq(preview.tenantId, tenantId)))
+    : [];
   return (
     <main>
       <h1>Study {studyRow.id}</h1>
@@ -49,6 +66,7 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
       <pre>{JSON.stringify(event, null, 2)}</pre>
       <AnalysesSection studyId={studyRow.id} runs={runs} />
       <FindingsSection findings={findings} />
+      <RepairSection repair={repairs[0] ?? null} checks={checks} preview={previews[0] ?? null} />
     </main>
   );
 }

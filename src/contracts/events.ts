@@ -11,6 +11,7 @@ export const EVENT_TYPES = [
   "issue.updated",
   "finding.ready_for_repair",
   "repair.candidate_ready",
+  "repair.draft_pr_ready",
   "checks.completed",
   "preview.ready",
   "retest.requested",
@@ -22,6 +23,34 @@ export const studyPublishedPayloadSchema = z.object({
   study_id: z.string(),
   study_revision: z.number().int().positive(),
   plan_ref: z.string(),
+});
+
+export const repairCandidateReadyPayload = z.object({
+  repair_run_id: z.string().min(1),
+  finding_id: z.string().min(1),
+  candidate_commit_sha: z.string().min(1),
+});
+
+export const checksCompletedPayload = z.object({
+  repair_run_id: z.string().min(1),
+  finding_id: z.string().min(1),
+  check_run_id: z.string().min(1),
+  commit_sha: z.string().min(1),
+});
+
+export const previewReadyPayload = z.object({
+  repair_run_id: z.string().min(1),
+  finding_id: z.string().min(1),
+  candidate_commit_sha: z.string().min(1),
+  preview_url: z.string().url(),
+  fixture_ref: z.string().min(1),
+  study_id: z.string().min(1),
+  study_revision: z.number().int().positive(),
+});
+
+export const workflowBlockedPayload = z.object({
+  repair_run_id: z.string().min(1),
+  reason: z.string().min(1),
 });
 
 export const eventEnvelopeSchema = z.object({
