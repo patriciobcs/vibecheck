@@ -211,7 +211,7 @@ Add unresolved proposals under Open decisions until resolved. JSON schema versio
 
 - [ ] Per-study-session Jev evaluation of instrumentation logs needs a journey/detector mapping for study events; not implemented.
 
-- [x] Durable worker: a separate process leasing rows from a Postgres `jobs` table (`apps/web/src/worker`). Preview provider still open.
+- [x] Durable worker: a separate process leasing rows from a Postgres `jobs` table (`apps/web/src/worker`). Preview provider: Vercel Git integration, resolved by candidate SHA.
 - [ ] Verify Devin account/API capabilities, budgets and artifact retrieval with a real call.
 - [ ] Measure timestamp alignment tolerance between video, transcript and events, and verify Safari/Firefox screen share end to end. Vonage recording, signed callbacks and SLNG transcription are verified with real calls (2026-09-19); see VC-02's verification record.
 - [ ] Select notification provider; local development writes magic links and invitations to a database test inbox (`/dev/inbox`).

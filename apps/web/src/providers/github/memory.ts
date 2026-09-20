@@ -7,6 +7,11 @@ export class MemoryIssuePublisher implements RepoPublisher {
   async findByMarker(_repo: IssueRepository, marker: string) {
     return this.issues.find((issue) => issue.body.includes(marker)) ?? null;
   }
+  async findComment(_repo: IssueRepository, number: number, marker: string) {
+    return this.comments.some(
+      (comment) => comment.startsWith(`${number}:`) && comment.includes(marker),
+    );
+  }
   async create(
     _repo: IssueRepository,
     input: { title: string; body: string; labels: string[] },

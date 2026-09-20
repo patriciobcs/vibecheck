@@ -12,10 +12,10 @@ Use Devin to reproduce supported findings and create working design alternatives
 | Mode | GitHub issue | Code/PR | Preview and human retest |
 | --- | --- | --- | --- |
 | issues_only | Create/update | None | None |
-| draft_pr | Create/update | Devin change, independent checks, draft PR | Retest off; preview optional |
+| draft_pr | Create/update | Devin change, independent checks, draft PR | Retest off; Vercel preview when configured |
 | prototype_and_retest | Create/update | Devin change, independent checks, draft PR | Deploy checked candidate and assign retest |
 
-The demo build defaults to `draft_pr`; preview and human retest remain deferred. `issues_only` remains the recommended default for real tenants. The owner can select another mode at product or study level. Study settings snapshot the choice. Raising automation for an existing issue requires a deliberate owner action; lowering it or pausing must gate queued side effects immediately. No mode authorizes automatic merging or production deployment.
+The demo build defaults to `draft_pr`; human retest remains deferred. When `PREVIEW_PROVIDER=vercel`, draft-PR mode resolves the GitHub-integrated Vercel deployment by candidate SHA, waits for a ready deployment and health-checks it without triggering a build. `issues_only` remains the recommended default for real tenants. The owner can select another mode at product or study level. Study settings snapshot the choice. Raising automation for an existing issue requires a deliberate owner action; lowering it or pausing must gate queued side effects immediately. No mode authorizes automatic merging or production deployment.
 
 ## Repository adapter and prerequisites
 
@@ -24,6 +24,19 @@ Record repository owner/name, installation reference, base branch/SHA, editable 
 Research-only access does not imply write permission. A setup probe must demonstrate the baseline starts, fixtures load and baseline regression checks pass. If baseline behavior is already broken, distinguish expected reproduction failure from unrelated baseline failures.
 
 Use a branch/worktree in an authorized repo by default. A GitHub fork can be configured where permissions and CI support it. Validate fork secret restrictions and deployment access; do not assume workflows on forks inherit secrets. Separate stateful resources by variant/assignment so tests cannot interfere.
+
+### Preview deployment
+
+The supported real preview provider is Vercel's GitHub integration. The target repository
+builds previews automatically for branch pushes; VibeCheck does not trigger a deployment.
+After checks pass, it resolves the newest preview for the candidate SHA through Vercel's
+deployments API, waits up to `VERCEL_DEPLOY_TIMEOUT_MS`, and health-checks the resulting URL.
+`VERCEL_TOKEN` and `VERCEL_PROJECT_ID` are required, `VERCEL_TEAM_ID` is optional, and
+`VERCEL_API_BASE`/`VERCEL_POLL_MS` configure the API and polling interval. Deployment Protection
+must be disabled for preview environments so the health check can reach the deployment.
+Missing deployments and failed/canceled builds block the run with `preview_not_found` or
+`preview_build_failed`; an unhealthy URL blocks it with `preview_unhealthy`. The fixture
+provider remains available for local tests and labeled demos.
 
 ## Repair workflow
 
@@ -99,7 +112,7 @@ A draft PR may be retained for a blocked run, clearly marked with failed checks.
 ## Open decisions / future changes
 
 - [ ] Verify actual Devin authentication, session lifecycle, artifact retrieval and cancellation behavior.
-- [ ] Select preview provider after reproducing the target app environment.
+- [x] Select preview provider after reproducing the target app environment: Vercel Git integration, resolved by candidate SHA.
 - [ ] Define the first supported repository adapter; general stack detection comes later.
 - [ ] Multi-variant execution and owner-controlled production rollout are future scope.
 
@@ -107,19 +120,20 @@ A draft PR may be retained for a blocked run, clearly marked with failed checks.
 
 VC-04 currently includes tenant-scoped repair runs, check runs and previews,
 durable `repair.run` jobs, retry accounting, draft PR orchestration, and
-deterministic fixture adapters for repair, validation and preview. The fixture
-provider returns a candidate-shaped response but does not modify a repository or
-claim a real PR or deployment. The Devin adapter uses the existing session API
-and structured output contract.
+deterministic fixture adapters for repair and validation. The Vercel adapter
+resolves GitHub-integrated deployments by candidate SHA; it does not trigger
+builds. The Devin adapter uses the existing session API and structured output
+contract.
 
 The fixture validator currently enforces only allowed diff paths. The
-production Excalidraw acceptance validator and Vercel deployment adapter remain
-pending. The demo policy currently owns allowed paths and the five VC-07
+production Excalidraw acceptance validator remains pending. The demo policy
+currently owns allowed paths and the five VC-07
 invariants; moving those values onto repository bindings is an open decision.
 GitHub App repair operations require Contents read, Pull requests write and
 Issues write permissions.
 
 Blocked reasons include `not_reproduced`, `out_of_scope`, `checks_failed`,
-`preview_unhealthy` and `github_permissions`; missing base or candidate
+`preview_not_found`, `preview_build_failed`, `preview_unhealthy` and
+`github_permissions`; missing base or candidate
 artifacts are terminal failures. Draft PRs use `Refs #N`, not auto-closing
 references, and separate functional checks from human evidence.
