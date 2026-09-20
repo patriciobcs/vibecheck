@@ -50,6 +50,41 @@
       "when": 1789853680896,
       "tag": "0006_review_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789885941447,
+      "tag": "0007_purple_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789887427600,
+      "tag": "0008_fantastic_steel_serpent",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789888485000,
+      "tag": "0009_exotic_franklin_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789890253187,
+      "tag": "0010_white_the_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789891721030,
+      "tag": "0011_giant_zuras",
+      "breakpoints": true
     }
   ]
 }

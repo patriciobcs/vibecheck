@@ -22,4 +22,26 @@ describe("StudyPlanSchema", () => {
   it("rejects a non-integer study_revision", () => {
     expect(StudyPlanSchema.safeParse({ ...samplePlan, study_revision: 1.5 }).success).toBe(false);
   });
+
+  it("accepts a bounded participant scenario", () => {
+    expect(samplePlan.task.scenario?.steps).toHaveLength(3);
+  });
+
+  it("rejects scenarios with more than seven steps", () => {
+    const scenario = {
+      intro: "Complete the task.",
+      steps: Array.from({ length: 8 }, (_, i) => ({
+        order: i + 1,
+        instruction: `Step ${i + 1}`,
+      })),
+      think_aloud_cues: [],
+      estimated_minutes: 5,
+    };
+    expect(
+      StudyPlanSchema.safeParse({
+        ...samplePlan,
+        task: { ...samplePlan.task, scenario },
+      }).success,
+    ).toBe(false);
+  });
 });

@@ -1,96 +1,134 @@
-# VC-05 · Retesting, notifications and PR validation
+# VC-05 · Experiment summary for the product team
 
 Status: Draft
-Input: [VC-04](04-prototypes-and-verification.md) · Reuses: [VC-02](02-test-delivery-and-recording.md)
+Input: [VC-03](03-evidence-analysis-and-github-issues.md) findings, [VC-02](02-test-delivery-and-recording.md) sessions and participation events · Consumed by: [VC-06](06-owner-dashboard-and-orchestration.md)
 
 ## Goal
 
-Automatically recruit humans for a checked preview, run the same task, compare evidence honestly, and show on the PR whether and how its exact code version was human-tested.
+Turn the sessions of one experiment into a single, honest summary the product team can act on: who was invited and who completed the task, what was observed across participants, how sure we are, and what is being done about it (issues, draft PRs). The summary is per experiment (one published study revision) across multiple participants; it is never a per-participant report.
 
-## Retest policies
+Human retesting of code candidates on previews (the former VC-05 scope) is deferred; see "Deferred: retesting" at the end. Nothing in this spec asks a participant to test a candidate build.
 
-| Setting | Behavior |
-| --- | --- |
-| enabled | Derived from `prototype_and_retest`; off for issues-only/draft-PR mode |
-| participant_policy | `fresh` default; `returning` or `mixed` explicitly selectable |
-| source | Direct invite, embedded, or marketplace; external testing happens on the preview |
-| target_count | Configurable; small demo count is exploratory, not statistical proof |
-| invitations | In-app default; optional email to opted-in recipients |
-| reminder_limit | Proposed one reminder per assignment; respect unsubscribe and expiry |
-| study_deadline | Explicit UTC time; expiry closes recruitment with `insufficient_data` |
+## Scope boundary
 
-Returning participants can explain whether a proposed fix addresses their earlier concern, but prior exposure affects performance. Separate fresh and returning cohorts in comparisons; do not pool them invisibly.
+The SDK invitation popup, participant dialog, scenario rendering, screen/voice recording, upload, and Jev monitoring pipeline are implemented in-repo under VC-02 and the monitoring domain. VC-05 consumes their persisted rows and contracts:
 
-## Workflow
+| Direction | Contract | Owner |
+| --- | --- | --- |
+| VibeCheck → SDK | `study.published` event and `GET /api/studies/:id` (immutable plan with the participant-facing scenario) | VC-01 |
+| SDK → VibeCheck | `POST /api/studies/:id/participation` (external-channel-only participation additions) | VC-05 (this spec) |
+| SDK → VibeCheck | `SessionManifest` + events/transcript (`session.upload_verified`) | VC-02 → VC-03 |
+| Jev → VibeCheck | persisted `research_candidates` and `jev_evaluations` | VC-03/06 monitoring and summary context |
 
-1. On `preview.ready`, verify the SHA, health, expiry, policy and remaining budget.
-2. Create a RetestStudy referencing the frozen baseline task/research question, comparable fixture and candidate SHA. Keep the original study and sessions immutable.
-3. Select eligible participants. Fresh means no previous exposure to this task/product flow in recorded study history, not a guarantee that they have never seen the product elsewhere; record self-reported familiarity.
-4. Reserve an assignment and fixture, then send an in-app/email invitation through the outbox. Avoid duplicate assignment messages.
-5. Invitation contains a short neutral description, time expectation, reward, expiry and scoped link. Do not say which control moved, that the original was broken, or that the participant is expected to like the fix.
-6. Run VC-02 on the preview with equivalent capture settings. Verify served build identity at session start; mark sessions non-comparable if the preview changes midway.
-7. Analyze the retest through the same evidence pipeline, then generate a version-specific comparison.
-8. Update the existing PR managed evidence section and dashboard. Retesting does not auto-merge the PR.
+## Participation events
 
-## Metrics and interpretation
-
-Report counts and denominators: completed task, partial, failed/stuck, missing outcome and excluded sessions with reasons. Record task duration excluding documented pauses, navigation detours, assistance, perceived difficulty and qualitative observations. Missing instrumentation must remain unknown.
-
-Compare like-for-like task revision, fixture, cohort and completion rules. Retain participant comments that contradict a favorable aggregate. Time alone does not prove improvement; an easier task, learned behavior or changed fixture can explain a difference.
-
-For the MVP show descriptive results such as `baseline 0/1 completed; variant 1/1 completed; fresh participants; preliminary`. Do not display significant uplift, causality, general effectiveness or a universal UX score from tiny samples. Powered experiments and confidence intervals require a separately specified design.
-
-## Validation summary
+Persisted VC-02 invitation/assignment/session rows are the primary funnel source. Because `invitation_deliveries` does not carry `study_revision`, `invited` uses the revision-scoped assignment count. `participation_events` remains supported only for external channels; events whose session is null or does not match a persisted session are deduplicated by participant and kind and added as an overlay. Events are idempotent by `event_id`; unknown participants are opaque ids and no personal data is accepted.
 
 ```json
 {
   "schema_version": "1.0",
-  "validation_id": "validation_example",
-  "pull_request_ref": "pr_example",
-  "candidate_commit_sha": "REPLACE_WITH_REAL_SHA",
+  "event_id": "evt_example",
+  "study_id": "study_example",
   "study_revision": 1,
-  "fixture_revision": "excalidraw_fixture_v1",
-  "functional_status": "passed",
-  "human_status": "tested_preliminary",
-  "outcome": "encouraging",
-  "cohort": "fresh",
-  "baseline": {"attempted": 1, "completed": 0},
-  "variant": {"attempted": 1, "completed": 1},
-  "evidence_refs": ["session_baseline", "session_retest"],
-  "limitations": ["Exploratory sample; not evidence of statistical significance."],
+  "participant_ref": "participant_opaque",
+  "kind": "invited",
+  "occurred_at": "2026-09-19T10:00:00Z",
+  "session_id": null
+}
+```
+
+`kind` ∈ `invited`, `accepted`, `dismissed`, `started`, `completed`, `abandoned`. `session_id` is required for `started`, `completed` and `abandoned` and must match the manifest later uploaded through VC-02. A participant can appear once per kind per study revision; replays are ignored. Missing funnel data is reported as unknown, never inferred from session counts.
+
+## Summary generation
+
+1. Trigger: every `analysis.completed` for the study, every `participation` event of kind `completed`/`abandoned`, and an explicit owner request. Generation is a durable `summary.generate` job with one queued/running job per study revision; input changes can schedule a later run.
+2. Inputs are read from persisted rows only: VC-02 assignments and sessions, external-channel participation events, findings (VC-03), analysis runs with their manifest outcome/completeness, repair runs, issue mappings and matching research candidates. `inputs_hash` includes their ids and relevant states/outcomes; an unchanged hash produces no new revision.
+3. Deterministic part (computed in code, not by the agent): participation funnel, session outcomes, findings grouped by fingerprint with `observed/eligible` counts, certainty, issue and repair status per finding, exclusions with reasons (`baseline_mismatch`, `incomplete_capture`, `analysis_failed`).
+4. Narrative part (agent, structured output): a headline, 3–5 key observations each citing finding ids, and limitations. The agent receives only the deterministic summary and sanitized finding fields; passive Jev candidates are not supplied as narrative evidence. It never receives media, transcripts or participant identifiers. Output is validated: every cited `finding_id` must exist in the summary; counts in the text are not trusted and the UI renders numbers from the deterministic part.
+5. The summary is stored as an immutable `ExperimentSummary` revision; the latest is selected by revision ordering. Older revisions stay readable.
+
+Provider adapters: `fixture` (deterministic narrative for tests and demos, labeled) and `devin` (reuses the VC-01/03 Devin client and structured-output schema).
+
+## Experiment summary contract
+
+```json
+{
+  "schema_version": "1.0",
+  "summary_id": "summary_example",
+  "study_id": "study_example",
+  "study_revision": 1,
+  "revision": 2,
+  "status": "summarized",
+  "baseline_commit_sha": "REPLACE_WITH_REAL_SHA",
+  "participation": {
+    "invited": 12,
+    "accepted": 5,
+    "dismissed": 7,
+    "started": 5,
+    "completed": 3,
+    "abandoned": 2,
+    "unknown": false
+  },
+  "sessions": {
+    "eligible": 3,
+    "excluded": [{ "session_id": "session_example", "reason": "incomplete_capture" }],
+    "outcomes": { "completed": 1, "stuck": 1, "gave_up": 1, "withdrew": 0, "unknown": 0 }
+  },
+  "themes": [
+    {
+      "finding_id": "finding_example",
+      "title": "Toolbar: sticky note tool is hard to discover",
+      "category": "discoverability",
+      "observed_session_count": 2,
+      "eligible_session_count": 3,
+      "certainty": "repeated_observation",
+      "impact": "high",
+      "issue_ref": { "provider": "github", "repo": "owner/repo", "number": 4, "url": "https://github.com/owner/repo/issues/4" },
+      "repair_status": "queued"
+    }
+  ],
+  "narrative": {
+    "headline": "Participants struggled to find the sticky note tool",
+    "observations": [
+      { "text": "Two of three participants opened the shape menu before finding the sticky note tool.", "finding_ids": ["finding_example"] }
+    ],
+    "limitations": ["Three sessions; exploratory, not statistical evidence."]
+  },
+  "provenance": "human_session",
+  "inputs_hash": "sha256_example",
   "generated_at": "2026-09-19T15:00:00Z"
 }
 ```
 
-Use separate statuses for functional checks and human evidence. Human status: `not_requested`, `pending`, `tested_preliminary`, `inconclusive`, `stale`, `unavailable`. Outcome can be `encouraging`, `mixed`, `no_observed_improvement` or `unknown`. A completed human session may reveal regression and still counts as human-tested.
+Themes carry the current repair-run status for their finding, or `null` when no repair run exists. Repair-run identifiers, statuses, and update timestamps are included in `inputs_hash`, so a repair state change produces a new summary revision. `status`: `collecting` (no eligible session yet), `summarized`, `insufficient_data` (deadline passed with fewer eligible sessions than `recruitment.target_count` and at least one finding absent), `failed` (agent output invalid after one correction request; the deterministic part is still stored). `provenance` is the strictest provenance among the included sessions: any fixture or simulated session makes the whole summary `fixture`/`simulated_session` and the UI labels it as sample data.
 
-## GitHub representation
+An optional `jev_screening` object is labeled `passive_signal` and contains source candidate references plus matching candidate category, target, observation-session count and lifecycle state. It is passive context, not human evidence.
 
-Managed PR section includes linked issue/finding, tested SHA, deployment/build identity, independent check results, task/cohort/counts, outcome, limitations, authenticated evidence link and updated timestamp. Possible labels: `vibecheck:human-pending`, `vibecheck:human-tested`, `vibecheck:human-inconclusive`, `vibecheck:validation-stale`.
+## Interpretation rules
 
-Never use `human-tested` to imply universally validated. The PR body states preliminary results explicitly. On a new PR HEAD, mark old results stale and remove any current-validity badge; preserve history. Re-run functional tests and create new human assignments according to the configured policy. Deletion/withdrawal of evidence recomputes summaries and removes content-dependent claims where needed.
+Report counts with denominators. Small samples are exploratory; do not display significance, uplift, satisfaction scores or a universal UX score. A summary with contradicting sessions keeps the contradiction visible (`certainty: contradictory`). Missing instrumentation stays `unknown`. The summary must not name, quote verbatim or otherwise identify a participant; observations paraphrase.
 
-## Failures and cancellation
+## Visibility and sharing
 
-Email failure retries within bounds without duplicating assignments. No testers by deadline ends as insufficient data. Preview downtime pauses invitations; expired links offer reassignment only if a healthy equivalent build exists. A participant who returns after HEAD changes must not test a stale candidate unnoticed.
-
-When the owner disables retesting, cancel unclaimed invitations and stop new reminders. Let active sessions finish unless the environment is unsafe or access is revoked, and label resulting evidence accurately. Credits are tied to valid participation, never to favorable retest outcomes.
+The summary is available to the product team through the tenant-scoped dashboard and `GET /api/studies/:id/summary`. Sharing beyond the tenant is a later option: a signed, expiring read-only link to the summary only (no media, no transcripts). Public visibility or per-user visibility inside the app is recorded as an open decision.
 
 ## Acceptance criteria
 
-- A healthy checked preview automatically generates one eligible assignment per requested slot.
-- Invitations reveal no hypothesis or expected answer, and use authenticated scoped access.
-- Retest runs exactly the intended candidate/task/fixture revision.
-- Fresh/returning participants and assistance are recorded and visible.
-- The PR distinguishes functional pass, human participation and usability outcome.
-- New code makes old human validation stale; no old badge silently applies to a new SHA.
-- No response, failed task and missing data remain distinguishable outcomes.
-- Development sends only to test inboxes or explicitly authorized participants.
+- Every completed analysis or participation change produces at most one new summary revision; identical inputs produce none.
+- Funnel and outcome numbers come from persisted events and manifests, never from agent text.
+- Every narrative observation cites at least one existing finding id; invalid output is stored as `failed` without hiding the deterministic part.
+- Sample/fixture inputs make the summary visibly labeled as sample data.
+- The summary contains no participant identifiers, verbatim transcript quotes, media links or session UUIDs in the narrative.
+- Cross-tenant reads are denied; older summary revisions remain readable.
 
 ## Open decisions / future changes
 
-- [ ] Pick email provider and decide sender branding and opt-in flow.
-- [ ] Add concurrent randomized original/variant assignment after the sequential demo.
-- [ ] Define a statistically powered evaluation mode if customers need causal improvement claims.
-- [ ] Decide policy for automated retesting after later PR changes and its cost cap.
+- [ ] Participation event authentication for the SDK (shared secret vs. per-product key) — depends on spec-2's delivery design.
+- [ ] Per-study-session Jev evaluation of instrumentation logs needs a journey/detector mapping for study events; not implemented.
+- [ ] Share links (signed, expiring) and in-app visibility roles.
+- [ ] Export (Markdown/PDF) of a summary for people without dashboard access.
+- [ ] Add a persisted recruitment deadline before implementing `insufficient_data`; the current `StudyPlan` contract has `target_count` but no deadline source.
 
+## Deferred: retesting
+
+Automatic human retesting of a checked candidate (invite fresh participants to a preview, compare baseline vs. variant, `ValidationSummary`, PR labels `vibecheck:human-*`) is not part of the demo and is not implemented. The `prototype_and_retest` automation mode remains defined by VC-04 and stops at `preview_ready` until retesting is specified again. Guidance that still applies when it returns: separate fresh and returning cohorts, never pool them, never imply universal validation from small samples, and mark old human results stale when the PR HEAD changes.

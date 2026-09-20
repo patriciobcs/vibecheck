@@ -20,6 +20,8 @@ Seamless UX helps founders and product teams discover where users struggle, and 
 - [Excalidraw demo target](#excalidraw-demo-target)
 - [Passive monitoring (VC-02/03 continuous discovery)](#passive-monitoring-vc-0203-continuous-discovery)
 - [Discovery (VC-01)](#discovery-vc-01)
+- [GitHub issue publication (VC-03)](#github-issue-publication-vc-03)
+- [Repair pipeline (VC-04)](#repair-pipeline-vc-04)
 - [Specifications](#specifications)
 - [Contributing](#contributing)
 - [License](#license)
@@ -111,7 +113,7 @@ CI (`.github/workflows/ci.yml`) runs `pnpm check`, `pnpm test`, and a production
 
 Set `DEMO_MODE=true` in `apps/web/.env.local` (ignored in production). The app then hides developer copy (seed hints, SDK snippets, the test inbox), labels sample material "Demo data", and the landing and sign-in pages offer "Enter the demo", a one-click sign-in as the seed owner.
 
-`pnpm demo:record` (in `apps/web`) records the two-window demo as `demo-recordings/demo.mp4`: the visitor on the Excalidraw clone on the left, the owner's live analysis on the right. It drives the real pipeline (fake microphone → passive screening with Jev → audio-only study → transcript) and composes the halves with ffmpeg. Needs `pnpm dev` with demo mode, `pnpm tunnel`, the clone on :3200, and real provider keys.
+`pnpm demo:record` (in `apps/web`) records the two-window demo as `demo-recordings/demo.mp4`: the visitor on the Excalidraw clone on the left, the owner's live analysis on the right. It drives the real pipeline (fake microphone → passive screening with Jev → audio-only study → transcript) and composes the halves with ffmpeg, mixing in synthesized voices (macOS `say`, see `apps/web/scripts/voice`): the participant's think-aloud goes through the fake microphone and ends up in the real transcript, narrator clips are placed at the recorded phase times. Needs `pnpm dev` with demo mode, `pnpm tunnel`, the clone on :3200, and real provider keys.
 
 ## Excalidraw demo target
 
@@ -136,6 +138,14 @@ Products can enable passive semantic telemetry (off by default) at `/products/:i
 ## Discovery (VC-01)
 
 Discovery runs through a provider adapter: `fixture` returns labeled sample proposals for local development and tests; `devin` starts a Devin analysis session (`DEVIN_API_KEY`, `DISCOVERY_PROVIDER=devin`). A remote agent cannot reach `localhost`, so Devin discovery needs a publicly reachable target URL. Set `ALLOW_LOCAL_TARGETS=true` to accept loopback product URLs in development. Programmatic access to the product/discovery/study endpoints uses `Authorization: Bearer <api key>` (hashed at rest, seeded from `DEV_API_KEY`); the owner UI uses the signed-in session.
+
+## GitHub issue publication (VC-03)
+
+Analysis can publish sanitized findings through a GitHub App installation. Set `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` for bot-authored issues; `GITHUB_ISSUES_TOKEN` is a development/test fallback. Set `APP_BASE_URL` to a public deployment URL for the dashboard link to appear in issue bodies; localhost, `.local`, loopback, and private-network URLs are omitted.
+
+## Repair pipeline (VC-04)
+
+Repair runs default to deterministic local adapters. Set `REPAIR_PROVIDER`, `VALIDATOR`, and `PREVIEW_PROVIDER` to `fixture` for local development; the Devin repair adapter requires `REPAIR_PROVIDER=devin` and the existing Devin credentials.
 
 ## Specifications
 

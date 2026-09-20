@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { AssignmentView } from "@/domain/assignment-view";
@@ -269,7 +270,31 @@ export function ParticipantDialog({
       >
         {step === "task" ? (
           <>
-            <p className="text-[15px] leading-snug">{view.task.participantPrompt}</p>
+            {view.task.scenario ? (
+              <div className="space-y-3 text-[15px] leading-snug">
+                <p>{view.task.scenario.intro}</p>
+                <ol className="list-decimal space-y-1 pl-5">
+                  {view.task.scenario.steps
+                    .slice()
+                    .sort((a, b) => a.order - b.order)
+                    .map((scenarioStep) => (
+                      <li key={scenarioStep.order}>{scenarioStep.instruction}</li>
+                    ))}
+                </ol>
+                {view.task.scenario.think_aloud_cues.length ? (
+                  <div className="rounded-lg bg-secondary/60 p-3 text-sm">
+                    <p className="font-medium">Think aloud</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4">
+                      {view.task.scenario.think_aloud_cues.map((cue) => (
+                        <li key={cue}>{cue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-[15px] leading-snug">{view.task.participantPrompt}</p>
+            )}
             <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Timer className="size-3.5" /> About {minutes} min · think out loud · not finishing is
               fine
@@ -421,7 +446,7 @@ function Frame({
     <section className="w-[404px] max-w-[100vw] p-5 text-foreground" aria-label={title}>
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-tight text-muted-foreground">
-          <span className="inline-block size-1.5 rounded-full bg-brand" /> Seamless UX
+          <LogoMark className="size-3.5 text-brand" /> Seamless UX
         </span>
         <div className="flex items-center gap-2">
           {idx >= 0 ? (

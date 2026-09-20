@@ -16,3 +16,4 @@ test-results
 *.tsbuildinfo
 .turbo
 demo-recordings
+.vercel

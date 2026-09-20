@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { type Db, db, schema, type Tx } from "@/db/client";
 import { newId } from "@/lib/ids";
 
@@ -12,6 +12,8 @@ export async function enqueueJob(
   input: {
     type: string;
     payload: Record<string, unknown>;
+    /** Owning tenant; defaults to a `tenantId` string on the payload. Null = tenant-agnostic. */
+    tenantId?: string | null;
     dedupeKey?: string;
     maxAttempts?: number;
     runAt?: Date;
@@ -20,10 +22,13 @@ export async function enqueueJob(
   executor: Db | Tx = db,
 ): Promise<JobRow> {
   const id = newId("job");
+  const tenantId =
+    input.tenantId ?? (typeof input.payload.tenantId === "string" ? input.payload.tenantId : null);
   const [inserted] = await executor
     .insert(schema.jobs)
     .values({
       id,
+      tenantId,
       type: input.type,
       payload: input.payload,
       dedupeKey: input.dedupeKey ?? null,
@@ -32,12 +37,77 @@ export async function enqueueJob(
     })
     .onConflictDoNothing({ target: schema.jobs.dedupeKey })
     .returning();
-  if (inserted) return inserted;
+  if (inserted) {
+    scheduleInlineDrain(inserted.nextRunAt);
+    return inserted;
+  }
   const existing = await executor.query.jobs.findFirst({
     where: eq(schema.jobs.dedupeKey, input.dedupeKey ?? ""),
   });
   if (!existing) throw new Error("job insert conflict without existing row");
   return existing;
+}
+
+/** How long an inline drain keeps following the queue after its request (must fit the function limit). */
+const INLINE_DRAIN_BUDGET_MS = 50_000;
+/** A queued job due within this horizon is waited for; anything later is left to the next request or cron. */
+const INLINE_DRAIN_HORIZON_MS = 10_000;
+
+/**
+ * Serverless deployments have no worker process. With INLINE_JOBS=true, a request that enqueues a
+ * job also runs the queue after its response is sent (Next's `after`), waiting out short batch
+ * delays and following jobs that requeue themselves (archive reconciliation) for a bounded time.
+ * Outside a request (worker, tests) this is a no-op; a cron drain catches stragglers.
+ */
+function scheduleInlineDrain(runAt: Date) {
+  if (process.env.INLINE_JOBS !== "true") return;
+  const delay = Math.min(INLINE_DRAIN_HORIZON_MS, Math.max(0, runAt.getTime() - Date.now()));
+  import("next/server")
+    .then(({ after }) => {
+      after(() => inlineDrainLoop(delay));
+    })
+    .catch(() => {
+      /* not inside a request: the cron drain will pick it up */
+    });
+}
+
+/** Any request may nudge the queue (the live board polls while a study finishes). */
+export function kickInlineDrain() {
+  scheduleInlineDrain(new Date());
+}
+
+async function inlineDrainLoop(firstDelayMs: number) {
+  const { drain } = await import("@/worker/runner");
+  const deadline = Date.now() + INLINE_DRAIN_BUDGET_MS;
+  let wait = firstDelayMs;
+  while (Date.now() + wait < deadline) {
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait + 200));
+    await drain("inline", 10);
+    const due = await nextDueAt();
+    if (!due) return;
+    wait = Math.max(0, due.getTime() - Date.now());
+    if (wait > INLINE_DRAIN_HORIZON_MS) return;
+  }
+}
+
+/**
+ * When the earliest leasable queued job may run, or null when there is none. A paused tenant's job
+ * is skipped for the same reason `leaseNextJob` skips it: waiting for it would never make progress.
+ */
+export async function nextDueAt(): Promise<Date | null> {
+  const [row] = await db
+    .select({ nextRunAt: schema.jobs.nextRunAt })
+    .from(schema.jobs)
+    .leftJoin(schema.tenants, eq(schema.jobs.tenantId, schema.tenants.id))
+    .where(
+      and(
+        eq(schema.jobs.status, "queued"),
+        or(isNull(schema.jobs.tenantId), eq(schema.tenants.paused, false)),
+      ),
+    )
+    .orderBy(asc(schema.jobs.nextRunAt))
+    .limit(1);
+  return row?.nextRunAt ?? null;
 }
 
 /** Atomically leases the next runnable job (queued and due, or running with an expired lease). */
@@ -54,22 +124,26 @@ export async function leaseNextJob(input: {
       and(eq(schema.jobs.status, "running"), lte(schema.jobs.leaseExpiresAt, now)),
     );
     const typeFilter = input.types?.length ? inArray(schema.jobs.type, input.types) : undefined;
+    // A paused tenant's jobs stay queued (attempts and nextRunAt untouched) until resume.
+    const notPaused = or(isNull(schema.jobs.tenantId), eq(schema.tenants.paused, false));
     const [candidate] = await tx
-      .select()
+      .select({ job: schema.jobs })
       .from(schema.jobs)
-      .where(typeFilter ? and(runnable, typeFilter) : runnable)
+      .leftJoin(schema.tenants, eq(schema.jobs.tenantId, schema.tenants.id))
+      .where(typeFilter ? and(runnable, notPaused, typeFilter) : and(runnable, notPaused))
       .orderBy(schema.jobs.nextRunAt)
       .limit(1)
-      .for("update", { skipLocked: true });
+      .for("update", { skipLocked: true, of: schema.jobs });
     if (!candidate) return null;
+    const job = candidate.job;
     // An expired lease means the previous worker died mid-job: that was an attempt, so a job that
     // keeps crashing its worker is dead-lettered instead of looping forever.
-    const expired = candidate.status === "running";
-    const attempts = expired ? candidate.attempts + 1 : candidate.attempts;
+    const expired = job.status === "running";
+    const attempts = expired ? job.attempts + 1 : job.attempts;
     const lastError = expired
-      ? `lease expired while running on ${candidate.lockedBy ?? "unknown worker"}`
-      : candidate.lastError;
-    if (expired && attempts >= candidate.maxAttempts) {
+      ? `lease expired while running on ${job.lockedBy ?? "unknown worker"}`
+      : job.lastError;
+    if (expired && attempts >= job.maxAttempts) {
       await tx
         .update(schema.jobs)
         .set({
@@ -80,7 +154,7 @@ export async function leaseNextJob(input: {
           lockedBy: null,
           updatedAt: now,
         })
-        .where(eq(schema.jobs.id, candidate.id));
+        .where(eq(schema.jobs.id, job.id));
       return null;
     }
     const [leased] = await tx
@@ -93,7 +167,7 @@ export async function leaseNextJob(input: {
         leaseExpiresAt: leaseUntil,
         updatedAt: now,
       })
-      .where(eq(schema.jobs.id, candidate.id))
+      .where(eq(schema.jobs.id, job.id))
       .returning();
     return leased ?? null;
   });
@@ -138,9 +212,9 @@ export async function failJob(id: string, err: unknown) {
     .where(eq(schema.jobs.id, id));
 }
 
-/** Requeue a failed/dead job explicitly (owner-visible retry, VC-06). */
-export async function retryJob(id: string) {
-  await db
+/** Requeue a failed/dead/cancelled job explicitly (owner-visible retry, VC-06). */
+export async function retryJob(id: string): Promise<JobRow | null> {
+  const [row] = await db
     .update(schema.jobs)
     .set({
       status: "queued",
@@ -149,5 +223,19 @@ export async function retryJob(id: string) {
       lastError: null,
       updatedAt: new Date(),
     })
-    .where(eq(schema.jobs.id, id));
+    .where(
+      and(eq(schema.jobs.id, id), inArray(schema.jobs.status, ["failed", "dead", "cancelled"])),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Cancel a job that has not started; running work is left to finish (VC-06). */
+export async function cancelJob(id: string): Promise<JobRow | null> {
+  const [row] = await db
+    .update(schema.jobs)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(and(eq(schema.jobs.id, id), eq(schema.jobs.status, "queued")))
+    .returning();
+  return row ?? null;
 }

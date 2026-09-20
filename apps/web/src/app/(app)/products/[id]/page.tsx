@@ -2,10 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
+import { productOverview } from "@/domain/overview";
 import { ownerContext, ownerProduct, productDiscovery } from "@/domain/owner-products";
 import { createDiscoveryRun } from "@/domain/products";
 import { env } from "@/lib/env";
 import { AutoRefresh } from "./auto-refresh";
+import { OverviewSection } from "./overview-section";
+import { CandidatesPanel } from "./signals-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +41,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   const product = await ownerProduct(ctx.tenantIds, id);
   if (!product) notFound();
   const runs = await productDiscovery(product.id);
+  const overview = await productOverview(ctx.tenantIds, product.id);
   const sources = new Map(
     [...product.releaseNotes, ...product.supportComplaints].map((s) => [s.id, s]),
   );
@@ -51,11 +55,13 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         <>
           <NavLink href="/products">Products</NavLink>
           <NavLink href="/owner">Sessions</NavLink>
+          <NavLink href="/operations">Operations</NavLink>
           <span className="px-3 text-foreground">{ctx.email}</span>
         </>
       }
     >
       <AutoRefresh active={active} />
+      {overview ? <OverviewSection overview={overview} /> : null}
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <div>
           <Link href="/products" className="text-xs text-muted-foreground hover:text-foreground">
@@ -147,11 +153,38 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                           ) : null}
                           {p.sourceCandidateRefs.length ? (
                             <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] text-brand">
-                              From passive signal
+                              From Jev passive candidate
                             </span>
                           ) : null}
                         </div>
                         <blockquote className="mt-2 text-sm">{p.participantPrompt}</blockquote>
+                        {p.scenario ? (
+                          <div className="mt-3 rounded-lg bg-secondary/60 p-3 text-sm">
+                            <p className="font-medium">Participant scenario</p>
+                            <p className="mt-1">{p.scenario.intro}</p>
+                            <ol className="mt-2 list-decimal space-y-1 pl-5">
+                              {p.scenario.steps
+                                .slice()
+                                .sort((a, b) => a.order - b.order)
+                                .map((step) => (
+                                  <li key={step.order}>{step.instruction}</li>
+                                ))}
+                            </ol>
+                            {p.scenario.think_aloud_cues.length ? (
+                              <div className="mt-2">
+                                <p className="font-medium">Think aloud</p>
+                                <ul className="mt-1 list-disc space-y-1 pl-4">
+                                  {p.scenario.think_aloud_cues.map((cue) => (
+                                    <li key={cue}>{cue}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Estimated time: {p.scenario.estimated_minutes} minutes
+                            </p>
+                          </div>
+                        ) : null}
                         <p className="mt-2 text-xs text-muted-foreground">{p.rationale}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Evidence: {p.evidenceRefs.join(", ") || "none"} ({p.evidenceType}) ·
@@ -191,6 +224,9 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               ) : null}
             </article>
           ))}
+          {overview ? (
+            <CandidatesPanel candidates={overview.latest_candidates} productId={product.id} />
+          ) : null}
         </div>
         <aside className="space-y-4">
           <div className="surface p-5 text-sm">

@@ -23,6 +23,9 @@ unreachable return needs_setup. If context is insufficient return cannot_assess.
 Do not invent traffic, complaints or observed failures. Distinguish signal from
 hypothesis. Use only these success_rule_ref values: ${SUCCESS_RULE_REFS.join(", ")}.
 Use only these eligibility_rule_ref values: ${ELIGIBILITY_RULE_REFS.join(", ")}.
+For every proposal, include a neutral agent-designed scenario with a short intro,
+present-tense imperative steps, and optional think-aloud cues. Do not name controls,
+leak a hypothesis, or ask the participant to be negative.
 Return only this exact JSON shape:
 ${JSON.stringify(agentOutputJsonSchema)}
 

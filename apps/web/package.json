@@ -13,10 +13,13 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local src/db/migrate.ts",
+    "db:migrate:prod": "tsx --env-file=.env.production.local src/db/migrate.ts",
+    "db:seed:prod": "tsx --env-file=.env.production.local src/db/seed.ts",
     "db:seed": "tsx --env-file-if-exists=.env.local src/db/seed.ts",
     "db:reset-sample": "tsx --env-file-if-exists=.env.local src/db/reset-sample.ts",
     "tunnel": "tsx --env-file-if-exists=.env.local scripts/tunnel.ts",
-    "demo:record": "tsx --env-file-if-exists=.env.local scripts/record-demo.ts"
+    "demo:record": "tsx --env-file-if-exists=.env.local scripts/record-demo.ts",
+    "vonage:callback": "tsx --env-file-if-exists=.env.local scripts/vonage-callback.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

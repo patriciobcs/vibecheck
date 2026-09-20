@@ -17,7 +17,7 @@ export const studyPlanDefaults = {
     retention_days: 30,
   },
   automation: {
-    mode: "prototype_and_retest" as const,
+    mode: "draft_pr" as const,
     max_variants: 1,
     max_repair_attempts: 2,
     agent_budget_ref: "demo_budget",
@@ -83,6 +83,7 @@ export async function publishStudy(
       time_limit_seconds: input.task?.time_limit_seconds ?? 300,
       success_rule_ref: proposal.successRuleRef,
       fixture_ref: input.fixture_ref,
+      ...(proposal.scenario ? { scenario: proposal.scenario } : {}),
     },
     baseline: input.baseline,
     recruitment: {

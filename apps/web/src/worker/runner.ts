@@ -1,9 +1,18 @@
-import { fetchArchiveJob, transcribeAssetJob } from "@/domain/archive-pipeline";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/db/client";
+import { handleAnalysisRun } from "@/domain/analyses";
+import {
+  fetchArchiveJob,
+  reconcileArchiveJob,
+  reconcileStaleArchives,
+  transcribeAssetJob,
+} from "@/domain/archive-pipeline";
 import {
   handleDiscoveryRun,
   markDiscoveryRunFailed,
   markDiscoveryRunQueued,
 } from "@/domain/discovery";
+import { publishFinding } from "@/domain/issues";
 import { completeJob, failJob, heartbeatJob, leaseNextJob } from "@/domain/jobs";
 import { detectorGeneratorFor, generateDetector } from "@/domain/monitoring/detectors";
 import { evaluateJob } from "@/domain/monitoring/evaluate";
@@ -12,6 +21,8 @@ import {
   scanJourney,
   sweepIdleJourneys,
 } from "@/domain/monitoring/screening";
+import { runRepair } from "@/domain/repairs";
+import { generateSummary } from "@/domain/summaries";
 import { env } from "@/lib/env";
 import { jevClient, mediaClient, sttClient } from "@/providers";
 import { storage } from "@/providers/storage";
@@ -24,6 +35,12 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
       if (!media) throw new Error("Vonage is not configured; cannot fetch archive");
       return fetchArchiveJob(payload as { archiveId: string }, { media, storage: storage() });
     }
+    case "archive.reconcile": {
+      const media = mediaClient();
+      if (!media) throw new Error("Vonage is not configured; cannot reconcile archive");
+      await reconcileArchiveJob(payload as { archiveId: string; attempt?: number }, { media });
+      return;
+    }
     case "asset.transcribe": {
       const stt = sttClient();
       if (!stt) throw new Error("SLNG is not configured; cannot transcribe");
@@ -31,6 +48,16 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     }
     case "discovery.run":
       return handleDiscoveryRun((payload as { runId: string }).runId);
+    case "analysis.run":
+      return handleAnalysisRun((payload as { analysisRunId: string }).analysisRunId);
+    case "issue.publish":
+      return publishFinding((payload as { findingId: string }).findingId);
+    case "repair.run":
+      return runRepair((payload as { repairRunId: string }).repairRunId);
+    case "summary.generate": {
+      const p = payload as { tenantId: string; studyId: string; studyRevision: number };
+      return generateSummary(p.tenantId, p.studyId, p.studyRevision);
+    }
     case "monitoring.scan": {
       const p = payload as {
         journeyInstanceId: string;
@@ -43,6 +70,7 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
     case "monitoring.sweep":
       await sweepIdleJourneys();
       await retryDeferredEvaluations();
+      await sweepArchives();
       return;
     case "jev.evaluate": {
       const jev = jevClient();
@@ -69,11 +97,32 @@ export async function runJob(type: string, payload: Record<string, unknown>) {
   }
 }
 
+/** Provider check for uploaded assets whose callback never came; a no-op without Vonage. */
+export async function sweepArchives() {
+  const media = mediaClient();
+  if (!media) return [];
+  return reconcileStaleArchives({ media });
+}
+
 /** Reflect a job failure on the domain object it drives (a retryable failure returns a run to `queued`). */
 async function onJobFailure(
   job: { type: string; payload: unknown; attempts: number; maxAttempts: number },
   err: unknown,
 ) {
+  if (job.type === "analysis.run") {
+    const runId = (job.payload as { analysisRunId?: string }).analysisRunId;
+    if (!runId) return;
+    const terminal = job.attempts + 1 >= job.maxAttempts;
+    await db
+      .update(schema.analysisRuns)
+      .set({
+        status: terminal ? "failed" : "queued",
+        error: terminal ? (err instanceof Error ? err.message : "job_failed") : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.analysisRuns.id, runId));
+    return;
+  }
   if (job.type !== "discovery.run") return;
   const runId = (job.payload as { runId?: string }).runId;
   if (!runId) return;

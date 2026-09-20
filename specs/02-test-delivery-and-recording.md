@@ -10,14 +10,14 @@ Deliver the same study through a link or an embedded invitation, capture declare
 ## Invitation and assignment
 
 - Direct link: owner shares a study invitation with friends or customers. Exchange a scoped token for an assignment after eligibility and consent; do not expose test credentials in URLs.
-- Embedded: a small SDK checks eligibility and invitation caps, then displays a dismissible toast at an appropriate moment. No capture begins merely because the toast appeared.
+- Embedded: a small SDK checks eligibility and invitation caps, then displays a dismissible toast at an appropriate moment. The eligibility offer carries the immutable participant-facing scenario when one is configured. No capture begins merely because the toast appeared.
 - Marketplace: signed-in testers claim available tasks from a simple queue. Transactional claims prevent exceeding the target count. Reserve a fixture/account per assignment.
 - Support dismissal and cooldown. Proposed starting default: one invitation per participant/product per seven days; configurable. Do not interrupt critical workflows such as checkout.
 - Reveal a neutral task, expected duration, recording requirements and any reward before participation. Failure to accomplish the task does not invalidate participation.
 
 ## Recording configuration
 
-| Signal | MVP default | Boundaries |
+| Capture surface | MVP default | Boundaries |
 | --- | --- | --- |
 | Screen | Required for recorded studies | Explicit browser screen-share choice; encourage the application tab. |
 | Microphone | Required for think-aloud studies | Permission and clear recording indicator; missing permission gives retry or exit. |
@@ -43,6 +43,8 @@ Pixel-level screen recordings can reveal information beyond masked DOM events. U
 `invited → eligible → assigned → consent → device_check → recording → submitting → complete`
 
 The participant may pause, resume, mark themselves stuck, finish early or withdraw. A neutral reminder such as "What are you looking for?" may be used sparingly; log its timestamp because moderation can affect behavior. Never coach toward a specific control or show an engagement/roast score during testing.
+
+When the published plan includes an agent-designed scenario, the participant dialog renders its introduction, numbered steps and think-aloud cues. When no scenario exists, it renders the existing `participant_prompt` unchanged.
 
 At completion ask for perceived difficulty and optional comments. Capture declared completion separately from instrumented completion. Store missing evidence as missing, not as zero time or failure.
 
@@ -205,4 +207,3 @@ Additional acceptance criteria:
 - [ ] Device participants are per browser profile (Safari partitions iframe storage per top site), so cooldowns are per device+site, not per person; credits for anonymous participants have no payout path yet.
 - [ ] Define participant-facing withdrawal and partial-session credit policy.
 - [ ] Accessibility alternatives for participants who cannot provide think-aloud audio.
-

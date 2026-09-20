@@ -13,7 +13,17 @@
       "evidence_type": "reported",
       "eligibility_rule_ref": "eligible_whiteboard_users_v1",
       "success_rule_ref": "stickynote_capture_v1",
-      "uncertainties": ["No baseline human test has been completed."]
+      "uncertainties": ["No baseline human test has been completed."],
+      "scenario": {
+        "intro": "Help add the ideas to the board so the team can review them.",
+        "steps": [
+          { "order": 1, "instruction": "Review the ideas listed in the task." },
+          { "order": 2, "instruction": "Add each idea to the board." },
+          { "order": 3, "instruction": "Check that your ideas are visible." }
+        ],
+        "think_aloud_cues": ["What are you looking for?", "What do you expect to happen next?"],
+        "estimated_minutes": 5
+      }
     },
     {
       "task_id": "task_match_colors",
@@ -24,7 +34,17 @@
       "evidence_type": "reported",
       "eligibility_rule_ref": "eligible_whiteboard_users_v1",
       "success_rule_ref": "fill_match_v1",
-      "uncertainties": ["No baseline human test has been completed."]
+      "uncertainties": ["No baseline human test has been completed."],
+      "scenario": {
+        "intro": "Help make the selected shapes use the same fill.",
+        "steps": [
+          { "order": 1, "instruction": "Review the selected shapes." },
+          { "order": 2, "instruction": "Choose one shape as the visual reference." },
+          { "order": 3, "instruction": "Update the other shapes to match it." }
+        ],
+        "think_aloud_cues": ["What are you looking for?"],
+        "estimated_minutes": 5
+      }
     },
     {
       "task_id": "task_navigate_board",
@@ -35,7 +55,17 @@
       "evidence_type": "reported",
       "eligibility_rule_ref": "eligible_whiteboard_users_v1",
       "success_rule_ref": "viewport_reached_v1",
-      "uncertainties": ["No baseline human test has been completed."]
+      "uncertainties": ["No baseline human test has been completed."],
+      "scenario": {
+        "intro": "Help bring the marked region of the board into view.",
+        "steps": [
+          { "order": 1, "instruction": "Review the board currently on screen." },
+          { "order": 2, "instruction": "Find the region marked for the team offsite." },
+          { "order": 3, "instruction": "Bring that region fully into view." }
+        ],
+        "think_aloud_cues": ["What do you expect to happen next?"],
+        "estimated_minutes": 5
+      }
     }
   ]
 }

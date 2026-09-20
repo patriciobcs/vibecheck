@@ -1,14 +1,15 @@
 import { cn } from "cn";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LogoMark } from "./logo";
 
 export function Wordmark({ className }: { className?: string }) {
   return (
     <Link
       href="/"
-      className={cn("inline-flex items-center gap-2 font-semibold tracking-tight", className)}
+      className={cn("inline-flex items-center gap-1.5 font-semibold tracking-tight", className)}
     >
-      <span className="inline-block size-2.5 rounded-full bg-brand" aria-hidden />
+      <LogoMark className="size-5 text-brand" />
       Seamless UX
     </Link>
   );

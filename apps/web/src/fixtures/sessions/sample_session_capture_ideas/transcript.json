@@ -1,0 +1,44 @@
+[
+  {
+    "segment_id": "segment_01",
+    "start_ms": 0,
+    "end_ms": 12000,
+    "speaker": "participant",
+    "text": "I need to add a few ideas to this board, but I do not immediately see how to add a note."
+  },
+  {
+    "segment_id": "segment_02",
+    "start_ms": 12000,
+    "end_ms": 30000,
+    "speaker": "participant",
+    "text": "I am looking around the toolbar and trying the rectangle tool instead."
+  },
+  {
+    "segment_id": "segment_03",
+    "start_ms": 30000,
+    "end_ms": 48000,
+    "speaker": "participant",
+    "text": "That made a shape, so I will type the idea inside the shape."
+  },
+  {
+    "segment_id": "segment_04",
+    "start_ms": 48000,
+    "end_ms": 68000,
+    "speaker": "participant",
+    "text": "I can finish the task this way, although it takes longer than I expected."
+  },
+  {
+    "segment_id": "segment_05",
+    "start_ms": 68000,
+    "end_ms": 82000,
+    "speaker": "participant",
+    "text": "I am not sure whether this is the intended way to capture ideas."
+  },
+  {
+    "segment_id": "segment_06",
+    "start_ms": 82000,
+    "end_ms": 100000,
+    "speaker": "participant",
+    "text": "I finished adding the ideas and would continue if there were more."
+  }
+]

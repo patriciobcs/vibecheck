@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db/client";
 import { newId } from "@/lib/ids";
 import type { MediaClient } from "@/providers/vonage";
+import { scheduleArchiveReconcile } from "./archive-pipeline";
 import type { AssignmentRow } from "./assignments";
 import { canTransition, type ParticipantState } from "./participant-flow";
 
@@ -390,6 +391,7 @@ export async function finishRecording(input: {
     } catch (err) {
       console.error("stopArchive failed; reconciliation job will retry", err);
     }
+    await scheduleArchiveReconcile(ctx.asset.providerArchiveId);
   }
   return { ok: true };
 }
