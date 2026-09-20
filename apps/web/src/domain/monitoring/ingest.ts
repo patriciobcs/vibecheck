@@ -189,6 +189,7 @@ export async function ingestObservationBatch(input: {
       await enqueueJob(
         {
           type: "monitoring.scan",
+          tenantId: session.tenantId,
           payload: {
             journeyInstanceId,
             observationSessionId: session.id,

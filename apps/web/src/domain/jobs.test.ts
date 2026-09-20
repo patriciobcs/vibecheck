@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "@/db/client";
 import { resetDb } from "@/test/db";
-import { completeJob, enqueueJob, failJob, leaseNextJob } from "./jobs";
+import { seedStudy } from "@/test/fixtures";
+import { cancelJob, completeJob, enqueueJob, failJob, leaseNextJob, retryJob } from "./jobs";
 
 beforeEach(resetDb);
 
@@ -89,5 +91,44 @@ describe("job queue", () => {
     await leaseNextJob({ workerId: "w", leaseSeconds: 60 });
     await completeJob(job.id);
     expect((await db.query.jobs.findFirst())?.status).toBe("done");
+  });
+});
+
+describe("pause-aware leasing", () => {
+  it("does not lease a paused tenant's job and leases it after resume", async () => {
+    const { tenantId } = await seedStudy();
+    const job = await enqueueJob({ type: "t", payload: {}, tenantId });
+    await db.update(schema.tenants).set({ paused: true }).where(eq(schema.tenants.id, tenantId));
+    expect(await leaseNextJob({ workerId: "w", leaseSeconds: 60 })).toBeNull();
+    const row = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, job.id) });
+    expect(row?.status).toBe("queued");
+    expect(row?.attempts).toBe(0);
+    await db.update(schema.tenants).set({ paused: false }).where(eq(schema.tenants.id, tenantId));
+    expect((await leaseNextJob({ workerId: "w", leaseSeconds: 60 }))?.id).toBe(job.id);
+  });
+
+  it("still leases a job with no tenant", async () => {
+    await db.update(schema.tenants).set({ paused: true });
+    await enqueueJob({ type: "t", payload: {} });
+    expect(await leaseNextJob({ workerId: "w", leaseSeconds: 60 })).not.toBeNull();
+  });
+
+  it("cancels only queued jobs and retries failed ones", async () => {
+    const { tenantId } = await seedStudy();
+    const queued = await enqueueJob({ type: "t", payload: {}, tenantId });
+    const running = await enqueueJob({ type: "t2", payload: {}, tenantId });
+    await db.update(schema.jobs).set({ status: "running" }).where(eq(schema.jobs.id, running.id));
+    const failed = await enqueueJob({ type: "t3", payload: {}, tenantId });
+    await db.update(schema.jobs).set({ status: "failed" }).where(eq(schema.jobs.id, failed.id));
+
+    expect((await cancelJob(queued.id))?.status).toBe("cancelled");
+    expect(await cancelJob(running.id)).toBeNull();
+    expect(await cancelJob(failed.id)).toBeNull();
+    const retried = await retryJob(failed.id);
+    expect(retried?.status).toBe("queued");
+    expect(retried?.attempts).toBe(0);
+    // A cancelled job is retryable; a running one is not.
+    expect((await retryJob(queued.id))?.status).toBe("queued");
+    expect(await retryJob(running.id)).toBeNull();
   });
 });

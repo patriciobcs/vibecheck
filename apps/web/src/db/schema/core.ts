@@ -31,6 +31,8 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   /** Global pause: blocks new invitations and side effects (VC-01/06). */
   paused: boolean("paused").default(false).notNull(),
+  /** When the pause took effect; `paused` stays the source of truth, this is display/audit. */
+  pausedAt: ts("paused_at"),
   createdAt: createdAt(),
 });
 
@@ -746,7 +748,9 @@ export const jobs = pgTable(
     payload: jsonb("payload").notNull(),
     /** Business key: enqueueing the same key twice is a no-op. */
     dedupeKey: text("dedupe_key").unique(),
-    status: text("status", { enum: ["queued", "running", "done", "failed", "dead"] })
+    /** Tenant that owns the work; null for tenant-agnostic jobs. Paused tenants' jobs are not leased. */
+    tenantId: text("tenant_id"),
+    status: text("status", { enum: ["queued", "running", "done", "failed", "dead", "cancelled"] })
       .notNull()
       .default("queued"),
     attempts: integer("attempts").default(0).notNull(),
@@ -758,7 +762,47 @@ export const jobs = pgTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").defaultNow().notNull(),
   },
-  (t) => [index("jobs_status_next_run_idx").on(t.status, t.nextRunAt)],
+  (t) => [
+    index("jobs_status_next_run_idx").on(t.status, t.nextRunAt),
+    index("jobs_tenant_idx").on(t.tenantId),
+  ],
+);
+
+/**
+ * Inbound flag from the Jev pipeline (VC-06), keyed by the caller's `signal_id` per product.
+ * A hint, not a finding: no session evidence, never creates issues/repairs. Distinct from
+ * `jev_evaluations` (internal screening); `evidence_ref` may point at a window/evaluation there.
+ */
+export const signals = pgTable(
+  "signals",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    signalId: text("signal_id").notNull(),
+    source: text("source").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    severity: text("severity", { enum: ["low", "medium", "high"] }).notNull(),
+    semanticTarget: text("semantic_target").notNull(),
+    observedSessions: jsonb("observed_sessions")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    windowStart: ts("window_start").notNull(),
+    windowEnd: ts("window_end").notNull(),
+    evidenceRef: text("evidence_ref"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("signals_product_signal_uq").on(t.productId, t.signalId),
+    index("signals_tenant_idx").on(t.tenantId),
+  ],
 );
 
 /** Domain events emitted with the shared envelope (specs/README.md). */

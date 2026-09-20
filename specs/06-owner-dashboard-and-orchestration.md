@@ -11,7 +11,29 @@ Give owners a coherent view of research and implementation progress, configurabl
 
 ### Product overview
 
-Show product URL, connection health, participant sources, studies in progress, findings needing attention, previews, and latest human outcomes. Empty states give one clear next action: connect product, run discovery or invite testers. Avoid fabricated ROI, participation counts or generic honesty/UX scores.
+Show product URL, repository binding and connection health, experiments (studies) by stage, findings needing attention, open issues and draft PRs, the latest experiment summary and a Signals panel. Empty states give one clear next action: connect product, run discovery or publish an experiment. Avoid fabricated ROI, participation counts or generic honesty/UX scores; numbers come from persisted rows with denominators.
+
+### Signals
+
+Continuous activity tracking and its analysis by Jev are built by the spec-2 team. The dashboard receives their flags through `POST /api/products/:id/signals` (contract `Signal` in `packages/contracts/src/signal.ts`), stores them as `signals` rows and lists them per product with source, severity, semantic target and time. A signal is a hint, not a finding: it has no session evidence and is never published as an issue or fed to repair. "Propose an experiment from this signal" (feeding VC-01 discovery with the signal as a labeled input) is an open decision.
+
+```json
+{
+  "schema_version": "1.0",
+  "signal_id": "signal_example",
+  "source": "jev",
+  "title": "Toolbar: repeated hover without selection",
+  "description": "Users hover the shape tools for more than 5s before selecting anything.",
+  "severity": "medium",
+  "semantic_target": "toolbar.shapes",
+  "observed_sessions": ["observation_session_1", "observation_session_2"],
+  "window_start": "2026-09-19T00:00:00Z",
+  "window_end": "2026-09-19T12:00:00Z",
+  "evidence_ref": null
+}
+```
+
+`severity` ∈ `low`, `medium`, `high`; `observed_sessions` is optional and displayed with the window as its denominator; `evidence_ref` is an opaque reference resolved through the sender (it may point at an observation window or `jev_evaluations` row), never a URL rendered in the UI. Replays with the same `signal_id` and the same or an earlier `window_end` are ignored; a later `window_end` updates the row. A `Signal` is an externally submitted hint keyed by the caller's `signal_id`; it is not a duplicate of `jev_evaluations`, which records internal screening.
 
 ### Proposed tests
 
@@ -19,7 +41,7 @@ Cards include participant-facing task, rationale/evidence, audience, duration an
 
 ### Study detail
 
-Use a clear timeline: Recruiting → Testing → Analyzing → Issues → Building → Retesting → Results. A mode that stops at issues should end successfully there, not appear unfinished. Show target/claimed/completed counts, actual statuses, deadlines and reasons for waiting.
+Use a clear timeline derived from persisted state: Proposed → Published → Collecting → Summarized → Issues → Draft PR (→ Preview). Stages after Summarized depend on the automation mode: `issues_only` ends successfully at Issues, `draft_pr` at Draft PR, `prototype_and_retest` at Preview (retesting is deferred, VC-05). A mode that stops early ends with a completed label, not an unfinished one. Each stage shows its count (completed sessions, findings, issues) and the reason it is waiting (no sessions yet, analysis running, agent running, checks failed, blocked by permissions, paused).
 
 ### Evidence review
 
@@ -31,7 +53,7 @@ Each finding separates observation, explanation hypothesis and proposed experime
 
 ### Settings
 
-Repository/environment connection; owner-selected versus automatic studies; issues-only/draft-PR/retest mode; recruitment source and budget; capture channels; retention; invitation caps; email settings; maximum agent attempts/runtime/spend; allowed modification scope; global pause; delete/export data.
+Repository/environment connection; owner-selected versus automatic studies; issues-only/draft-PR/retest mode; recruitment source and budget; capture channels; retention; invitation caps; email settings; maximum agent attempts/runtime/spend; allowed modification scope; global pause; delete/export data. Implemented first: the tenant-level **global pause** (`tenants.paused` is the source of truth, `tenants.paused_at` records when it took effect, set through `POST /api/settings/pause` or the Operations page). The worker checks it before leasing any job (`jobs.tenant_id`): a paused tenant's jobs stay `queued` with attempts and `next_run_at` untouched, and the dashboard shows the paused banner. Every pause/resume writes an `audit_events` row recording the reason and the number of queued jobs affected.
 
 Roasty may explain a state in one sentence, but remains optional and never substitutes for accessible status text. No mascot chatter during a participant's task unless it is a logged neutral research prompt.
 
@@ -50,7 +72,7 @@ Next.js application/API, Postgres/Supabase for tenancy and workflow records, pri
 
 MVP durable worker is a separate process (`npm run worker`) backed by the `Job` table: claims use `SELECT … FOR UPDATE SKIP LOCKED`, a five-minute lease renewed by heartbeat, `attempts`/`maxAttempts` with exponential backoff on `nextRunAt`, and graceful shutdown on SIGINT/SIGTERM. Re-leasing a job whose lease expired counts as a failed attempt (the previous worker died mid-job), so a job that keeps crashing its worker is dead-lettered instead of looping. Jobs are enqueued on the caller's transaction (`enqueueJob(input, tx)`), so a job never commits without the rows it needs, and webhook receipts (Vonage archive callbacks, observation batches) commit together with the processing they deduplicate. Job payloads are schema-validated; unknown job types fail terminally. Do not build a complex workflow engine before the pipeline works. Every provider session/deployment ID is stored for reconciliation (`DiscoveryRun.providerSessionId`, `providerSessionUrl`).
 
-Core tables (snake_case in `apps/web/src/db/schema`; VC-01 and VC-02 tables are implemented, the monitoring tables exist as schema and are being filled in): `tenants`, `memberships`, `api_keys`, `products`, `integration_refs`, `product_config_revisions`, `discovery_runs`, `proposals`, `publish_requests`, `detector_definitions`, `monitoring_policy_revisions`, `observation_sessions`, `observation_events`, `observation_windows`, `jev_evaluations`, `research_candidates`, `candidate_study_links`, `studies`, `study_revisions`, `participants`, `assignments`, `sessions`, `assets`, `events`, `transcript_segments`, `findings`, `issue_mappings`, `repair_runs`, `check_runs`, `previews`, `validation_summaries`, `notification_outbox`, `jobs`, `audit_events`, optional `credit_ledger`.
+Core tables (snake_case in `apps/web/src/db/schema`; VC-01 and VC-02 tables are implemented, the monitoring tables exist as schema and are being filled in): `tenants`, `memberships`, `api_keys`, `products`, `integration_refs`, `product_config_revisions`, `discovery_runs`, `proposals`, `publish_requests`, `detector_definitions`, `monitoring_policy_revisions`, `observation_sessions`, `observation_events`, `observation_windows`, `jev_evaluations`, `research_candidates`, `candidate_study_links`, `studies`, `study_revisions`, `participants`, `assignments`, `sessions`, `assets`, `events`, `transcript_segments`, `findings`, `issue_mappings`, `repair_runs`, `check_runs`, `previews`, `validation_summaries`, `notification_outbox`, `jobs`, `signals`, `audit_events`, optional `credit_ledger`.
 
 Store credentials in an appropriate secret store; database records hold references. Event/media payload size must be bounded. Background processing loads bounded evidence windows rather than entire sessions into every model call.
 
@@ -65,9 +87,10 @@ Use the shared envelope and schema validation. Initial events:
 - `summary.generated`
 - `issue.created`, `issue.updated`, `finding.ready_for_repair`
 - `repair.candidate_ready`, `repair.draft_pr_ready`, `checks.completed`, `preview.ready`
+- `signal.flagged` (inbound from the Jev/spec-2 pipeline), `tenant.paused`, `tenant.resumed`
 - `retest.requested`, `validation.updated`, `workflow.blocked`
 
-`study.published` is written to `OutboxEvent` in the publish transaction with idempotency key `<study_id>:revision_<n>:publish`; `discovery.completed` is not yet emitted (run completion is read from `DiscoveryRun.status`). Use transactions plus an outbox for jobs and notifications. Each transition checks current state/revision and permissions. Consumers deduplicate; scheduled reconciliation resolves lost webhooks. Progress subscriptions via SSE or polling read the persisted state, not simulated timers.
+`study.published` is written to `event_outbox` in the publish transaction with idempotency key `<study_id>:revision_<n>:publish`; `signal.flagged` uses `signal:<product_id>:<signal_id>:<window_end>` so replays emit once; tenant-level events (`tenant.paused`, `tenant.resumed`) carry the tenant id in `product_id` because the shared envelope requires one. `discovery.completed` is not yet emitted (run completion is read from `DiscoveryRun.status`). Use transactions plus an outbox for jobs and notifications. Each transition checks current state/revision and permissions. Consumers deduplicate; scheduled reconciliation resolves lost webhooks. Progress subscriptions via SSE or polling read the persisted state, not simulated timers.
 
 VC-04 adds a durable `repair.run` job. Fixture adapters are deterministic
 local implementations; the worker stores provider session IDs before polling,
@@ -84,6 +107,8 @@ An owner should not need to review each code edit in the authorized isolated wor
 ## Failure and operational visibility
 
 Display distinctions between waiting for a human, provider rate limit, invalid agent output, missing media, test failure, preview failure, budget exhaustion and insufficient evidence. Offer safe retry/cancel where possible. A retry resumes an existing operation or intentionally creates a new version; never conceal duplicates.
+
+The Operations page (`/operations`, API under `/api/operations`) lists jobs (type, status, attempts, next run, last error) and outbox events per tenant, plus the global pause control. Failed/dead/cancelled jobs can be retried (resets `status` to `queued`, `attempts` to 0 and `next_run_at` to now) and queued jobs cancelled (`cancelled` job status); both actions are audited with the previous status and are rejected cross-tenant (404) or in the wrong state (409). Job handlers are idempotent, so a retry resumes the existing operation (the same run/finding/summary row) rather than creating a duplicate.
 
 Track measured timing: time to first session, upload/transcription latency, analysis time, Devin time, time to checked preview, time awaiting retest, and actual usage/cost where available. Mark estimates as estimates. These are operational measures, not product-market-fit proof.
 
@@ -117,7 +142,8 @@ Additional acceptance criteria:
 - Owner can move from product setup to evidence to issue/preview without losing context.
 - Each automation mode has a correct terminal state and clear UI label.
 - The dashboard reflects actual persisted progress and recovers after reload/restart.
-- Restarting workers or replaying callbacks does not duplicate issues, credits, assignments or PRs.
+- Restarting workers or replaying callbacks does not duplicate issues, credits, assignments, summaries or PRs.
+- Signals are displayed as hints with source and window; they never create issues or repairs by themselves.
 - Cross-tenant reads/writes and participant access to owner artifacts are denied.
 - Global pause blocks new external work while preserving audit and resumable state.
 - All current-human-validation labels match the exact current PR SHA.
@@ -131,6 +157,9 @@ Additional acceptance criteria:
 - [ ] Marketplace ranking, paid credits and participant quality appeals after MVP.
 - [ ] Team invitation and SSO requirements from actual customers.
 - [ ] Additional observability, retention export and provider-deletion guarantees.
+- [ ] Summarized stage and Draft PR/Preview panels read from local `SummarySource`/`RepairSource` stubs until the VC-04 (PR #5) and VC-05 (PR #6) ports land; tenant-level events carry the tenant id in `product_id`.
+- [ ] Authentication of inbound `signal.flagged` posts from the SDK/Jev pipeline (currently the tenant API key or session).
+- [ ] "Propose an experiment from a signal": feeding VC-01 discovery with signals as labeled inputs.
 
 ### Live analysis view (implemented 2026-09-20)
 

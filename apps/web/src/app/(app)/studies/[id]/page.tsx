@@ -7,7 +7,9 @@ import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { db, schema } from "@/db/client";
 import { ownerContext } from "@/domain/owner-products";
 import { latestSummary } from "@/domain/summaries";
+import { studyTimeline } from "@/domain/timeline";
 import { RepairSection } from "./_components/RepairSection";
+import { TimelineSection } from "./timeline-section";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,7 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
   const activeAnalysis = analyses.some(
     (run) => run.status === "queued" || run.status === "analysing",
   );
+  const timeline = await studyTimeline(ctx.tenantIds, study.id);
 
   return (
     <Shell
@@ -74,6 +77,7 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
         <>
           <NavLink href="/products">Products</NavLink>
           <NavLink href="/owner">Sessions</NavLink>
+          <NavLink href="/operations">Operations</NavLink>
           <span className="px-3 text-foreground">{ctx.email}</span>
         </>
       }
@@ -95,6 +99,12 @@ export default async function StudyPage({ params }: PageProps<"/studies/[id]">) 
         Revision {study.currentRevision} · {assignments} assignment{assignments === 1 ? "" : "s"} ·{" "}
         <InviteLinkButton studyId={study.id} />
       </p>
+      {timeline?.stages.some((s) => s.waitingReason === "paused") ? (
+        <p className="mt-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+          Tenant paused; new external work is waiting.
+        </p>
+      ) : null}
+      <div className="mt-6">{timeline ? <TimelineSection stages={timeline.stages} /> : null}</div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className="surface p-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

@@ -297,6 +297,7 @@ async function announceQueued(
   await enqueueJob(
     {
       type: "jev.evaluate",
+      tenantId: e.tenantId,
       payload: { evaluationId: e.id },
       dedupeKey: `jev.evaluate:${e.id}`,
       maxAttempts: 3,

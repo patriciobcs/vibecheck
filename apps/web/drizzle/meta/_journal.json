@@ -71,6 +71,13 @@
       "when": 1789888485000,
       "tag": "0009_exotic_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789890253187,
+      "tag": "0010_white_the_leader",
+      "breakpoints": true
     }
   ]
 }

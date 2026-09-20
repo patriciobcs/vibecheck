@@ -35,6 +35,7 @@ export default async function OwnerPage() {
         <>
           <NavLink href="/products">Products</NavLink>
           <NavLink href="/marketplace">Marketplace</NavLink>
+          <NavLink href="/operations">Operations</NavLink>
           <span className="px-3 text-foreground">{session.user.email}</span>
         </>
       }

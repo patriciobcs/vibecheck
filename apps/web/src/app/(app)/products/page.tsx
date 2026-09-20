@@ -31,6 +31,7 @@ export default async function ProductsPage() {
       nav={
         <>
           <NavLink href="/owner">Sessions</NavLink>
+          <NavLink href="/operations">Operations</NavLink>
           <span className="px-3 text-foreground">{ctx.email}</span>
         </>
       }
