@@ -84,7 +84,7 @@ Provider adapters: `fixture` (deterministic narrative for tests and demos, label
       "certainty": "repeated_observation",
       "impact": "high",
       "issue_ref": { "provider": "github", "repo": "owner/repo", "number": 4, "url": "https://github.com/owner/repo/issues/4" },
-      "repair_status": null
+      "repair_status": "queued"
     }
   ],
   "narrative": {
@@ -100,7 +100,7 @@ Provider adapters: `fixture` (deterministic narrative for tests and demos, label
 }
 ```
 
-`repair_status` remains in the contract for forward compatibility but is null until the VC-04 repair-run port lands on main. `status`: `collecting` (no eligible session yet), `summarized`, `insufficient_data` (deadline passed with fewer eligible sessions than `recruitment.target_count` and at least one finding absent), `failed` (agent output invalid after one correction request; the deterministic part is still stored). `provenance` is the strictest provenance among the included sessions: any fixture or simulated session makes the whole summary `fixture`/`simulated_session` and the UI labels it as sample data.
+Themes carry the current repair-run status for their finding, or `null` when no repair run exists. Repair-run identifiers, statuses, and update timestamps are included in `inputs_hash`, so a repair state change produces a new summary revision. `status`: `collecting` (no eligible session yet), `summarized`, `insufficient_data` (deadline passed with fewer eligible sessions than `recruitment.target_count` and at least one finding absent), `failed` (agent output invalid after one correction request; the deterministic part is still stored). `provenance` is the strictest provenance among the included sessions: any fixture or simulated session makes the whole summary `fixture`/`simulated_session` and the UI labels it as sample data.
 
 ## Interpretation rules
 

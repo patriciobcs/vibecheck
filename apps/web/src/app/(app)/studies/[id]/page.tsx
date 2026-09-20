@@ -6,8 +6,8 @@ import { AutoRefresh } from "@/app/(app)/products/[id]/auto-refresh";
 import { NavLink, SampleBadge, Shell } from "@/components/layout/shell";
 import { db, schema } from "@/db/client";
 import { ownerContext } from "@/domain/owner-products";
-import { RepairSection } from "./_components/RepairSection";
 import { latestSummary } from "@/domain/summaries";
+import { RepairSection } from "./_components/RepairSection";
 
 export const dynamic = "force-dynamic";
 

@@ -76,7 +76,7 @@ export async function computeDeterministic(
   });
   if (!revision) throw new Error("study_plan_not_found");
   const plan = StudyPlanSchema.parse(revision.plan);
-  const [runs, participation, findings] = await Promise.all([
+  const [runs, participation, findings, repairRuns] = await Promise.all([
     db.query.analysisRuns.findMany({
       where: and(
         eq(schema.analysisRuns.studyId, studyId),
@@ -97,7 +97,15 @@ export async function computeDeterministic(
         eq(schema.findings.studyRevision, studyRevision),
       ),
     }),
+    db.query.repairRuns.findMany({
+      where: and(
+        eq(schema.repairRuns.studyId, studyId),
+        eq(schema.repairRuns.tenantId, tenantId),
+        eq(schema.repairRuns.studyRevision, studyRevision),
+      ),
+    }),
   ]);
+  const repairStatuses = new Map(repairRuns.map((row) => [row.findingId, row.status]));
   const funnel = Object.fromEntries(
     participationKinds.map((kind) => [
       kind,
@@ -157,8 +165,7 @@ export async function computeDeterministic(
               url: row.issueUrl,
             }
           : null,
-      // TODO(VC-04 port): read repair run status per finding once repair tables exist on main (PR #5).
-      repair_status: null,
+      repair_status: repairStatuses.get(row.id) ?? null,
     }));
   const provenance = strictestProvenance([
     ...findings.map((row) => row.provenance),
@@ -179,6 +186,11 @@ export async function computeDeterministic(
       "finding",
       row.id,
       `${row.updatedAt.toISOString()}:${row.observedSessionCount}:${row.certainty}`,
+    ]),
+    ...repairRuns.map((row): [string, string, string] => [
+      "repair",
+      row.id,
+      `${row.status}:${row.updatedAt.toISOString()}`,
     ]),
   ];
   const inputsHash = inputHash(rows);

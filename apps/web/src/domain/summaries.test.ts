@@ -191,6 +191,54 @@ describe("VC-05 experiment summaries", () => {
     });
   });
 
+  it("includes repair status in themes and input changes", async () => {
+    const { tenantId, studyId } = await seedStudy();
+    await db.insert(schema.findings).values({
+      id: "finding-repair-status",
+      tenantId,
+      studyId,
+      studyRevision: 1,
+      baselineCommitSha: "a".repeat(40),
+      title: "Toolbar: sticky note tool is hard to discover",
+      fingerprint: "fingerprint-repair-status",
+      category: "discoverability",
+      semanticTarget: "toolbar",
+      observation: "The tool was hard to find.",
+      hypothesis: "The control may be hidden.",
+      impact: "task_slowed",
+      certainty: "preliminary",
+      limitations: [],
+      suggestedExperiment: null,
+      evidence: [],
+      observedSessionCount: 1,
+      eligibleSessionCount: 1,
+      provenance: "fixture",
+    });
+    await db.insert(schema.repairRuns).values({
+      id: "repair-status-run",
+      tenantId,
+      findingId: "finding-repair-status",
+      studyId,
+      studyRevision: 1,
+      issueRepo: "owner/repo",
+      issueNumber: 1,
+      mode: "draft_pr",
+      baseCommitSha: "a".repeat(40),
+      maxAttempts: 1,
+      validatorVersion: "fixture_validator_v1",
+      status: "queued",
+    });
+    const first = await computeDeterministic(tenantId, studyId, 1);
+    await db
+      .update(schema.repairRuns)
+      .set({ status: "implementing", updatedAt: new Date("2026-01-02T00:00:00.000Z") })
+      .where(eq(schema.repairRuns.id, "repair-status-run"));
+    const second = await computeDeterministic(tenantId, studyId, 1);
+    expect(first.summary.themes[0]?.repair_status).toBe("queued");
+    expect(second.summary.themes[0]?.repair_status).toBe("implementing");
+    expect(second.inputsHash).not.toBe(first.inputsHash);
+  });
+
   it("requests one correction and stores failed status for invalid narrative", async () => {
     const { tenantId, studyId } = await seedStudy();
     await db.insert(schema.analysisRuns).values({

@@ -64,6 +64,13 @@
       "when": 1789887427600,
       "tag": "0008_fantastic_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789888485000,
+      "tag": "0009_exotic_franklin_storm",
+      "breakpoints": true
     }
   ]
 }

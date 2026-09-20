@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { UtcTimestampSchema } from "./envelope";
 import { FindingCertaintySchema, FindingProvenanceSchema } from "./finding";
+import { repairStatusSchema } from "./repair-run";
 
 export const SummaryStatusSchema = z.enum([
   "collecting",
@@ -43,8 +44,7 @@ export const ExperimentThemeSchema = z.object({
   certainty: FindingCertaintySchema,
   impact: z.string().min(1),
   issue_ref: IssueRefSchema,
-  // TODO(VC-04 port): populated from repair runs once PR #5 lands; always null on main today.
-  repair_status: z.string().nullable(),
+  repair_status: repairStatusSchema.nullable(),
 });
 
 export const ExperimentSummarySchema = z.object({

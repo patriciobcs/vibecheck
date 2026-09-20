@@ -1,5 +1,10 @@
-import type { EvidencePackage, ExperimentSummary, Finding, SourceItem } from "@vibecheck/contracts";
-import type { CheckResult } from "@vibecheck/contracts";
+import type {
+  CheckResult,
+  EvidencePackage,
+  ExperimentSummary,
+  Finding,
+  SourceItem,
+} from "@vibecheck/contracts";
 import { sql } from "drizzle-orm";
 import {
   bigint,
