@@ -1,0 +1,29 @@
+{
+  "name": "@vibecheck/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup && node -e \"require('fs').cpSync('dist/vibecheck.global.js','../../apps/web/public/sdk/vibecheck.js');require('fs').cpSync('dist/vibecheck.global.js.map','../../apps/web/public/sdk/vibecheck.js.map')\"",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "@vibecheck/contracts": "workspace:*"
+  }
+}

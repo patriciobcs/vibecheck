@@ -1,0 +1,50 @@
+# Local Supabase for VibeCheck development. Only Postgres, Storage and Studio are used.
+# Better Auth handles application auth, so Supabase Auth, Realtime, Edge Runtime and
+# Inbucket are disabled to keep `supabase start` light.
+project_id = "vibecheck"
+
+[api]
+enabled = true
+port = 54331
+schemas = ["public", "storage"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54332
+shadow_port = 54330
+major_version = 17
+
+[db.migrations]
+enabled = false
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = true
+port = 54333
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = false
+
+[storage]
+enabled = true
+file_size_limit = "500MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[auth.email]
+enable_signup = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false

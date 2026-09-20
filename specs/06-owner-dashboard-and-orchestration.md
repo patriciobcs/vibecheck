@@ -46,11 +46,11 @@ Use backend authorization and row-level tenant boundaries; unguessable IDs alone
 
 ## Suggested architecture
 
-Next.js application/API, Postgres (Drizzle ORM, schema in `src/db/schema.ts`, migrations in `drizzle/`) for tenancy and workflow records, private object storage for media, and a durable worker for long-running jobs. Provider adapters: Devin, GitHub, media, STT, email, preview deployment. The browser must not hold an API request open for a Devin session or a human assignment.
+Next.js application/API, Postgres/Supabase for tenancy and workflow records, private object storage for media, and a durable worker for long-running jobs. Provider adapters: Devin, Jev, GitHub, media, STT, email, preview deployment. The browser must not hold an API request open for a Devin session or a human assignment.
 
-MVP durable worker is a separate process (`npm run worker`) backed by the `Job` table: claims use `SELECT … FOR UPDATE SKIP LOCKED`, a five-minute lease renewed by heartbeat, `attempts`/`maxAttempts` with exponential backoff on `nextRunAt`, and graceful shutdown on SIGINT/SIGTERM. Job payloads are schema-validated; unknown job types fail terminally. Do not build a complex workflow engine before the pipeline works. Every provider session/deployment ID is stored for reconciliation (`DiscoveryRun.providerSessionId`, `providerSessionUrl`).
+MVP durable worker is a separate process (`npm run worker`) backed by the `Job` table: claims use `SELECT … FOR UPDATE SKIP LOCKED`, a five-minute lease renewed by heartbeat, `attempts`/`maxAttempts` with exponential backoff on `nextRunAt`, and graceful shutdown on SIGINT/SIGTERM. Re-leasing a job whose lease expired counts as a failed attempt (the previous worker died mid-job), so a job that keeps crashing its worker is dead-lettered instead of looping. Jobs are enqueued on the caller's transaction (`enqueueJob(input, tx)`), so a job never commits without the rows it needs, and webhook receipts (Vonage archive callbacks, observation batches) commit together with the processing they deduplicate. Job payloads are schema-validated; unknown job types fail terminally. Do not build a complex workflow engine before the pipeline works. Every provider session/deployment ID is stored for reconciliation (`DiscoveryRun.providerSessionId`, `providerSessionUrl`).
 
-Core tables (first slice implemented: `Tenant`, `ApiKey`, `Product`, `DiscoveryRun`, `Proposal`, `Study`, `StudyPlanRevision`, `OutboxEvent`, `PublishRequest`, `Job`; tenant authentication is currently a hashed API key per tenant, memberships/roles come later): `tenants`, `memberships`, `products`, `integration_refs`, `product_config_revisions`, `discovery_runs`, `studies`, `study_revisions`, `participants`, `assignments`, `sessions`, `assets`, `events`, `transcript_segments`, `findings`, `issue_mappings`, `repair_runs`, `check_runs`, `previews`, `validation_summaries`, `notification_outbox`, `jobs`, `audit_events`, optional `credit_ledger`.
+Core tables (snake_case in `apps/web/src/db/schema`; VC-01 and VC-02 tables are implemented, the monitoring tables exist as schema and are being filled in): `tenants`, `memberships`, `api_keys`, `products`, `integration_refs`, `product_config_revisions`, `discovery_runs`, `proposals`, `publish_requests`, `detector_definitions`, `monitoring_policy_revisions`, `observation_sessions`, `observation_events`, `observation_windows`, `jev_evaluations`, `research_candidates`, `candidate_study_links`, `studies`, `study_revisions`, `participants`, `assignments`, `sessions`, `assets`, `events`, `transcript_segments`, `findings`, `issue_mappings`, `repair_runs`, `check_runs`, `previews`, `validation_summaries`, `notification_outbox`, `jobs`, `audit_events`, optional `credit_ledger`.
 
 Store credentials in an appropriate secret store; database records hold references. Event/media payload size must be bounded. Background processing loads bounded evidence windows rather than entire sessions into every model call.
 
@@ -58,6 +58,7 @@ Store credentials in an appropriate secret store; database records hold referenc
 
 Use the shared envelope and schema validation. Initial events:
 
+- `detector.published`, `observation.batch_received`, `evaluation.requested`, `evaluation.completed`, `research_candidate.updated`
 - `discovery.completed`, `study.published`, `assignment.claimed`
 - `session.upload_verified`, `session.analysis_ready`, `analysis.completed`
 - `issue.created`, `issue.updated`, `finding.ready_for_repair`
@@ -80,6 +81,29 @@ Track measured timing: time to first session, upload/transcription latency, anal
 
 Deletion jobs remove scoped media/transcripts and dependent content, invalidate links, and request provider deletion where supported. Preserve minimal non-content audit history. Do not falsely claim external data was deleted before confirmation.
 
+## Continuous monitoring controls and views
+
+Implemented as `/products/:id/monitoring` (2026-09-19): collection health, detectors with status and required events, evaluations with trigger/sample reason, requested and returned model, tokens and cost (labeled unpriced without a configured price), candidates with distinct-session denominators, evidence limitations and actions, and the policy form (each save is a new revision). Original intent: add a Monitoring view with collection health, active/stale detectors, known event coverage, last evaluated build, suspected friction and research candidates. Label these as signals, separate from findings supported by human studies. Show source events, window bounds, gaps, trigger versus random-sample reason, actual model version and detector version. Avoid an overall honesty or UX score.
+
+Candidate actions: inspect, dismiss with reason, request task proposal or open linked study. Default task publication remains owner-selected; show when saved auto-launch rules performed it. Display counts of distinct observation sessions, evaluated journeys and sampled journeys with explicit denominators. Trigger-selected data is not an unbiased estimate of all-user friction. Show unknown/unavailable outcomes separately from clean journeys.
+
+Settings expose the shared monitoring policy: disabled-by-default collection, allowed journeys/events, permissions integration, raw/derived retention, batching/window/cooldown, detector thresholds, normal sampling, session/product call caps and spend limits. Explain these as tuning parameters rather than guarantees. Invitation cooldown and consent are independent of detector cooldown. Users never see a live meter or automatic loss of credits.
+
+Use separate observation ingestion and screening jobs from media processing. The worker stores immutable windows and configuration snapshots, reserves budget transactionally before dispatch, reconciles usage and persists provider failures. Use bounded queues/backpressure, expiring leases and per-journey coalescing. A restarted worker must not issue another provider request for an unresolved in-flight request without explicit reconciliation/accounting. No exactly-once billing promise where the provider has no verified idempotency support.
+
+Global pause, revoked credentials, disabled monitoring and tighter caps gate queued evaluations and candidate-driven launches immediately. Retention/deletion cascades from source observations to windows and derived content; retained non-content audit rows indicate evidence removed. Existing recordings retain their own policy. Never retain raw logs indefinitely to preserve a chart.
+
+Metrics: actual calls/tokens/estimated or actual cost, queue time, provider latency, trigger mix, skipped/deferred counts, coverage, candidate-to-study conversion and labeled false-positive outcomes. Keep observed detector accuracy separate from model confidence. Operational dashboards are not proof of PMF.
+
+Additional acceptance criteria:
+
+- Cross-tenant observation reads, candidate actions and detector edits are rejected.
+- Owner can trace a signal through its detector/window to a neutral task and later human evidence.
+- Restart/concurrency tests demonstrate bounded provider calls and unique candidate/study mappings.
+- Collection off, global pause, deletion and budget exhaustion appear as actual persisted states.
+- Passive monitoring does not change participation credits or imply recording permission.
+
+
 ## Acceptance criteria
 
 - Owner can move from product setup to evidence to issue/preview without losing context.
@@ -100,3 +124,6 @@ Deletion jobs remove scoped media/transcripts and dependent content, invalidate 
 - [ ] Team invitation and SSO requirements from actual customers.
 - [ ] Additional observability, retention export and provider-deletion guarantees.
 
+### Live analysis view (implemented 2026-09-20)
+
+`/products/:id/monitoring/live` is the second-screen view for a running session: the owner's browser polls `GET /api/owner/products/:id/live` every second and renders persisted state only (stored events, windows, evaluations, candidates, assets, transcript segments); nothing is simulated or extrapolated. Until the first session exists it shows a waiting state with the product URL and the policy/provider status. Sessions (passive observation sessions and opted-in study sessions of the product) appear as tabs, or a dropdown past six, newest first; "Follow newest" auto-selects the most recently active one. A passive session shows a metrics strip derived deterministically from the stored events (`journey-metrics.ts`: journey time, attempts, detours = cancelled attempts, failures, help requests, outcome, time to goal), an instrumentation log stream, a journey timeline with the evaluated windows shaded, "What Jev reads into it" (every answer next to the question it answers, probability bars against the gate thresholds, model, latency, tokens, the redacted state that was sent, and earlier evaluations as a trend), and research candidates with the same actions as the Monitoring view. A study session shows the same strip over its semantic events plus recording and transcript status, a session log that interleaves actions and speech on one clock, the task, the timeline and the transcript. Facts come from events; meaning comes from Jev and is labeled as an estimate.

@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ALTER COLUMN "client_clock_origin_ms" SET DATA TYPE bigint;

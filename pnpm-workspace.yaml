@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  esbuild: true
+  "@biomejs/biome": true
+  "@tailwindcss/oxide": true
+  sharp: true
+  unrs-resolver: true
+  msw: false

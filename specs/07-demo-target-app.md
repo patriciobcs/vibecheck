@@ -110,12 +110,17 @@ Record the full run first, then edit waiting time. Never fabricate provider scre
 | --- | --- |
 | Selected upstream | `excalidraw/excalidraw`, MIT |
 | Spike commit reviewed | `97c68dd371e13c017a8dcca49f8b3995ba7890a8` (2026-09-19) |
+| Local clone | `../excalidraw`, branch `vibecheck-demo` adds the SDK script tag to `excalidraw-app/index.html` and demo semantic instrumentation (see VC-02 passive mode). Used to prove the in-app dialog, safe event capture and passive screening; not yet the code-repair loop. |
 | Team-owned fork | Not created yet; required before VC-04 writes anything |
 | Baseline commit | TBD; pin when the fork is created |
-| Setup verified | `yarn install` 4m24s, `yarn start` on port 3001, HTTP 200 |
-| Reset command | Not implemented; local storage reset plus scene re-seed is the intended mechanism |
+| Setup verified | `yarn install` 4m24s; `yarn --cwd ./excalidraw-app vite --port 3200` with `.env.development.local` holding `VITE_APP_PORT` and `VITE_APP_VIBECHECK_KEY`, HTTP 200 |
+| Reset command | Not implemented; a blank canvas needs no reset, local storage reset plus scene re-seed is the intended mechanism for seeded tasks |
 | Preview runtime | TBD; a static Vite build is sufficient because there is no backend |
 | Organizer confirmation for third-party target | Pending |
 | Measured baseline friction | No human sessions yet |
 
 Update this record with measured facts during implementation; do not infer completion from the presence of this spec.
+
+## Demo journey (2026-09-21)
+
+The recorded demo shows a real Excalidraw friction: a user who wants an image of their drawing tries the top-right "Share" button (which opens live collaboration), closes it, tries again, asks for help, and only then finds "Export image…" in the main menu. The fork (`excalidraw-app/vibecheck.ts`) reports this as `navigation` (`/dialog/share`, `/canvas`, `/menu/main`), `action_attempt`/`action_result` (`share_button` cancelled, `export_image` success), `help_request`, `progress` and `completion`; a completed journey only restarts when a new element is drawn. The fixture detector (version 2) asks Jev, in addition to the base questions, whether the export dialog was reached, whether a wrong path was taken, whether the goal was reached, whether the user recovered after help, and which confusion source fits (share mistaken for export, export hidden in menu, export dialog unclear, none). Verified live: `jev-1.13.0` answered friction 0.95, research 0.81, evidence sufficient, wrong path 0.97, recovered after help 0.97, source `share_mistaken_for_export`, and a research candidate was created. `pnpm demo:record` replays the journey twice: passively (screening) and as an audio-only study (transcript).

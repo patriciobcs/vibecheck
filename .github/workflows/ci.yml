@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["54332:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint and typecheck (Biome, next typegen, tsc)
+        run: pnpm check
+      - name: Unit and integration tests
+        # apps/web reads .env.test (dummy, non-secret values); the suite creates vibecheck_test itself.
+        run: pnpm test
+      - name: Production build without provider secrets
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54332/vibecheck_test
+          SUPABASE_URL: http://127.0.0.1:54331
+          SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+          BETTER_AUTH_SECRET: ci-only-better-auth-secret-at-least-32-chars
+        run: pnpm exec next build

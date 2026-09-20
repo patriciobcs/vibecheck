@@ -2,7 +2,7 @@
 
 Status: In progress — first slice implemented (see [Implementation status](#implementation-status))
 Depends on: [shared contracts](README.md), [VC-06](06-owner-dashboard-and-orchestration.md)
-Output consumer: [VC-02](02-test-delivery-and-recording.md)
+Output consumers: VC-03 screening and [VC-02](02-test-delivery-and-recording.md)
 
 ## Goal
 
@@ -28,7 +28,7 @@ Task prompts describe realistic goals without naming the control to click or sus
 
 Provide `cannot_assess` and `needs_setup` outcomes. Validate agent JSON; make a bounded correction request on malformed output and preserve the raw response for restricted debugging. Never interpret malformed output as permission to publish.
 
-Output is malformed when it violates the schema, echoes the wrong `discovery_run_id` or `source_revision`, exceeds `MAX_PROPOSALS` (3), or references a `success_rule_ref` / `eligibility_rule_ref` outside the registered rule set (`src/contracts/rules.ts`). The prompt lists the allowed rule identifiers so the agent cannot substitute prose. Exactly one correction request is made; a second malformed response fails the run without proposals.
+Output is malformed when it violates the schema, echoes the wrong `discovery_run_id` or `source_revision`, exceeds `MAX_PROPOSALS` (3), or references a `success_rule_ref` / `eligibility_rule_ref` outside the registered rule set (`packages/contracts/src/rules.ts`). The prompt lists the allowed rule identifiers so the agent cannot substitute prose. Exactly one correction request is made; a second malformed response fails the run without proposals.
 
 A remote agent cannot reach an owner's laptop: a `localhost` target produces `needs_setup` from the `devin` provider. Local demos therefore use the `fixture` provider; Devin discovery requires a publicly reachable URL or a deployed preview.
 
@@ -108,6 +108,24 @@ Study: `draft → published → recruiting`; later lifecycle belongs to VC-06.
 
 Discovery jobs are retried with backoff; a non-final failure returns the run to `queued`, and only a terminal failure marks it `failed` with the error. Repo access failure must not prevent URL-only research. An inaccessible app produces a setup request, not fabricated task recommendations. Editing a published plan creates a new immutable revision; existing sessions stay attached to the original. Deduplicate repeated publish requests.
 
+## Continuous detector authoring and candidate intake
+
+Implemented 2026-09-19: `POST /api/owner/products/:id/detectors` publishes a hand-authored detector (`mode: manual`) or queues generation (`mode: generate`, provider `fixture` or `devin`, job `detector.generate`); `DetectorDefinitionSchema` and `validateDetectorQuestions` in `packages/contracts` enforce the base questions, `other_or_uncertain`, stand-alone instructions and size limits; generated output must also pass `GeneratedDetectorSchema` and lists `missing_instrumentation`, which yields `needs_instrumentation` instead of activation. A new observed build marks older detectors `stale`. Candidate intake: discovery runs accept `source_candidate_refs`; the Devin prompt includes the candidates and the fixture provider echoes the refs on its first proposal. Original intent: discovery also emits immutable `DetectorDefinition` records from the shared contract. Devin reads authorized code, routes, semantic actions, success rules and known instrumentation. It maps each journey to observable progress, success, failures and help requests. Distinguish existing telemetry from instrumentation that still needs implementation; inactive detectors with missing signals return `needs_instrumentation`. Read-only discovery cannot silently edit the target app to add events. Verified 2026-09-19 with a real Devin session (`provider: devin`, journey hint "share a drawing via a live collaboration link", build `vibecheck-demo`): Devin returned a six-question detector in about 40 seconds that passed `GeneratedDetectorSchema` and was stored as `needs_instrumentation`, because the clone emits only `journey_start`, `progress` and `help_request` and the share flow needs `action_attempt`, `action_result`, `completion` and `exit` events. Nothing was activated; the missing events are listed on the detector's status reason.
+
+Generate Jev `questions` JSON using supported `noul`, `choice` and `score` types. Every instruction must stand alone: question keys are not a substitute for instructions, and questions cannot depend on another answer. Include evidence sufficiency, observable friction, research warranted and an `other_or_uncertain` category. Known goal and outcomes must come from declared tasks or instrumented rules; inferred intentions are labeled. Silence, slow reading and inactive tabs cannot establish frustration or dishonesty.
+
+Validate schema, required event coverage, question size and criteria before publishing a detector. Store code/build identity, source references, instrumentation version and generation provenance. Exercise labeled success, friction, normal hesitation and missing-data fixtures before activation. Enable only within the owner's monitoring policy. New builds require compatibility verification; otherwise pause the old detector as stale rather than silently applying it to changed controls.
+
+VC-03 research candidates become optional discovery inputs. Devin converts their suspected problems into neutral task proposals, with `source_candidate_refs`, supporting evidence and uncertainty. Do not expose the suspected failure or Jev score to participants. Owner selection remains the default; `auto_launch` uses existing audience, invitation, concurrent-study and spending limits. Repeated detector output updates a candidate instead of launching duplicate studies. A candidate can be dismissed or produce no useful task.
+
+Additional acceptance criteria:
+
+- Unsupported/malformed question schemas and missing telemetry prevent detector activation.
+- A deployment with incompatible instrumentation marks its detectors stale.
+- Candidate-derived studies preserve source references and neutral wording.
+- Duplicate candidate deliveries cannot create duplicate studies or bypass launch policy.
+
+
 ## Acceptance criteria
 
 - An owner can connect a product, inspect proposed tasks and publish only selected tasks.
@@ -120,7 +138,7 @@ Discovery jobs are retried with backoff; a non-final failure returns the run to 
 
 ## Implementation status
 
-Implemented in the first slice: API-key tenant authentication (`Authorization: Bearer`, hashed at rest), `POST/GET /products`, `POST /products/:id/discovery-runs`, `GET /discovery-runs/:id`, `POST/GET /studies`, both discovery providers, malformed-output correction, durable worker processing, idempotent publication with `StudyPlanRevision` and outbox event, and a thin owner UI (product list, onboarding form, run status with proposal cards, publish form, study view).
+Implemented (ported into the `apps/web` monorepo on 2026-09-19): API-key tenant authentication (`Authorization: Bearer`, hashed at rest) or the signed-in owner session, `POST/GET /api/products`, `POST /api/products/:id/discovery-runs`, `GET /api/discovery-runs/:id`, `POST/GET /api/studies`, both discovery providers (`fixture`, `devin`), malformed-output correction (exactly one), durable processing on the shared `jobs` table, idempotent publication writing `study_revisions` (provenance `vc01`) and the `study.published` outbox event, and the owner UI (`/products`, `/products/new`, `/products/:id` with runs and proposal cards, `/products/:id/publish`, `/studies/:id`). A published study is immediately claimable through VC-02's channels because both sides validate the same `StudyPlan` schema in `packages/contracts`. Verified by unit/integration tests and a browser e2e (`e2e/discovery.spec.ts`) that connects a product, runs fixture discovery, publishes a proposal and reads it back.
 
 Not yet implemented, so the corresponding acceptance criteria are open: GitHub installation and `repo_binding` validation (accepted as opaque JSON), `launch_policy` / `auto_launch` and automatic limits, editing proposal cards before publication (only `participant_prompt` and `time_limit_seconds` are overridable), study revisions after the first, and the `recruiting` transition, which belongs to VC-02.
 
@@ -130,5 +148,5 @@ Not yet implemented, so the corresponding acceptance criteria are open: GitHub i
 - [ ] GitHub App scope and setup wizard UX after provider verification.
 - [ ] Release-trigger integration versus manual release description for the first build.
 - [ ] Multi-task studies and audience quotas after the one-task pipeline works.
-- [ ] Scheduling continuous discovery based on actual customer usage.
+- [ ] Calibrate generated detectors and discovery cadence against labeled journeys before broader rollout.
 

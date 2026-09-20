@@ -24,29 +24,82 @@ A connected web app, recorded task-based testing, evidence-backed findings, and 
 
 Changes run in isolated test environments. Human retesting evaluates usability; automated checks verify functionality.
 
+## Development
+
+```bash
+pnpm install
+pnpm db:start            # local Supabase (Postgres 54332, API 54331, Studio 54333)
+cp .env.example apps/web/.env.local   # fill Vonage + SLNG values; local Supabase keys from `supabase status`
+pnpm db:migrate && pnpm db:seed       # applies migrations, seeds a labeled sample study
+pnpm dev                 # http://localhost:3000
+pnpm worker              # archive fetch, transcription, monitoring scans, Jev evaluations, Devin jobs (separate terminal; restart after pulling)
+pnpm check && pnpm test  # Biome + `next typegen` + tsc, unit/integration tests (isolated vibecheck_test database;
+#   .env.test carries dummy non-secret values so this works from a clean checkout; CI runs the same)
+pnpm test:e2e            # Playwright; starts its own dev server on :3100
+E2E_BASE_URL=http://localhost:3000 pnpm test:e2e   # or reuse a running `pnpm dev` (stop `pnpm worker` first:
+#   the browser tests drain jobs inline by type and stub the evaluation; a live worker would race them)
+LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2e/live-session.spec.ts
+#   ^ simulated full session against real Vonage + SLNG: fake mic plays e2e/fixtures/speech.wav,
+#     waits for the archive callback (needs `pnpm tunnel`) and asserts the transcript text
+LIVE_PROVIDERS=1 E2E_BASE_URL=http://localhost:3000 pnpm exec playwright test e2e/live-monitoring.spec.ts
+#   ^ real Jev screening of a help request on the instrumented Excalidraw clone (needs JEV_API_KEY, worker, :3200)
+#     Devin detector authoring: POST /api/owner/products/:id/detectors {"mode":"generate","provider":"devin",...}
+# Live demo: open /products/product_excalidraw_local/monitoring/live in a second window; it polls
+#   persisted state every second (waiting state → session tabs → signals, screening, Jev, candidates)
+pnpm db:reset-sample     # clears assignments on the sample studies so they recruit again
+```
+
+### Demo mode and the recorded demo
+
+Set `DEMO_MODE=true` in `apps/web/.env.local` (ignored in production). The app then hides developer
+copy (seed hints, SDK snippets, the test inbox), labels sample material "Demo data", and the
+landing and sign-in pages offer "Enter the demo", a one-click sign-in as the seed owner.
+
+`pnpm demo:record` (in `apps/web`) records the two-window demo as `demo-recordings/demo.mp4`:
+the visitor on the Excalidraw clone on the left, the owner's live analysis on the right. It drives
+the real pipeline (fake microphone → passive screening with Jev → audio-only study → transcript)
+and composes the halves with ffmpeg. Needs `pnpm dev` with demo mode, `pnpm tunnel`, the clone on
+:3200 and real provider keys.
+
+### Excalidraw demo target
+
+The participant dialog runs inside the product page through the SDK. A local Excalidraw clone
+(`../excalidraw`, branch `vibecheck-demo`) carries the script tag:
+
+```bash
+cd ../excalidraw && yarn install
+# .env.development.local: VITE_APP_PORT=3200 and VITE_APP_VIBECHECK_KEY=<excalidraw key from pnpm db:seed>
+yarn --cwd ./excalidraw-app vite --port 3200
+```
+
+Open http://localhost:3200. After a few seconds the invitation toast appears; "See the task" opens the
+dialog over the canvas. Direct links and marketplace claims land on the product page with the
+assignment handed off in a URL fragment, which the SDK consumes.
+
+Sign in with the seed owner email (`SEED_OWNER_EMAIL`) and open the link from `/dev/inbox`.
+
+The Vonage archive callback must reach the dev server from the internet. `pnpm tunnel` (requires `cloudflared`) opens a quick tunnel, writes `PUBLIC_WEBHOOK_BASE_URL` into `.env.local`, and, when `VONAGE_API_KEY`/`VONAGE_API_SECRET` are set, updates the application's archive-status webhook address for you. Enable the signature secret once in the Vonage dashboard and paste it into `VONAGE_ARCHIVE_SIGNATURE_SECRET`; quick-tunnel hostnames change on every restart, but the secret does not.
+
 *VibeCheck is under development.*
+
+## Passive monitoring (VC-02/03 continuous discovery)
+
+Products can enable passive semantic telemetry (off by default) at `/products/:id/monitoring`. The SDK
+collects allowlisted journey events only when the host reports a granted collection permission
+(`data-collection-permission="granted"` on the script tag, or `VibeCheck.setCollectionPermission`), and
+emits them with `VibeCheck.track(type, payload)`. Deterministic triggers build bounded windows that Jev
+screens (`JEV_API_KEY`); results become research candidates the owner can dismiss or turn into neutral
+task proposals through discovery. Run `pnpm worker` for scans, sweeps and evaluations.
 
 ## Specifications
 
 See [specs/README.md](specs/README.md) for the workflow specifications, shared contracts, and change policy.
 
-## Running locally
+## Discovery (VC-01)
 
-```bash
-docker compose up -d
-cp .env.example .env
-npm install
-npm run db:migrate
-npm run db:seed
-npm run dev
-npm run worker
-```
-
-Set `ALLOW_LOCAL_TARGETS=true` for localhost demo targets. Set a non-empty
-`DEV_API_KEY` in `.env` before running the seed; the seed refuses to run when
-it is missing, and the same key authenticates the UI. Run the worker in a
-second terminal. Database-backed tests require `DATABASE_URL`.
-Set `DISCOVERY_PROVIDER=devin` and `DEVIN_API_KEY` to use the Devin provider.
-
-The fixture discovery provider returns clearly labelled sample output from the
-VC-07 demo target. It is not agent inference or human research evidence.
+Discovery runs through a provider adapter: `fixture` returns labeled sample proposals for local
+development and tests; `devin` starts a Devin analysis session (`DEVIN_API_KEY`, `DISCOVERY_PROVIDER=devin`).
+A remote agent cannot reach `localhost`, so Devin discovery needs a publicly reachable target URL.
+Set `ALLOW_LOCAL_TARGETS=true` to accept loopback product URLs in development. Programmatic access to
+the product/discovery/study endpoints uses `Authorization: Bearer <api key>` (hashed at rest, seeded
+from `DEV_API_KEY`); the owner UI uses the signed-in session.
